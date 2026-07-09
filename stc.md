@@ -1,0 +1,38 @@
+```
+└── 📁fiscalix-web
+    └── 📁app
+        └── 📁api
+            └── 📁auth
+            └── 📁companies
+            └── 📁reports
+            └── 📁taxes
+            └── 📁transactions
+            └── 📁users
+        └── 📁companies
+        └── 📁dashboard
+        └── 📁login
+        └── 📁profile
+        └── 📁reports
+        └── 📁settings
+        └── 📁taxes
+        └── 📁transactions
+        ├── favicon.ico
+        ├── globals.css
+        ├── layout.tsx
+        ├── page.tsx
+    └── 📁components
+    └── 📁lib
+    └── 📁models
+    ├── .gitignore
+    ├── AGENTS.md
+    ├── CLAUDE.md
+    ├── eslint.config.mjs
+    ├── middleware.ts
+    ├── next-env.d.ts
+    ├── next.config.ts
+    ├── package-lock.json
+    ├── package.json
+    ├── postcss.config.mjs
+    ├── README.md
+    └── tsconfig.json
+```
