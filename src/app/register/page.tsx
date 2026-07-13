@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ViewTransition } from "react";
 import { Brand } from "@/components/Brand";
+import { Icon } from "@/components/Icon";
 import { RegisterForm } from "@/components/RegisterForm";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -35,9 +36,9 @@ export default async function RegisterPage({
           <h2>Empieza a tomar el control de tus finanzas.</h2>
           <p>Crea tu perfil en minutos y consulta movimientos, obligaciones y reportes desde un mismo lugar.</p>
           <ul className="benefit-list">
-            <li><b>✓</b><span><strong>Información centralizada</strong><small>Todo lo importante siempre disponible.</small></span></li>
-            <li><b>✓</b><span><strong>Acceso seguro</strong><small>Tu sesión está protegida por Firebase.</small></span></li>
-            <li><b>✓</b><span><strong>Control sencillo</strong><small>Diseñado para entenderse desde el primer día.</small></span></li>
+            <li><b><Icon name="check" /></b><span><strong>Información centralizada</strong><small>Todo lo importante siempre disponible.</small></span></li>
+            <li><b><Icon name="check" /></b><span><strong>Acceso seguro</strong><small>Tu sesión está protegida por Firebase.</small></span></li>
+            <li><b><Icon name="check" /></b><span><strong>Control sencillo</strong><small>Diseñado para entenderse desde el primer día.</small></span></li>
           </ul>
         </div>
       </section>
