@@ -1,7 +1,11 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { ProfileEditor } from "@/components/ProfileEditor";
 import { getCurrentUser } from "@/lib/auth";
+import { canViewAdminDashboard } from "@/lib/roles";
+import { supabase } from "@/lib/supabase";
 import { firstName, initials } from "@/lib/utils";
 
 const activity = [
@@ -9,13 +13,6 @@ const activity = [
   ["manage_accounts", "Perfil actualizado", "Información personal revisada", "Hoy, 08:30 AM"],
   ["home", "Ingreso registrado", "Acceso al panel principal", "Ayer, 04:15 PM"],
   ["verified_user", "Cuenta verificada", "Sesión protegida correctamente", "12 May, 07:50 PM"],
-] as const;
-
-const summary = [
-  ["Empresas", "0", "Listas para registrar", "business"],
-  ["Movimientos", "0", "Sin actividad reciente", "sync_alt"],
-  ["Obligaciones", "0", "Todo en orden", "check_circle"],
-  ["Reportes", "0", "Pendientes de generar", "bar_chart"],
 ] as const;
 
 function fallback(value?: string | null, fallbackText = "Pendiente de registrar") {
@@ -30,13 +27,50 @@ export default async function ProfilePage() {
   const phone = fallback(user.telefono);
   const state = fallback(user.estado, "Cuenta activa");
 
+  let companyIds: string[] = [];
+  if (canViewAdminDashboard(user)) {
+    const { data } = await supabase.from("empresas").select("id").neq("estado", "suspendida");
+    companyIds = (data ?? []).map((item) => item.id);
+  } else {
+    const { data } = await supabase.from("empresa_usuario").select("empresa_id").eq("usuario_id", user.id);
+    companyIds = [...new Set((data ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
+  }
+
+  const [incomeResult, expenseResult, obligationResult, fiscalResult] = companyIds.length
+    ? await Promise.all([
+        supabase.from("ingresos").select("fecha_ingreso").in("empresa_id", companyIds),
+        supabase.from("gastos").select("fecha_gasto").in("empresa_id", companyIds),
+        supabase.from("obligaciones_fiscales").select("id").in("empresa_id", companyIds).eq("activa", true),
+        supabase.from("empresa_fiscal").select("rfc,regimenes_fiscales(clave_sat,nombre)").eq("empresa_id", companyIds[0]).maybeSingle(),
+      ])
+    : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }, { data: null, error: null }];
+
+  const reportPeriods = new Set([
+    ...(incomeResult.data ?? []).map((item) => item.fecha_ingreso?.slice(0, 7)),
+    ...(expenseResult.data ?? []).map((item) => item.fecha_gasto?.slice(0, 7)),
+  ].filter(Boolean));
+  const movementCount = (incomeResult.data?.length ?? 0) + (expenseResult.data?.length ?? 0);
+  const obligationCount = obligationResult.data?.length ?? 0;
+  const fiscalRegime = Array.isArray(fiscalResult.data?.regimenes_fiscales)
+    ? fiscalResult.data.regimenes_fiscales[0]
+    : fiscalResult.data?.regimenes_fiscales;
+  const fiscalRegimeLabel = fiscalRegime
+    ? [fiscalRegime.clave_sat, fiscalRegime.nombre].filter(Boolean).join(" · ")
+    : "Pendiente de registrar";
+  const summary = [
+    ["Empresas", String(companyIds.length), companyIds.length === 1 ? "Empresa vinculada" : "Empresas vinculadas", "business", "/companies"],
+    ["Movimientos", String(movementCount), movementCount ? "Ingresos y gastos registrados" : "Sin actividad reciente", "sync_alt", "/dashboard"],
+    ["Obligaciones", String(obligationCount), obligationCount ? "Obligaciones activas" : "Todo en orden", "check_circle", "/companies"],
+    ["Reportes", String(reportPeriods.size), reportPeriods.size ? "Periodos disponibles" : "Sin actividad para analizar", "bar_chart", "/reports"],
+  ] as const;
+
   const personalInfo = [
     ["person", "Nombre completo", fullName],
     ["mail", "Correo electrónico", user.correo],
     ["call", "Teléfono", phone],
     ["verified_user", "Estado de cuenta", state],
-    ["receipt_long", "RFC", "Pendiente de registrar"],
-    ["balance", "Régimen fiscal", "Pendiente de registrar"],
+    ["receipt_long", "RFC", fiscalResult.data?.rfc || "Pendiente de registrar"],
+    ["balance", "Régimen fiscal", fiscalRegimeLabel],
     ["payments", "Moneda", "MXN"],
   ] as const;
 
@@ -80,7 +114,7 @@ export default async function ProfilePage() {
           <article className="profile-card personal-card">
             <div className="profile-card-heading">
               <h2><Icon name="person" />Información personal</h2>
-              <button type="button">Editar información</button>
+              <ProfileEditor apellido={user.apellido} correo={user.correo} nombre={user.nombre} telefono={user.telefono ?? ""} />
             </div>
             <div className="info-list">
               {personalInfo.map(([icon, label, value]) => (
@@ -116,7 +150,6 @@ export default async function ProfilePage() {
           <article className="profile-card activity-card">
             <div className="profile-card-heading">
               <h2><Icon name="timeline" />Actividad reciente</h2>
-              <a href="#">Ver todas</a>
             </div>
             <div className="activity-list">
               {activity.map(([icon, title, detail, time]) => (
@@ -138,13 +171,13 @@ export default async function ProfilePage() {
               <h2><Icon name="bar_chart" />Resumen de tu cuenta</h2>
             </div>
             <div className="profile-summary-grid">
-              {summary.map(([label, value, helper, icon]) => (
-                <div className="summary-tile" key={label}>
+              {summary.map(([label, value, helper, icon, href]) => (
+                <Link className="summary-tile" href={href} key={label}>
                   <small>{label}</small>
                   <strong>{value}</strong>
                   <span>{helper}</span>
                   <b><Icon name={icon} /></b>
-                </div>
+                </Link>
               ))}
             </div>
           </article>

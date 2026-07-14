@@ -94,7 +94,6 @@ export default async function ExpensesPage() {
                   <th>Empresa</th>
                   <th>Monto</th>
                   <th>Categoría</th>
-                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,12 +105,11 @@ export default async function ExpensesPage() {
                       <td>{firstRelation(expense.empresas)?.nombre_comercial || "Sin empresa"}</td>
                       <td>{moneyFormatter.format(asNumber(expense.monto))}</td>
                       <td><span className="expense-category"><Icon name="category" /> {categoryLabel(expense)}</span></td>
-                      <td><button className="expense-menu-button" type="button" aria-label={`Acciones de ${expense.concepto}`}>•••</button></td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={5}>
                       <div className="expenses-empty">
                         <span><Icon name="trending_down" /></span>
                         <strong>No hay gastos registrados</strong>

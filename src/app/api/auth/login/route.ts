@@ -9,6 +9,9 @@ interface FirebaseLoginResponse {
   error?: { message?: string };
 }
 
+const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
+const SUSPENDED_ACCOUNT_MESSAGE = "Tu cuenta fue suspendida por razones de seguridad. Contacta a un administrador para realizar las aclaraciones correspondientes.";
+
 const firebaseMessages: Record<string, string> = {
   EMAIL_NOT_FOUND: "No existe una cuenta con este correo.",
   INVALID_PASSWORD: "La contraseña es incorrecta.",
@@ -27,11 +30,26 @@ export async function POST(request: Request) {
     const password = typeof body.password === "string" ? body.password : "";
     const apiKey = normalizeEnvValue(process.env.FIREBASE_WEB_API_KEY);
 
-    function failure(message: string, status: number) {
-      if (isJson) return NextResponse.json({ success: false, message }, { status });
+    function failure(message: string, status: number, code?: string) {
+      if (isJson) return NextResponse.json({ success: false, code, message }, { status });
       const url = new URL("/login", request.url);
       url.searchParams.set("error", message);
+      if (code) url.searchParams.set("code", code);
       return NextResponse.redirect(url, 303);
+    }
+
+    async function suspendedFailureIfNeeded() {
+      const { data: suspendedProfile } = await supabase
+        .from("usuarios")
+        .select("estado")
+        .eq("correo", email)
+        .maybeSingle();
+
+      if (suspendedProfile?.estado === "suspendido") {
+        return failure(SUSPENDED_ACCOUNT_MESSAGE, 403, SUSPENDED_ACCOUNT_CODE);
+      }
+
+      return null;
     }
 
     if (!email || !password) {
@@ -55,6 +73,10 @@ export async function POST(request: Request) {
 
     if (!firebaseResponse.ok || !firebaseData.idToken || !firebaseData.localId) {
       const code = firebaseData.error?.message?.split(" : ")[0] ?? "";
+      if (code === "USER_DISABLED") {
+        const suspendedFailure = await suspendedFailureIfNeeded();
+        if (suspendedFailure) return suspendedFailure;
+      }
       return failure(firebaseMessages[code] ?? "No fue posible iniciar sesión.", 401);
     }
 
@@ -67,6 +89,9 @@ export async function POST(request: Request) {
 
     if (error || !profile) {
       return failure("Tu cuenta no tiene un perfil de Fiscalix asociado.", 403);
+    }
+    if (profile.estado === "suspendido") {
+      return failure(SUSPENDED_ACCOUNT_MESSAGE, 403, SUSPENDED_ACCOUNT_CODE);
     }
     if (profile.estado && profile.estado !== "activo") {
       return failure("Tu cuenta no está activa.", 403);

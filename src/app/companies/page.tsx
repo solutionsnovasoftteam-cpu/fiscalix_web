@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { CompanyFiscalEditor } from "@/components/CompanyFiscalEditor";
 import { getCurrentUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
@@ -28,6 +29,8 @@ type TaxObligation = {
   activa: boolean | null;
 };
 
+type FiscalRegime = { clave_sat: string; id: string; nombre: string };
+
 function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
@@ -53,26 +56,28 @@ export default async function CompaniesPage() {
 
   const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
 
-  const [companiesResult, fiscalResult, obligationsResult] = companyIds.length
-    ? await Promise.all([
-        supabase.from("empresas").select("id,nombre_comercial,rfc,estado").in("id", companyIds).order("nombre_comercial", { ascending: true }),
-        supabase.from("empresa_fiscal").select("id,empresa_id,rfc,regimen_id,regimenes_fiscales(clave_sat,nombre)").in("empresa_id", companyIds),
-        supabase.from("obligaciones_fiscales").select("id,empresa_id,nombre,periodicidad,descripcion,activa").in("empresa_id", companyIds),
-      ])
-    : [
-        { data: [] as Company[], error: null },
-        { data: [] as FiscalInfo[], error: null },
-        { data: [] as TaxObligation[], error: null },
-      ];
+  const [companiesResult, fiscalResult, obligationsResult, regimesResult] = await Promise.all([
+    companyIds.length
+      ? supabase.from("empresas").select("id,nombre_comercial,rfc,estado").in("id", companyIds).order("nombre_comercial", { ascending: true })
+      : Promise.resolve({ data: [] as Company[], error: null }),
+    companyIds.length
+      ? supabase.from("empresa_fiscal").select("id,empresa_id,rfc,regimen_id,regimenes_fiscales(clave_sat,nombre)").in("empresa_id", companyIds)
+      : Promise.resolve({ data: [] as FiscalInfo[], error: null }),
+    companyIds.length
+      ? supabase.from("obligaciones_fiscales").select("id,empresa_id,nombre,periodicidad,descripcion,activa").in("empresa_id", companyIds)
+      : Promise.resolve({ data: [] as TaxObligation[], error: null }),
+    supabase.from("regimenes_fiscales").select("id,clave_sat,nombre").order("clave_sat", { ascending: true }),
+  ]);
 
   const companies = (companiesResult.data ?? []) as Company[];
   const fiscalRecords = (fiscalResult.data ?? []) as FiscalInfo[];
   const obligations = (obligationsResult.data ?? []) as TaxObligation[];
+  const regimes = (regimesResult.data ?? []) as FiscalRegime[];
   const selectedCompany = companies[0];
   const selectedFiscal = selectedCompany ? fiscalRecords.find((record) => record.empresa_id === selectedCompany.id) : undefined;
   const selectedObligations = selectedCompany ? obligations.filter((obligation) => obligation.empresa_id === selectedCompany.id) : [];
   const activeObligations = selectedObligations.filter((obligation) => obligation.activa !== false);
-  const hasError = membershipError || companiesResult.error || fiscalResult.error || obligationsResult.error;
+  const hasError = membershipError || companiesResult.error || fiscalResult.error || obligationsResult.error || regimesResult.error;
 
   return (
     <AppShell activeHref="/companies" user={user}>
@@ -82,7 +87,7 @@ export default async function CompaniesPage() {
             <h1>Mi empresa</h1>
             <span>Información de tu empresa registrada en la base de datos.</span>
           </div>
-          <button className="primary-button compact" type="button"><Icon name="edit" /> Editar información</button>
+          <CompanyFiscalEditor company={selectedCompany ? { id:selectedCompany.id, nombre:selectedCompany.nombre_comercial ?? "", regimeId:selectedFiscal?.regimen_id ?? "", rfc:selectedFiscal?.rfc || selectedCompany.rfc || "" } : null} regimes={regimes.map((regime) => ({ clave:regime.clave_sat, id:regime.id, nombre:regime.nombre }))} />
         </header>
 
         {hasError && (

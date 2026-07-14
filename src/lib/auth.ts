@@ -4,6 +4,7 @@ import { getAuth } from "firebase-admin/auth";
 import { cookies } from "next/headers";
 import { getFirebaseAdmin } from "@/lib/firebaseAdmin";
 import { supabase } from "@/lib/supabase";
+import { getUserRoleByUserId } from "@/lib/userRoles";
 import type { FiscalixUser } from "@/models/User";
 
 export const SESSION_COOKIE = "fiscalix_session";
@@ -32,7 +33,12 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
       .single();
 
     if (error || !data) return null;
-    return data as FiscalixUser;
+    if (data.estado && data.estado !== "activo") return null;
+
+    return {
+      ...(data as Omit<FiscalixUser, "rol">),
+      rol: await getUserRoleByUserId(decoded.uid),
+    };
   } catch {
     return null;
   }

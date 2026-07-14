@@ -8,10 +8,10 @@ import { getCurrentUser } from "@/lib/auth";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ code?: string; error?: string }>;
 }) {
   if (await getCurrentUser()) redirect("/dashboard");
-  const { error } = await searchParams;
+  const { code, error } = await searchParams;
   return (
     <main className="login-page">
       <ViewTransition name="auth-panel" share="auth-panel-morph">
@@ -19,7 +19,7 @@ export default async function LoginPage({
         <div className="login-card">
           <Brand />
           <div className="login-heading"><span>Bienvenido de nuevo</span><h1>Inicia sesión en tu cuenta</h1><p>Administra tus obligaciones fiscales de forma simple y segura.</p></div>
-          <LoginForm initialError={error ?? ""} />
+          <LoginForm initialError={error ?? ""} initialErrorCode={code ?? ""} />
           <p className="register-copy">¿Aún no tienes una cuenta? <Link href="/register">Crear cuenta</Link></p>
         </div>
         <p className="legal">Al continuar, aceptas nuestros <a href="#">Términos de servicio</a> y <a href="#">Aviso de privacidad</a>.</p>

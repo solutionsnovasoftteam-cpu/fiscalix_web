@@ -143,7 +143,6 @@ export default async function IncomePage() {
                   <th>Empresa</th>
                   <th>Monto</th>
                   <th>Categoría</th>
-                  <th>Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -155,12 +154,11 @@ export default async function IncomePage() {
                       <td>{firstRelation(income.empresas)?.nombre_comercial || "Sin empresa"}</td>
                       <td>{moneyFormatter.format(asNumber(income.monto))}</td>
                       <td><span className="income-category"><Icon name="trending_up" /> {categoryLabel(income)}</span></td>
-                      <td><button className="income-menu-button" type="button" aria-label={`Acciones de ${income.concepto}`}>•••</button></td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6}>
+                    <td colSpan={5}>
                       <div className="income-empty">
                         <span><Icon name="trending_up" /></span>
                         <strong>No hay ingresos registrados</strong>

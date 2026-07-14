@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSession, SESSION_COOKIE, SESSION_MAX_AGE, verifyToken } from "@/lib/auth";
 import { getFirebaseAdmin, normalizeEnvValue } from "@/lib/firebaseAdmin";
 import { supabase } from "@/lib/supabase";
+import { assignDefaultRoleToUser } from "@/lib/userRoles";
 
 interface SignUpResponse {
   idToken?: string;
@@ -106,6 +107,8 @@ export async function POST(request: Request) {
       console.error("Error de Supabase al registrar usuario:", error.code);
       return failure("No fue posible guardar el perfil del usuario.", 409);
     }
+
+    await assignDefaultRoleToUser(uid);
 
     const response = isJson
       ? NextResponse.json({ success: true, message: "Cuenta creada correctamente", data }, { status: 201 })
