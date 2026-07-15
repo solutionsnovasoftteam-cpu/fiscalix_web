@@ -128,3 +128,14 @@ button { cursor:pointer; }
 @media (max-width:1000px) { .reports-stats{grid-template-columns:repeat(2,1fr)} }
 @media (max-width:560px) { .reports-content{padding:22px 16px 40px}.reports-stats{grid-template-columns:1fr}.reports-card-heading{align-items:flex-start;flex-direction:column}.profile-editor-backdrop{padding:14px}.profile-editor-grid{grid-template-columns:1fr}.profile-editor-grid label.wide{grid-column:auto}.profile-editor-actions{flex-direction:column-reverse}.profile-editor-actions>button{width:100%} }
 .profile-editor-grid select { width:100%; height:43px; padding:0 12px; border:1px solid #ffffff18; border-radius:8px; outline:0; background:#ffffff09; color:white; font-size:12px; }.profile-editor-grid select:focus { border-color:#01c38d88; box-shadow:0 0 0 3px #01c38d18; }.profile-editor-grid select option { color:var(--navy); }
+
+/* Dialog behavior shared across the application. */
+.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor { overflow:auto; overscroll-behavior:contain; }
+.auth-modal,.profile-editor,.plans-editor-card { max-height:calc(100dvh - 48px); overflow:auto; outline:0; }
+.plans-editor { z-index:80; }
+.plans-editor-heading button:disabled,.plans-editor-actions button:disabled { opacity:.55; cursor:wait; }
+@media (max-width:560px) {
+  .auth-modal-backdrop,.profile-editor-backdrop,.plans-editor { padding:14px; }
+  .auth-modal,.profile-editor,.plans-editor-card { max-height:calc(100dvh - 28px); }
+  .auth-modal { padding:22px 18px; }
+}

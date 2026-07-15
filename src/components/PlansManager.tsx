@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { mergePlansWithDbRows, planMonthlyAmount, type FiscalixPlan, type PlanDbRow } from "@/lib/plans";
+import { useModal } from "@/lib/useModal";
 
 type PlanDraft = {
   annualAmountText: string;
@@ -63,6 +64,9 @@ export function PlansManager({
   const [plans, setPlans] = useState(initialPlans);
   const [savedMessage, setSavedMessage] = useState(initialStatus);
   const [isSaving, setIsSaving] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeEditor = useCallback(() => setDraft(null), []);
+  useModal({ busy: isSaving, dialogRef, onClose: closeEditor, open: draft !== null });
 
   const featuredPlan = useMemo(() => plans.find((plan) => plan.id === "plus") ?? plans[2], [plans]);
 
@@ -220,15 +224,15 @@ export function PlansManager({
       </section>
 
       {draft && (
-        <section className="plans-editor" aria-label={`Editar ${draft.name}`}>
-          <div className="plans-editor-card">
+        <section className="plans-editor" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isSaving) closeEditor(); }}>
+          <div aria-labelledby="plan-editor-title" aria-modal="true" className="plans-editor-card" ref={dialogRef} role="dialog" tabIndex={-1}>
             <div className="plans-editor-heading">
               <div>
                 <p>EDITANDO PLAN</p>
-                <h2>{draft.name}</h2>
+                <h2 id="plan-editor-title">{draft.name}</h2>
                 <span>Estos cambios se guardan en la tabla planes de Supabase.</span>
               </div>
-              <button aria-label="Cerrar editor" type="button" onClick={() => setDraft(null)}>×</button>
+              <button aria-label="Cerrar editor" disabled={isSaving} type="button" onClick={closeEditor}>×</button>
             </div>
 
             <div className="plans-editor-grid">
@@ -291,7 +295,7 @@ export function PlansManager({
             </div>
 
             <div className="plans-editor-actions">
-              <button type="button" onClick={() => setDraft(null)}>Cancelar</button>
+              <button type="button" disabled={isSaving} onClick={closeEditor}>Cancelar</button>
               <button className="primary-button compact" type="button" onClick={savePlan} disabled={isSaving}>
                 {isSaving ? "Guardando..." : "Guardar en Supabase"}
               </button>

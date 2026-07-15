@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { useModal } from "@/lib/useModal";
 
 type ProfileEditorProps = {
   apellido: string;
@@ -16,15 +17,9 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !busy) setOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [busy, open]);
+  const dialogRef = useRef<HTMLElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useModal({ busy, dialogRef, onClose: close, open });
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,7 +53,7 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
       <button onClick={() => { setMessage(""); setOpen(true); }} type="button">Editar información</button>
       {open && (
         <div className="profile-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
-          <section aria-labelledby="profile-editor-title" aria-modal="true" className="profile-editor" role="dialog">
+          <section aria-labelledby="profile-editor-title" aria-modal="true" className="profile-editor" ref={dialogRef} role="dialog" tabIndex={-1}>
             <div className="profile-editor-heading">
               <div><span>PERFIL PERSONAL</span><h2 id="profile-editor-title">Editar información</h2><p>Actualiza los datos visibles en tu cuenta.</p></div>
               <button aria-label="Cerrar" disabled={busy} onClick={() => setOpen(false)} type="button"><Icon name="close" /></button>

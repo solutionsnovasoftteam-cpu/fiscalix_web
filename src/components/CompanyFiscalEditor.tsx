@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { useModal } from "@/lib/useModal";
 
 type Regime = { clave: string; id: string; nombre: string };
 
@@ -14,6 +15,9 @@ export function CompanyFiscalEditor({ company, regimes }: {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const dialogRef = useRef<HTMLElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useModal({ busy, dialogRef, onClose: close, open });
 
   if (!company) return null;
 
@@ -35,7 +39,7 @@ export function CompanyFiscalEditor({ company, regimes }: {
   return <>
     <button className="primary-button compact" onClick={() => { setMessage(""); setOpen(true); }} type="button"><Icon name="edit" /> Editar información</button>
     {open && <div className="profile-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
-      <section aria-labelledby="company-editor-title" aria-modal="true" className="profile-editor" role="dialog">
+      <section aria-labelledby="company-editor-title" aria-modal="true" className="profile-editor" ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="profile-editor-heading"><div><span>DATOS FISCALES</span><h2 id="company-editor-title">Editar empresa</h2><p>Registra los datos tal como aparecen en la constancia fiscal.</p></div><button aria-label="Cerrar" disabled={busy} onClick={() => setOpen(false)} type="button"><Icon name="close" /></button></div>
         <form onSubmit={submit}>
           <div className="profile-editor-grid">

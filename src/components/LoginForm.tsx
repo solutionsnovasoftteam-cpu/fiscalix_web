@@ -1,7 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useModal } from "@/lib/useModal";
 
 const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
 const SUSPENDED_ACCOUNT_MESSAGE = "Tu cuenta fue suspendida por razones de seguridad. Contacta a un administrador para realizar las aclaraciones correspondientes.";
@@ -18,6 +19,9 @@ export function LoginForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(initialErrorCode === SUSPENDED_ACCOUNT_CODE ? "" : initialError);
   const [showSuspendedModal, setShowSuspendedModal] = useState(initialErrorCode === SUSPENDED_ACCOUNT_CODE);
+  const dialogRef = useRef<HTMLElement>(null);
+  const closeModal = useCallback(() => setShowSuspendedModal(false), []);
+  useModal({ dialogRef, onClose: closeModal, open: showSuspendedModal });
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,12 +69,14 @@ export function LoginForm({
       </form>
 
       {showSuspendedModal && (
-        <div className="auth-modal-backdrop" role="presentation">
+        <div className="auth-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeModal(); }}>
           <section
             aria-labelledby="suspended-account-title"
             aria-modal="true"
             className="auth-modal"
+            ref={dialogRef}
             role="dialog"
+            tabIndex={-1}
           >
             <div className="auth-modal-icon">!</div>
             <p>CUENTA SUSPENDIDA</p>
