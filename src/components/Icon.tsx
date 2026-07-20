@@ -14,6 +14,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M5 12h14" />
     </>
   ),
+  api: (
+    <>
+      <path d="M7 8c-1.7 0-3 1.1-3 2.5v3c0 1.4 1.3 2.5 3 2.5" />
+      <path d="M7 8v8" />
+      <path d="M17 8c1.7 0 3 1.1 3 2.5v3c0 1.4-1.3 2.5-3 2.5" />
+      <path d="M17 8v8" />
+      <path d="M10 12h4" />
+    </>
+  ),
   attach_money: (
     <>
       <path d="M12 3v18" />
@@ -135,6 +144,13 @@ const icons: Record<string, ReactNode> = {
   keyboard_arrow_down: (
     <>
       <path d="m6 9 6 6 6-6" />
+    </>
+  ),
+  language: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </>
   ),
   location_on: (

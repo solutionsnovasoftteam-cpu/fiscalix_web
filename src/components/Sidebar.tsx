@@ -14,6 +14,11 @@ const nav = [
   ["Impuestos", "/taxes", "percent"],
   ["Planes", "/plans", "payments"],
   ["Reportes", "/reports", "bar_chart"],
+  ["Comprobantes", "/receipts", "receipt_long"],
+  ["Centro fiscal", "/centro-fiscal", "language"],
+  ["Integraciones", "/integrations", "api"],
+  ["Nómina", "/payroll", "payments"],
+  ["Más configuraciones", "/settings", "settings"],
 ] as const;
 
 const adminNav = ["Administración", "/admin", "manage_accounts"] as const;
