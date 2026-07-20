@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   if (!canManagePlans(user)) {
-    return NextResponse.json({ message: "No tienes permisos para editar planes." }, { status: 403 });
+    return NextResponse.json({ message: "Solo el superadministrador puede editar planes." }, { status: 403 });
   }
 
   const body = (await request.json()) as PlanPayload;

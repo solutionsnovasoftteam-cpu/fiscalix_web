@@ -35,7 +35,7 @@ export function isSuperAdminRole(value: unknown) {
 }
 
 export function canManagePlans(user: { rol?: unknown } | null | undefined) {
-  return isAdminRole(user?.rol);
+  return isSuperAdminRole(user?.rol);
 }
 
 export function canViewAdminDashboard(user: { rol?: unknown } | null | undefined) {
