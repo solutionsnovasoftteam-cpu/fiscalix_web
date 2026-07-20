@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Icon } from "@/components/Icon";
 import { useModal } from "@/lib/useModal";
@@ -314,7 +315,7 @@ export function IntegrationsHub() {
         Mostrando {filtered.length} de {items.length} integraciones
       </footer>
 
-      {showNewModal && (
+      {showNewModal && typeof document !== "undefined" && createPortal(
         <div
           className="integrations-modal-backdrop"
           onMouseDown={(event) => {
@@ -363,7 +364,8 @@ export function IntegrationsHub() {
               </div>
             )}
           </section>
-        </div>
+        </div>,
+        document.body,
       )}
     </main>
   );

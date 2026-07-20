@@ -234,3 +234,179 @@ button { cursor:pointer; }
 .cf-modal input:focus{border-color:#01c38d88;box-shadow:0 0 0 3px #01c38d18}
 @media (max-width:1200px){.cf-stats,.cf-mid-grid,.cf-bottom-grid{grid-template-columns:1fr 1fr}.cf-bottom-grid .cf-panel-wide{grid-column:1/-1}}
 @media (max-width:760px){.cf-page{padding:22px 16px 40px}.cf-header{align-items:flex-start;flex-direction:column}.cf-stats,.cf-mid-grid,.cf-bottom-grid,.cf-actions-grid{grid-template-columns:1fr}}
+
+/* Pantallas secundarias unificadas */
+.receipts-page,.integrations-page,.settings-page,.payroll-page{position:relative;min-height:calc(100vh - 79px);max-width:1500px;margin:0 auto;padding:31px 34px 55px;color:white;background:radial-gradient(circle at 76% 5%,#01c38d26 0,#01c38d0d 22%,transparent 44%),linear-gradient(180deg,#191e29 0%,#132d46 100%)}
+.receipts-page::before,.integrations-page::before,.settings-page::before,.payroll-page::before{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(120deg,#696e7916 0%,transparent 42%,#696e7926 100%)}
+.receipts-page>*,.integrations-page>*,.settings-page>*,.payroll-page>*{position:relative;z-index:1}
+.receipts-hero,.integrations-hero,.settings-header,.payroll-header{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:22px}
+.receipts-title,.integrations-hero-copy,.settings-header>div:first-child,.payroll-header>div:first-child{min-width:0}
+.receipts-title{display:flex;align-items:center;gap:15px}
+.receipts-title-icon{display:grid;place-items:center;width:48px;height:48px;border:1px solid #01c38d55;border-radius:14px;background:#01c38d16;color:var(--blue);box-shadow:0 0 24px #01c38d24}
+.receipts-title p,.integrations-hero-copy p,.settings-eyebrow,.payroll-eyebrow{margin:0 0 8px;color:var(--blue);font-size:11px;font-weight:900;letter-spacing:2px;text-transform:uppercase}
+.receipts-title h1,.integrations-hero-copy h1,.settings-header h1,.payroll-header h1{margin:0;color:white;font-size:30px;font-weight:500;letter-spacing:-.8px}
+.receipts-title>div>span,.integrations-hero-copy span,.settings-header>div:first-child>span,.payroll-header>div:first-child>span{display:block;margin-top:8px;color:#d8dee8;font-size:13px;line-height:1.5}
+.receipts-new,.integrations-new,.settings-btn,.payroll-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 18px;border:0;border-radius:9px;font-size:11px;font-weight:900;transition:transform .22s ease,box-shadow .22s ease,background .22s ease,color .22s ease,border-color .22s ease}
+.receipts-new,.integrations-new,.settings-btn-primary,.payroll-btn-primary{background:var(--button-gradient);color:var(--deep-blue);box-shadow:0 18px 32px #01c38d22,0 10px 24px #00000026}
+.receipts-new:hover,.integrations-new:hover,.settings-btn-primary:hover,.payroll-btn-primary:hover{background:var(--button-gradient-hover);color:white;transform:translateY(-1px);box-shadow:0 22px 38px #01c38d26,0 12px 26px #00000034}
+.settings-btn-outline,.payroll-btn-secondary{border:1px solid #ffffff18;background:#ffffff08;color:#d8dee8}
+.settings-btn-outline:hover,.payroll-btn-secondary:hover{border-color:#01c38d66;color:white;background:#01c38d18}
+.settings-btn-block,.payroll-btn-block{width:100%}
+.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;margin-bottom:22px}
+.receipts-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+.receipts-summary article,.integrations-stats article,.payroll-kpis article,.settings-quick-card{position:relative;overflow:hidden;min-height:94px;padding:18px;border:1px solid #ffffff12;border-radius:12px;background:linear-gradient(145deg,#132d46d9,#191e29ea);box-shadow:0 24px 52px #0000002c}
+.receipts-summary article,.integrations-stats article,.settings-quick-card{display:flex;align-items:center;gap:14px}
+.receipts-summary article>span,.integrations-stats article>span,.settings-quick-card>span,.payroll-kpis article::after{display:grid;place-items:center;width:42px;height:42px;flex:none;border-radius:12px;background:#01c38d1a;color:var(--blue);box-shadow:0 0 24px #01c38d20}
+.receipts-summary small,.integrations-stats small,.payroll-kpis small,.settings-quick-card small{display:block;color:#a7b3c6;font-size:10px;font-weight:800}
+.receipts-summary strong,.integrations-stats strong,.payroll-kpis strong{display:block;margin-top:4px;color:white;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums}
+.payroll-kpis article{display:grid;gap:8px}
+.payroll-kpis article::after{content:"";position:absolute;right:16px;top:16px;width:38px;height:38px}
+.payroll-kpis article span{color:#8fa2b9;font-size:10px;font-weight:800}
+.payroll-kpis article.is-accent{border-color:#01c38d4a;background:linear-gradient(145deg,#01c38d21,#132d46d9)}
+.integrations-stats .tone-blue>span{background:#38bdf822;color:#9ec5ff}.integrations-stats .tone-violet>span{background:#8b5cf622;color:#c6b7ff}.integrations-stats .tone-amber>span{background:#f59e0b24;color:#ffc477}
+.receipts-alert,.settings-feedback,.payroll-feedback{display:flex;align-items:center;gap:10px;border:1px solid #f59e0b44;background:#f59e0b18;color:#ffc477;font-size:12px;font-weight:800}
+.receipts-alert{margin-bottom:16px;padding:12px 14px;border-radius:10px}
+.settings-feedback,.payroll-feedback{position:fixed;right:24px;top:94px;z-index:60;padding:12px 15px;border-color:#01c38d55;border-radius:999px;background:#01c38d1f;color:#dffbf3;box-shadow:0 18px 40px #00000045;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.receipts-card,.integrations-toolbar,.settings-panel,.payroll-panel{border:1px solid #ffffff12;border-radius:12px;background:linear-gradient(145deg,#132d46d9,#191e29ea);box-shadow:0 26px 54px #0000002e;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.receipts-card{overflow:hidden}
+.receipts-card-top,.integrations-toolbar,.settings-panel-head,.payroll-panel-head{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.receipts-card-top{padding:16px 18px;border-bottom:1px solid #ffffff10}
+.integrations-toolbar{margin-bottom:18px;padding:12px}
+.receipts-search,.integrations-search,.settings-search,.payroll-search{display:flex;align-items:center;gap:9px;min-height:42px;padding:0 12px;border:1px solid #ffffff16;border-radius:10px;background:#ffffff08;color:#a7b3c6}
+.receipts-search{width:min(620px,100%)}
+.integrations-search,.settings-search,.payroll-search{width:300px}
+.receipts-search input,.integrations-search input,.settings-search input,.payroll-search input{width:100%;border:0;outline:0;background:transparent;color:white;font-size:12px}
+.receipts-search input::placeholder,.integrations-search input::placeholder,.settings-search input::placeholder,.payroll-search input::placeholder{color:#8fa2b9}
+.receipts-search:focus-within,.integrations-search:focus-within,.settings-search:focus-within,.payroll-search:focus-within{border-color:#01c38d88;box-shadow:0 0 0 3px #01c38d18}
+.receipts-search button{height:30px;padding:0 11px;border:0;border-radius:7px;background:#01c38d22;color:#42f2bd;font-size:10px;font-weight:900}
+.receipts-count,.integrations-footer{color:#a7b3c6;font-size:11px;font-weight:800}
+.receipts-table-wrap,.settings-table-wrap,.payroll-table-wrap{overflow:auto}
+.receipts-table,.settings-table,.payroll-table{width:100%;min-width:760px;border-collapse:collapse}
+.receipts-table th,.receipts-table td,.settings-table th,.settings-table td,.payroll-table th,.payroll-table td{padding:14px 16px;border-bottom:1px solid #ffffff0b;text-align:left;font-size:11px}
+.receipts-table th,.settings-table th,.payroll-table th{color:#9aa8bb;font-size:9px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
+.receipts-table td,.settings-table td,.payroll-table td{color:#e7ebef;font-weight:700}
+.receipts-table tr:last-child td,.settings-table tr:last-child td,.payroll-table tr:last-child td{border-bottom:0}
+.receipt-folio{display:block;color:white;font-weight:900}.receipts-table td small{display:block;margin-top:4px;color:#8fa2b9;font-size:10px}
+.receipt-type,.receipt-status,.payroll-status,.integrations-status{display:inline-flex;align-items:center;gap:6px;min-height:24px;padding:0 9px;border-radius:999px;font-size:10px;font-weight:900}
+.receipt-type.income,.payroll-status.active,.integrations-status.active{background:#01c38d18;color:#42f2bd}
+.receipt-type.expense,.payroll-status.pending,.integrations-status.pending{background:#f59e0b18;color:#ffc477}
+.payroll-status.inactive,.integrations-status.inactive{background:#ffffff10;color:#a7b3c6}
+.receipt-amount{font-weight:900;font-variant-numeric:tabular-nums}.receipt-amount.income{color:#42f2bd}.receipt-amount.expense{color:#ffc477}
+.receipt-status i,.integrations-status i{width:6px;height:6px;border-radius:50%;background:currentColor;box-shadow:0 0 10px currentColor}
+.receipt-action,.payroll-icon-btn,.settings-icon-btn{display:inline-grid;place-items:center;width:32px;height:32px;margin-left:6px;border:1px solid #ffffff14;border-radius:8px;background:#ffffff08;color:#d8dee8}
+.receipt-action:hover,.payroll-icon-btn:hover,.settings-icon-btn:hover{border-color:#01c38d66;color:#42f2bd;background:#01c38d18}
+.receipts-empty,.integrations-empty,.integrations-modal-empty{display:grid;place-items:center;min-height:260px;padding:34px;text-align:center;color:#a7b3c6}
+.receipts-empty span,.integrations-empty span,.integrations-modal-empty span{display:grid;place-items:center;width:58px;height:58px;margin-bottom:12px;border-radius:50%;background:#01c38d18;color:var(--blue);box-shadow:0 0 28px #01c38d1f}
+.receipts-empty strong,.integrations-empty strong,.integrations-modal-empty strong{display:block;color:white;font-size:15px}.receipts-empty small,.integrations-empty small,.integrations-modal-empty small{display:block;margin-top:7px;color:#8fa2b9}
+.integrations-hero-actions,.settings-header-actions,.payroll-header-actions{display:flex;align-items:center;gap:12px}
+.integrations-tabs,.integrations-filters,.settings-theme-options,.payroll-pages{display:flex;flex-wrap:wrap;gap:8px}
+.integrations-tabs button,.integrations-filters button,.settings-theme-options button,.payroll-pages button{min-height:32px;padding:0 12px;border:1px solid #ffffff14;border-radius:999px;background:#ffffff08;color:#a7b3c6;font-size:10px;font-weight:900}
+.integrations-tabs button.is-active,.integrations-filters button.is-active,.settings-theme-options button.is-active,.payroll-pages button.is-active{border-color:#01c38d66;background:#01c38d22;color:#42f2bd}
+.integrations-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.integrations-card{display:grid;gap:16px;min-height:240px;padding:18px;border:1px solid #ffffff12;border-radius:12px;background:linear-gradient(145deg,#132d46d9,#191e29ea);box-shadow:0 24px 52px #0000002c}
+.integrations-card.status-active{border-color:#01c38d30}.integrations-card.status-pending{border-color:#f59e0b30}
+.integrations-card-top{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:13px}
+.integrations-logo{display:grid;place-items:center;width:54px;height:54px;border:1px solid #ffffff14;border-radius:14px;overflow:hidden}
+.integrations-logo img{width:34px;height:34px;object-fit:contain}
+.integrations-card h2{margin:0;color:white;font-size:15px}.integrations-card p{margin:5px 0 0;color:#a7b3c6;font-size:11px;line-height:1.45}
+.integrations-card-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#8fa2b9;font-size:10px;font-weight:800}
+.integrations-category{display:inline-flex;align-items:center;min-height:24px;padding:0 9px;border-radius:999px;background:#ffffff0b;color:#d8dee8}
+.integrations-sync{display:inline-flex;align-items:center;gap:6px}
+.integrations-card-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}
+.integrations-toggle{display:flex;align-items:center;gap:8px;color:#a7b3c6;font-size:10px;font-weight:900}
+.integrations-toggle input{position:absolute;opacity:0;pointer-events:none}
+.integrations-toggle span{position:relative;width:38px;height:22px;border-radius:999px;background:#ffffff14;box-shadow:inset 0 0 0 1px #ffffff14}
+.integrations-toggle span::before{content:"";position:absolute;left:3px;top:3px;width:16px;height:16px;border-radius:50%;background:#a7b3c6;transition:transform .2s ease,background .2s ease}
+.integrations-toggle input:checked+span{background:#01c38d28}.integrations-toggle input:checked+span::before{transform:translateX(16px);background:#42f2bd}
+.integrations-toggle input:disabled+span{opacity:.55}
+.integrations-action{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:34px;padding:0 12px;border:1px solid #ffffff16;border-radius:8px;background:#ffffff08;color:#d8dee8;font-size:10px;font-weight:900}
+.integrations-action.primary{border:0;background:var(--button-gradient);color:var(--deep-blue)}
+.integrations-footer{margin-top:16px;text-align:right}
+.integrations-modal-backdrop{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:24px;background:#050b11c7;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.integrations-modal{width:min(720px,100%);max-height:min(760px,calc(100vh - 48px));overflow:auto;padding:22px;border:1px solid #ffffff18;border-radius:14px;background:linear-gradient(145deg,#191e29fa,#132d46f7);box-shadow:0 32px 80px #00000070,0 0 36px #01c38d18;outline:0}
+.integrations-modal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:18px}
+.integrations-modal-head span{color:var(--blue);font-size:9px;font-weight:900;letter-spacing:1.4px}.integrations-modal-head h2{margin:5px 0;color:white}.integrations-modal-head p{margin:0;color:#a7b3c6;font-size:12px}
+.integrations-modal-head>button{display:grid;place-items:center;width:34px;height:34px;border:1px solid #ffffff16;border-radius:9px;background:#ffffff09;color:#d8dee8;font-size:22px;line-height:1}
+.integrations-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.integrations-modal-item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:12px;padding:13px;border:1px solid #ffffff12;border-radius:11px;background:#ffffff07;color:white;text-align:left}
+.integrations-modal-item:hover{border-color:#01c38d55;background:#01c38d12}.integrations-modal-item strong,.integrations-modal-item small,.integrations-modal-item em{display:block}.integrations-modal-item small{margin-top:3px;color:#a7b3c6;font-size:10px}.integrations-modal-item em{margin-top:5px;color:#42f2bd;font-size:9px;font-style:normal;font-weight:900}
+.settings-quick{grid-template-columns:repeat(4,minmax(0,1fr))}
+.settings-quick-card{appearance:none;text-align:left;color:white}
+.settings-quick-card strong{display:block;color:white;font-size:13px}.settings-quick-card em{display:flex;align-items:center;gap:5px;margin-top:6px;color:#42f2bd;font-size:10px;font-style:normal;font-weight:900}
+.settings-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(300px,.8fr);gap:16px;margin-bottom:16px}
+.settings-side{display:grid;gap:16px;align-content:start}
+.settings-panel{padding:18px}
+.settings-panel-head{margin-bottom:16px}.settings-panel-head h2{margin:0;color:white;font-size:15px}.settings-panel-head p{margin:4px 0 0;color:#a7b3c6;font-size:11px}.settings-panel-head>span{display:grid;place-items:center;width:36px;height:36px;border-radius:10px;background:#01c38d18;color:var(--blue)}
+.settings-form,.settings-prefs,.settings-security-list,.settings-backup{display:grid;gap:13px}
+.settings-form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.settings-form label,.settings-prefs label,.settings-backup label,.settings-list-select{display:grid;gap:8px;color:#d8dee8;font-size:11px;font-weight:900}
+.settings-prefs label span{display:flex;align-items:center;gap:8px;color:#d8dee8}
+.settings-form input,.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form input,.payroll-form select{width:100%;height:42px;padding:0 12px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff09;color:white;outline:0;font-size:12px}
+.settings-form input:disabled,.settings-form select:disabled{color:#a7b3c6;background:#ffffff05}
+.settings-form input:focus,.settings-form select:focus,.settings-prefs select:focus,.settings-backup select:focus,.settings-list-select select:focus,.payroll-form input:focus,.payroll-form select:focus{border-color:#01c38d88;box-shadow:0 0 0 3px #01c38d18}
+.settings-theme{display:grid;gap:8px;color:#d8dee8;font-size:11px;font-weight:900}
+.settings-security-row,.settings-list-link,.settings-list-select,.settings-destination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #ffffff10;border-radius:10px;background:#ffffff07;color:#d8dee8}
+.settings-security-row strong,.settings-list-link span,.settings-list-select span{display:block;color:white;font-size:11px}.settings-security-row small{display:block;margin-top:4px;color:#8fa2b9;font-size:10px}
+.settings-toggle{position:relative;width:44px;height:24px;flex:none;border:0;border-radius:999px;background:#ffffff16}.settings-toggle i{position:absolute;left:3px;top:3px;width:18px;height:18px;border-radius:50%;background:#a7b3c6;transition:transform .2s ease,background .2s ease}.settings-toggle.is-on{background:#01c38d2e}.settings-toggle.is-on i{transform:translateX(20px);background:#42f2bd}
+.settings-list-link{width:100%;border:1px solid #ffffff10;text-align:left}.settings-list-link:hover{border-color:#01c38d55;background:#01c38d12;color:#42f2bd}
+.settings-backup p{margin:0;color:#a7b3c6;font-size:12px}.settings-backup strong,.settings-destination strong{color:white}.settings-destination strong{display:flex;align-items:center;gap:7px}.settings-destination i{display:block;width:8px;height:8px;border-radius:50%;background:#42f2bd;box-shadow:0 0 12px #01c38d}
+.settings-link-btn{border:0;background:transparent;color:var(--blue);font-size:11px;font-weight:900}
+.settings-activity{margin-top:16px}.settings-empty{padding:38px!important;text-align:center;color:#a7b3c6!important}
+.settings-row-menu{position:relative}.settings-menu,.payroll-menu{position:absolute;right:0;top:38px;z-index:20;display:grid;min-width:160px;padding:6px;border:1px solid #ffffff14;border-radius:10px;background:#191e29f5;box-shadow:0 20px 45px #00000055}
+.settings-menu button,.payroll-menu button{width:100%;padding:10px;border:0;border-radius:8px;background:transparent;color:#d8dee8;font-size:11px;font-weight:800;text-align:left}.settings-menu button:hover,.payroll-menu button:hover{background:#01c38d18;color:#42f2bd}
+.payroll-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);gap:16px;margin-bottom:16px}
+.payroll-panel{padding:18px}.payroll-panel-wide{min-width:0}
+.payroll-panel-head{margin-bottom:14px}.payroll-panel-head h2{margin:0;color:white;font-size:15px}.payroll-panel-head p{margin:4px 0 0;color:#8fa2b9;font-size:11px}
+.payroll-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:14px;padding:12px;border:1px solid #ffffff10;border-radius:10px;background:#ffffff06}
+.payroll-table td:first-child{display:flex;align-items:center;gap:10px}.payroll-avatar{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:#01c38d1c;color:#42f2bd;font-size:11px;font-weight:900}.payroll-table strong{color:white}
+.payroll-row-actions{text-align:right}.payroll-pages{justify-content:flex-end;margin-top:14px}
+.payroll-panel-slip h2{margin:0 0 8px;color:white;font-size:15px}.payroll-slip-total{margin:0 0 16px;color:white;font-size:28px;font-weight:900}.payroll-slip-lines{display:grid;gap:10px;margin:0 0 18px;padding:0;list-style:none}.payroll-slip-lines li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:9px;border-bottom:1px solid #ffffff0c}.payroll-slip-lines span{color:#8fa2b9;font-size:10px;font-weight:800}.payroll-slip-lines strong{color:white;font-size:11px}
+.payroll-history-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.payroll-history-card{display:grid;gap:10px;padding:14px;border:1px solid #ffffff10;border-radius:11px;background:#ffffff07}.payroll-history-card header,.payroll-history-meta{display:flex;align-items:center;justify-content:space-between;gap:10px}.payroll-history-card strong{color:white}.payroll-history-card p{margin:0;color:#d8dee8;font-size:12px;font-weight:800}.payroll-history-card small{color:#8fa2b9}.payroll-history-meta span{color:#a7b3c6;font-size:10px}.payroll-history-meta em{color:#42f2bd;font-style:normal;font-weight:900}
+.payroll-menu-floating{position:fixed!important;top:auto;right:auto}
+@media (max-width:1220px){.integrations-grid{grid-template-columns:1fr 1fr}.settings-grid{grid-template-columns:1fr 1fr}.settings-side{grid-column:1/-1}.payroll-layout{grid-template-columns:1fr}.payroll-history-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:900px){.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick{grid-template-columns:1fr 1fr}.integrations-hero,.settings-header,.payroll-header{flex-direction:column}.integrations-hero-actions,.settings-header-actions,.payroll-header-actions{width:100%;align-items:stretch;flex-direction:column}.integrations-search,.settings-search,.payroll-search{width:100%}.integrations-new,.settings-btn-primary,.payroll-btn-primary{width:100%}.integrations-grid,.settings-grid,.payroll-history-grid,.integrations-modal-grid{grid-template-columns:1fr}}
+@media (max-width:560px){.receipts-page,.integrations-page,.settings-page,.payroll-page{padding:22px 16px 40px}.receipts-hero{align-items:flex-start;flex-direction:column}.receipts-title{align-items:flex-start}.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick,.settings-form-row{grid-template-columns:1fr}.receipts-card-top,.integrations-toolbar,.settings-panel-head,.payroll-panel-head{align-items:flex-start;flex-direction:column}.receipts-new,.receipts-search{width:100%}.integrations-card-top{grid-template-columns:auto 1fr}.integrations-status{grid-column:1/-1;justify-self:start}.integrations-card-actions{align-items:flex-start;flex-direction:column}.integrations-action{width:100%}.settings-feedback,.payroll-feedback{left:16px;right:16px;justify-content:center}.payroll-form{grid-template-columns:1fr}.payroll-pages{justify-content:flex-start}}
+
+/* Normalización final de simetría visual entre pantallas internas */
+:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){position:relative;width:min(100%,1500px);max-width:1500px;min-height:calc(100vh - 79px);margin:0 auto;padding:31px 34px 55px;color:white;background:radial-gradient(circle at 50% -10%,#01c38d24 0%,#01c38d10 24%,transparent 46%),linear-gradient(180deg,#191e29 0%,#132d46 100%)}
+:is(.receipts-page,.integrations-page,.settings-page,.payroll-page)::before{display:none}
+:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page)>*{position:relative;z-index:1}
+:is(.stat-card,.panel,.profile-card,.company-card,.expenses-table-card,.income-table-card,.reports-card,.plan-card,.plans-editor-card,.admin-table-card,.receipts-card,.integrations-toolbar,.integrations-card,.settings-panel,.payroll-panel,.cf-panel){border:1px solid #ffffff12;border-radius:12px;background:linear-gradient(145deg,#132d46d9,#191e29ea);box-shadow:0 26px 54px #0000002e;-webkit-backdrop-filter:blur(18px) saturate(1.08);backdrop-filter:blur(18px) saturate(1.08)}
+.settings-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:1220px){.settings-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:760px){:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){padding:24px 17px 42px}}
+@media (max-width:560px){:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){padding:22px 16px 40px}.settings-grid{grid-template-columns:1fr}}
+
+/* Sistema de simetría CSS: espaciado, headers, grids, cards y tablas */
+:root{--app-max-width:1500px;--app-page-y:31px;--app-page-x:34px;--app-page-bottom:55px;--app-gap:17px;--app-gap-lg:24px;--app-radius:12px;--app-card-bg:linear-gradient(145deg,#132d46d9,#191e29ea);--app-card-border:#ffffff12;--app-card-shadow:0 26px 54px #0000002e;--app-panel-head:#ffffff07;--app-divider:#ffffff0d;--app-muted:#a7b3c6;--app-soft:#d8dee8}
+:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){width:min(100%,var(--app-max-width));padding:var(--app-page-y) var(--app-page-x) var(--app-page-bottom)}
+:is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header){display:flex;align-items:flex-start;justify-content:space-between;gap:var(--app-gap-lg);margin-bottom:22px}
+:is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header)>div:first-child{min-width:0}
+:is(.welcome>div,.expenses-header>div:first-child,.income-header>div:first-child,.companies-header>div:first-child,.plans-header>div:first-child,.admin-header>div:first-child,.reports-header,.cf-header>div:first-child,.receipts-title>div,.integrations-hero-copy,.settings-header>div:first-child,.payroll-header>div:first-child)>p{margin:0 0 8px;color:var(--blue);font-size:11px;font-weight:900;letter-spacing:1.6px;text-transform:uppercase}
+:is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header) h1{margin:0 0 8px;color:white;font-size:30px;font-weight:500;line-height:1.08;letter-spacing:-.8px;text-shadow:none}
+:is(.welcome>div,.expenses-header>div:first-child,.income-header>div:first-child,.companies-header>div:first-child,.plans-header>div:first-child,.admin-header>div:first-child,.reports-header,.cf-header>div:first-child,.receipts-title>div,.integrations-hero-copy,.settings-header>div:first-child,.payroll-header>div:first-child)>span{display:block;margin:0;color:var(--app-soft);font-size:13px;line-height:1.5}
+:is(.stats-grid,.expenses-stat-grid,.income-stat-grid,.companies-summary-grid,.plans-overview,.admin-stat-grid,.reports-stats,.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick,.cf-stats){display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--app-gap);margin-bottom:var(--app-gap)}
+:is(.dashboard-grid,.profile-grid,.company-info-grid,.plans-grid,.plans-editor-grid,.cf-mid-grid,.cf-bottom-grid,.settings-grid,.payroll-layout,.payroll-history-grid,.integrations-grid){gap:var(--app-gap)}
+:is(.stat-card,.panel,.profile-card,.company-card,.expenses-table-card,.income-table-card,.reports-card,.plan-card,.plans-editor-card,.admin-table-card,.receipts-card,.integrations-toolbar,.integrations-card,.settings-panel,.payroll-panel,.cf-panel){border:1px solid var(--app-card-border);border-radius:var(--app-radius);background:var(--app-card-bg);box-shadow:var(--app-card-shadow);-webkit-backdrop-filter:blur(18px) saturate(1.08);backdrop-filter:blur(18px) saturate(1.08)}
+:is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.admin-table-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head){min-height:72px;padding:18px 22px;border-bottom:1px solid var(--app-divider);background:var(--app-panel-head)}
+:is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.admin-table-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head) h2{margin:0 0 5px;color:white;font-size:15px;font-weight:700}
+:is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.admin-table-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head) p{margin:0;color:var(--app-muted);font-size:10px}
+:is(.primary-button.compact,.receipts-new,.integrations-new,.settings-btn,.payroll-btn,.plans-reset-button,.expenses-actions button,.income-actions button){min-height:42px;border-radius:9px;font-size:11px;font-weight:900}
+:is(.expenses-actions,.income-actions,.integrations-hero-actions,.settings-header-actions,.payroll-header-actions){display:flex;align-items:center;justify-content:flex-end;gap:12px}
+:is(.expenses-table,.income-table,.reports-table,.admin-table,.receipts-table,.settings-table,.payroll-table,.cf-table){width:100%;border-collapse:collapse}
+:is(.expenses-table,.income-table,.reports-table,.admin-table,.receipts-table,.settings-table,.payroll-table,.cf-table) th{color:#9aa8bb;font-size:9px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
+:is(.expenses-table,.income-table,.reports-table,.admin-table,.receipts-table,.settings-table,.payroll-table,.cf-table) td{color:#e7ebef;font-size:11px;font-weight:700}
+:is(.expenses-table,.income-table,.reports-table,.admin-table,.receipts-table,.settings-table,.payroll-table,.cf-table) th,:is(.expenses-table,.income-table,.reports-table,.admin-table,.receipts-table,.settings-table,.payroll-table,.cf-table) td{padding:15px 20px;border-bottom:1px solid #ffffff0b}
+:is(.dashboard-alert,.expenses-alert,.income-alert,.companies-alert,.receipts-alert,.admin-message,.settings-feedback,.payroll-feedback){border-radius:10px}
+@media (max-width:1000px){:is(.stats-grid,.expenses-stat-grid,.income-stat-grid,.companies-summary-grid,.plans-overview,.admin-stat-grid,.reports-stats,.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick,.cf-stats){grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){:is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header){flex-direction:column}:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){padding:24px 17px 42px}}
+@media (max-width:560px){:is(.stats-grid,.expenses-stat-grid,.income-stat-grid,.companies-summary-grid,.plans-overview,.admin-stat-grid,.reports-stats,.receipts-summary,.integrations-stats,.payroll-kpis,.settings-quick,.cf-stats){grid-template-columns:1fr}:is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page){padding:22px 16px 40px}:is(.expenses-actions,.income-actions,.integrations-hero-actions,.settings-header-actions,.payroll-header-actions){width:100%;align-items:stretch;flex-direction:column}:is(.expenses-actions button,.income-actions button,.integrations-new,.settings-btn-primary,.payroll-btn-primary,.plans-reset-button){width:100%}}
+
+/* Excepción para avisos flotantes: no deben entrar al flujo del layout */
+.settings-feedback,.payroll-feedback{position:fixed!important;top:94px;right:24px;left:auto!important;width:max-content;max-width:min(520px,calc(100vw - 48px));min-height:0;padding:12px 15px;border-radius:999px!important;z-index:100}
+@media (max-width:560px){.settings-feedback,.payroll-feedback{left:16px!important;right:16px;width:auto;max-width:none;justify-content:center;border-radius:12px!important}}
+
+/* Excepción para modales: siempre deben flotar sobre la pantalla completa */
+:is(.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor,.cf-modal-backdrop,.integrations-modal-backdrop){position:fixed!important;inset:0!important;z-index:120!important;display:grid!important;place-items:center!important;margin:0!important;min-height:100dvh!important;padding:24px!important;overflow:auto;overscroll-behavior:contain;background:#050b11c7!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.integrations-modal{width:min(760px,100%);max-height:calc(100dvh - 48px);overflow:auto;margin:auto}
+@media (max-width:560px){:is(.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor,.cf-modal-backdrop,.integrations-modal-backdrop){padding:14px!important}.integrations-modal{max-height:calc(100dvh - 28px)}}
