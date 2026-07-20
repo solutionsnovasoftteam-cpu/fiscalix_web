@@ -99,6 +99,9 @@ export default async function ProfilePage() {
                 <li><Icon name="call" />{phone}</li>
                 <li><Icon name="location_on" />México</li>
               </ul>
+              <form className="profile-hero-logout" action="/api/auth/logout" method="post">
+                <button type="submit"><Icon name="logout" />Cerrar sesión</button>
+              </form>
             </div>
           </div>
           <aside className="verified-card">

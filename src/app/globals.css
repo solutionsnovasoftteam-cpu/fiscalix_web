@@ -410,3 +410,16 @@ button { cursor:pointer; }
 :is(.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor,.cf-modal-backdrop,.integrations-modal-backdrop){position:fixed!important;inset:0!important;z-index:120!important;display:grid!important;place-items:center!important;margin:0!important;min-height:100dvh!important;padding:24px!important;overflow:auto;overscroll-behavior:contain;background:#050b11c7!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
 .integrations-modal{width:min(760px,100%);max-height:calc(100dvh - 48px);overflow:auto;margin:auto}
 @media (max-width:560px){:is(.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor,.cf-modal-backdrop,.integrations-modal-backdrop){padding:14px!important}.integrations-modal{max-height:calc(100dvh - 28px)}}
+
+.profile-hero-logout{margin-top:18px}
+.profile-hero-logout button{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:9px;padding:0 18px;border:0;border-radius:9px;background:var(--button-gradient);color:var(--deep-blue);font-size:11px;font-weight:900;box-shadow:0 12px 24px #0000002b,0 8px 18px #01c38d24;cursor:pointer;transition:background .22s ease,color .22s ease,transform .22s ease,box-shadow .22s ease}
+.profile-hero-logout button:hover{background:var(--button-gradient-hover);color:white;transform:translateY(-1px);box-shadow:0 16px 30px #00000038,0 10px 22px #01c38d2e}
+.profile-hero-logout button span{font-size:18px}
+
+/* Menú lateral compacto para mostrar todas las páginas sin scrollbar */
+.sidebar-brand{height:72px;padding:0 17px}
+.sidebar-brand .brand-logo{width:158px}
+.main-nav{overflow-y:hidden;scrollbar-gutter:auto;padding:16px 13px}
+.main-nav::-webkit-scrollbar{display:none}
+.nav-link{height:38px;gap:12px;margin:2px 0;padding:0 12px;font-size:12px}
+.nav-link>span{width:19px;font-size:17px}

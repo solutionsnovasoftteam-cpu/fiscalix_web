@@ -12,9 +12,6 @@ export function Navbar({ user }: { user: FiscalixUser }) {
         <Link className="avatar small profile-link" href="/profile" aria-label="Ir a mi perfil" title="Mi perfil">
           {initials(user.nombre, user.apellido)}
         </Link>
-        <form className="topbar-logout" action="/api/auth/logout" method="post">
-          <button type="submit"><Icon name="logout" /><span>Cerrar sesión</span></button>
-        </form>
       </div>
     </header>
   );
