@@ -423,3 +423,51 @@ button { cursor:pointer; }
 .main-nav::-webkit-scrollbar{display:none}
 .nav-link{height:38px;gap:12px;margin:2px 0;padding:0 12px;font-size:12px}
 .nav-link>span{width:19px;font-size:17px}
+
+/* Corrección final: Integraciones debe conservar su layout completo */
+.integrations-page{display:block!important;min-height:calc(100vh - 79px)!important;color:white!important;background:radial-gradient(circle at 50% -10%,#01c38d24 0%,#01c38d10 24%,transparent 46%),linear-gradient(180deg,#191e29 0%,#132d46 100%)!important}
+.integrations-page .integrations-hero{display:flex!important;align-items:flex-start!important;justify-content:space-between!important;gap:24px!important;margin-bottom:22px!important}
+.integrations-page .integrations-hero-copy p{margin:0 0 8px!important;color:var(--blue)!important;font-size:11px!important;font-weight:900!important;letter-spacing:1.6px!important;text-transform:uppercase!important}
+.integrations-page .integrations-hero-copy h1{margin:0 0 8px!important;color:white!important;font-size:30px!important;font-weight:500!important;line-height:1.08!important;letter-spacing:-.8px!important}
+.integrations-page .integrations-hero-copy span{display:block!important;color:#d8dee8!important;font-size:13px!important;line-height:1.5!important}
+.integrations-page .integrations-hero-actions{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:12px!important}
+.integrations-page .integrations-search{display:flex!important;align-items:center!important;gap:9px!important;width:300px!important;min-height:42px!important;padding:0 12px!important;border:1px solid #ffffff16!important;border-radius:10px!important;background:#ffffff08!important;color:#a7b3c6!important}
+.integrations-page .integrations-search input{width:100%!important;border:0!important;outline:0!important;background:transparent!important;color:white!important;font-size:12px!important}
+.integrations-page .integrations-new{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;min-height:42px!important;padding:0 18px!important;border:0!important;border-radius:9px!important;background:var(--button-gradient)!important;color:var(--deep-blue)!important;font-size:11px!important;font-weight:900!important;box-shadow:0 18px 32px #01c38d22,0 10px 24px #00000026!important}
+.integrations-page .integrations-stats{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:17px!important;margin-bottom:17px!important}
+.integrations-page .integrations-stats article{display:flex!important;align-items:center!important;gap:14px!important;min-height:94px!important;padding:18px!important;border:1px solid #ffffff12!important;border-radius:12px!important;background:linear-gradient(145deg,#132d46d9,#191e29ea)!important;box-shadow:0 24px 52px #0000002c!important}
+.integrations-page .integrations-stats article>span{display:grid!important;place-items:center!important;width:42px!important;height:42px!important;flex:none!important;border-radius:12px!important;background:#01c38d1a!important;color:var(--blue)!important}
+.integrations-page .integrations-stats small{display:block!important;color:#a7b3c6!important;font-size:10px!important;font-weight:800!important}
+.integrations-page .integrations-stats strong{display:block!important;margin-top:4px!important;color:white!important;font-size:24px!important;font-weight:800!important}
+.integrations-page .integrations-toolbar{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;margin-bottom:18px!important;padding:12px!important;border:1px solid #ffffff12!important;border-radius:12px!important;background:linear-gradient(145deg,#132d46d9,#191e29ea)!important;box-shadow:0 26px 54px #0000002e!important}
+.integrations-page .integrations-tabs,.integrations-page .integrations-filters{display:flex!important;flex-wrap:wrap!important;gap:8px!important}
+.integrations-page .integrations-tabs button,.integrations-page .integrations-filters button{min-height:32px!important;padding:0 12px!important;border:1px solid #ffffff14!important;border-radius:999px!important;background:#ffffff08!important;color:#a7b3c6!important;font-size:10px!important;font-weight:900!important}
+.integrations-page .integrations-tabs button.is-active,.integrations-page .integrations-filters button.is-active{border-color:#01c38d66!important;background:#01c38d22!important;color:#42f2bd!important}
+.integrations-page .integrations-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:17px!important}
+.integrations-page .integrations-card{display:grid!important;gap:16px!important;min-height:240px!important;padding:18px!important;border:1px solid #ffffff12!important;border-radius:12px!important;background:linear-gradient(145deg,#132d46d9,#191e29ea)!important;box-shadow:0 26px 54px #0000002e!important}
+.integrations-page .integrations-card-top{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto!important;align-items:start!important;gap:13px!important}
+.integrations-page .integrations-logo{display:grid!important;place-items:center!important;width:54px!important;height:54px!important;flex:none!important;border:1px solid #ffffff14!important;border-radius:14px!important;overflow:hidden!important}
+.integrations-page .integrations-logo img{width:34px!important;height:34px!important;object-fit:contain!important}
+.integrations-page .integrations-card h2{margin:0!important;color:white!important;font-size:15px!important}
+.integrations-page .integrations-card p{margin:5px 0 0!important;color:#a7b3c6!important;font-size:11px!important;line-height:1.45!important}
+.integrations-page .integrations-card-meta{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;color:#8fa2b9!important;font-size:10px!important;font-weight:800!important}
+.integrations-page .integrations-category{display:inline-flex!important;align-items:center!important;min-height:24px!important;padding:0 9px!important;border-radius:999px!important;background:#ffffff0b!important;color:#d8dee8!important}
+.integrations-page .integrations-sync{display:inline-flex!important;align-items:center!important;gap:6px!important;color:#8fa2b9!important}
+.integrations-page .integrations-status{display:inline-flex!important;align-items:center!important;gap:6px!important;min-height:24px!important;padding:0 9px!important;border-radius:999px!important;font-size:10px!important;font-weight:900!important}
+.integrations-page .integrations-status.active{background:#01c38d18!important;color:#42f2bd!important}
+.integrations-page .integrations-status.pending{background:#f59e0b18!important;color:#ffc477!important}
+.integrations-page .integrations-status.inactive{background:#ffffff10!important;color:#a7b3c6!important}
+.integrations-page .integrations-status i{width:6px!important;height:6px!important;border-radius:50%!important;background:currentColor!important;box-shadow:0 0 10px currentColor!important}
+.integrations-page .integrations-card-actions{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;margin-top:auto!important}
+.integrations-page .integrations-toggle{display:flex!important;align-items:center!important;gap:8px!important;color:#a7b3c6!important;font-size:10px!important;font-weight:900!important}
+.integrations-page .integrations-toggle input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+.integrations-page .integrations-toggle span{position:relative!important;width:38px!important;height:22px!important;border-radius:999px!important;background:#ffffff14!important;box-shadow:inset 0 0 0 1px #ffffff14!important}
+.integrations-page .integrations-toggle span::before{content:""!important;position:absolute!important;left:3px!important;top:3px!important;width:16px!important;height:16px!important;border-radius:50%!important;background:#a7b3c6!important;transition:transform .2s ease,background .2s ease!important}
+.integrations-page .integrations-toggle input:checked+span{background:#01c38d28!important}
+.integrations-page .integrations-toggle input:checked+span::before{transform:translateX(16px)!important;background:#42f2bd!important}
+.integrations-page .integrations-toggle input:disabled+span{opacity:.55!important}
+.integrations-page .integrations-action{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:7px!important;min-height:34px!important;padding:0 12px!important;border:1px solid #ffffff16!important;border-radius:8px!important;background:#ffffff08!important;color:#d8dee8!important;font-size:10px!important;font-weight:900!important}
+.integrations-page .integrations-action.primary{border:0!important;background:var(--button-gradient)!important;color:var(--deep-blue)!important}
+.integrations-page .integrations-footer{margin-top:16px!important;color:#a7b3c6!important;text-align:right!important;font-size:11px!important;font-weight:800!important}
+@media (max-width:1220px){.integrations-page .integrations-grid{grid-template-columns:1fr 1fr!important}}
+@media (max-width:900px){.integrations-page .integrations-hero,.integrations-page .integrations-hero-actions{flex-direction:column!important}.integrations-page .integrations-search,.integrations-page .integrations-new{width:100%!important}.integrations-page .integrations-grid{grid-template-columns:1fr!important}}
