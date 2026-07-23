@@ -2,6 +2,7 @@ import { getAuth } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getFirebaseAdmin } from "@/lib/firebaseAdmin";
+import { createAccountStatusNotifications } from "@/lib/notifications";
 import { canManageAdminUsers, canSuspendUserAccounts, canTargetUserRole } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { getUserRoleByUserId } from "@/lib/userRoles";
@@ -88,6 +89,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       console.error("Error al actualizar estado de usuario:", error.message);
       return NextResponse.json({ message: "No fue posible actualizar el estado del usuario." }, { status: 500 });
     }
+
+    await createAccountStatusNotifications({
+      actor: authorization.actor,
+      nextStatus,
+      targetName: [authorization.target.nombre, authorization.target.apellido].filter(Boolean).join(" ") || authorization.target.correo,
+      targetUserId: id,
+    });
 
     return NextResponse.json({
       message: nextStatus === "suspendido" ? "Cuenta suspendida correctamente." : "Cuenta reactivada correctamente.",

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { IncomeActions } from "@/app/income/income-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 type IncomeRow = {
@@ -13,6 +15,18 @@ type IncomeRow = {
   categoria_id: string | null;
   empresas: { nombre_comercial: string | null } | { nombre_comercial: string | null }[] | null;
   categorias_financieras: { nombre: string | null; tipo: string | null } | { nombre: string | null; tipo: string | null }[] | null;
+};
+
+type CompanyRow = {
+  estado: string | null;
+  id: string;
+  nombre_comercial: string | null;
+};
+
+type CategoryRow = {
+  id: string;
+  nombre: string | null;
+  tipo: string | null;
 };
 
 const moneyFormatter = new Intl.NumberFormat("es-MX", {
@@ -46,17 +60,93 @@ function categoryLabel(income: IncomeRow) {
   return firstRelation(income.categorias_financieras)?.nombre || "Sin categoría";
 }
 
+function splitCustomCompanyConcept(value: string | null | undefined) {
+  const cleanValue = value?.trim() ?? "";
+  const [companyName, ...descriptionParts] = cleanValue.split(" · ");
+  if (!descriptionParts.length) return { companyName: "", description: cleanValue };
+
+  const description = descriptionParts.join(" · ").trim();
+  return {
+    companyName: companyName.trim(),
+    description: description || cleanValue,
+  };
+}
+
+function companyLabel(income: IncomeRow) {
+  const registeredCompany = firstRelation(income.empresas)?.nombre_comercial;
+  if (registeredCompany) return registeredCompany;
+
+  return splitCustomCompanyConcept(income.concepto).companyName || "Independiente";
+}
+
+function incomeDescription(income: IncomeRow) {
+  if (firstRelation(income.empresas)?.nombre_comercial) return fallback(income.concepto);
+  return fallback(splitCustomCompanyConcept(income.concepto).description);
+}
+
+function fallback(value: string | null | undefined) {
+  return value?.trim() || "Sin registrar";
+}
+
+function isIncomeCategory(category: CategoryRow) {
+  const normalized = category.tipo?.trim().toLowerCase();
+  return !normalized || ["ingreso", "ingresos", "income", "incomes", "revenue", "venta", "ventas"].includes(normalized);
+}
+
+async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
+  if (canViewAdminDashboard(user)) {
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id,nombre_comercial,estado")
+      .order("nombre_comercial", { ascending: true });
+
+    return {
+      companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
+      error,
+    };
+  }
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("empresa_usuario")
+    .select("empresa_id")
+    .eq("usuario_id", user.id);
+
+  const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
+  if (!companyIds.length || membershipError) return { companies: [] as CompanyRow[], error: membershipError };
+
+  const { data, error } = await supabase
+    .from("empresas")
+    .select("id,nombre_comercial,estado")
+    .in("id", companyIds)
+    .order("nombre_comercial", { ascending: true });
+
+  return {
+    companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
+    error,
+  };
+}
+
 export default async function IncomePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { data, error } = await supabase
-    .from("ingresos")
-    .select("id,concepto,monto,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
-    .order("fecha_ingreso", { ascending: false })
-    .limit(50);
+  const { companies, error: companiesError } = await getAccessibleCompanies(user);
+  const companyIds = companies.map((company) => company.id);
 
-  const incomes = (data ?? []) as IncomeRow[];
+  const [incomeResult, categoriesResult] = await Promise.all([
+    companyIds.length
+      ? supabase
+          .from("ingresos")
+          .select("id,concepto,monto,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
+          .in("empresa_id", companyIds)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase.from("categorias_financieras").select("id,nombre,tipo").order("nombre", { ascending: true }),
+  ]);
+
+  const incomes = (incomeResult.data ?? []) as IncomeRow[];
+  const incomeCategories = ((categoriesResult.data ?? []) as CategoryRow[]).filter(isIncomeCategory);
   const total = incomes.reduce((sum, income) => sum + asNumber(income.monto), 0);
   const average = incomes.length ? total / incomes.length : 0;
   const categories = new Set(incomes.map((income) => income.categoria_id).filter(Boolean)).size;
@@ -70,13 +160,21 @@ export default async function IncomePage() {
             <h1>Ingresos</h1>
             <span>Gestiona todos los ingresos registrados en tu base de datos.</span>
           </div>
-          <div className="income-actions">
-            <button type="button">Exportar <Icon name="keyboard_arrow_down" /></button>
-            <button className="primary-button compact" type="button">Nuevo ingreso <Icon name="add" /></button>
-          </div>
+          <IncomeActions
+            categories={incomeCategories.map((category) => ({ id: category.id, nombre: fallback(category.nombre) }))}
+            companies={companies.map((company) => ({ id: company.id, nombre: fallback(company.nombre_comercial) }))}
+            rows={incomes.map((income) => ({
+              categoria: categoryLabel(income),
+              concepto: incomeDescription(income),
+              empresa: companyLabel(income),
+              fecha_ingreso: income.fecha_ingreso,
+              id: income.id,
+              monto: asNumber(income.monto),
+            }))}
+          />
         </header>
 
-        {error && (
+        {(companiesError || incomeResult.error || categoriesResult.error) && (
           <section className="income-alert" role="alert">
             <strong>No fue posible cargar los ingresos.</strong>
             <span>Revisa la conexión con Supabase o los permisos de la tabla ingresos.</span>
@@ -139,8 +237,8 @@ export default async function IncomePage() {
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Descripción</th>
                   <th>Empresa</th>
+                  <th>Descripción</th>
                   <th>Monto</th>
                   <th>Categoría</th>
                 </tr>
@@ -150,8 +248,8 @@ export default async function IncomePage() {
                   incomes.map((income) => (
                     <tr key={income.id}>
                       <td>{formatDate(income.fecha_ingreso)}</td>
-                      <td>{income.concepto}</td>
-                      <td>{firstRelation(income.empresas)?.nombre_comercial || "Sin empresa"}</td>
+                      <td>{companyLabel(income)}</td>
+                      <td>{incomeDescription(income)}</td>
                       <td>{moneyFormatter.format(asNumber(income.monto))}</td>
                       <td><span className="income-category"><Icon name="trending_up" /> {categoryLabel(income)}</span></td>
                     </tr>

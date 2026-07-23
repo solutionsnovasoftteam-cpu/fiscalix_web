@@ -21,6 +21,14 @@ type Integration = {
   tone: string;
 };
 
+export type IntegrationRow = {
+  estado: string | null;
+  id: string;
+  nombre: string | null;
+  partner: string | null;
+  tipo: string | null;
+};
+
 const categories = ["Todas", "Contabilidad", "Facturación", "Bancos", "Almacenamiento", "Pagos", "Otros"] as const;
 
 const seed: Integration[] = [
@@ -44,6 +52,8 @@ const catalog: Integration[] = [
   { id: "odoo", name: "Odoo", description: "ERP y operaciones empresariales", category: "Contabilidad", status: "pending", autoSync: false, lastSync: null, logo: "/integrations/odoo.svg", tone: "#714b67" },
   { id: "whatsapp", name: "WhatsApp Business", description: "Recordatorios y avisos a clientes", category: "Otros", status: "pending", autoSync: false, lastSync: null, logo: "/integrations/whatsapp.svg", tone: "#25d366" },
 ];
+
+const definitions = [...seed, ...catalog];
 
 const syncFormatter = new Intl.DateTimeFormat("es-MX", {
   day: "2-digit",
@@ -77,12 +87,42 @@ function statusLabel(status: IntegrationStatus) {
   return "Inactiva";
 }
 
-export function IntegrationsHub() {
-  const [items, setItems] = useState(seed);
+function normalizeStatus(value: string | null | undefined): IntegrationStatus {
+  if (value === "active" || value === "activa" || value === "activo") return "active";
+  if (value === "inactive" || value === "inactiva" || value === "inactivo") return "inactive";
+  return "pending";
+}
+
+function normalizeCategory(value: string | null | undefined, fallback: IntegrationCategory): IntegrationCategory {
+  return categories.includes(value as (typeof categories)[number]) && value !== "Todas"
+    ? value as IntegrationCategory
+    : fallback;
+}
+
+function integrationFromRow(row: IntegrationRow): Integration {
+  const definition = definitions.find((item) => item.id === row.partner || item.name === row.nombre);
+  const id = row.partner || definition?.id || row.id;
+
+  return {
+    autoSync: normalizeStatus(row.estado) === "active",
+    category: normalizeCategory(row.tipo, definition?.category ?? "Otros"),
+    description: definition?.description ?? "Integración registrada en Supabase.",
+    id,
+    lastSync: null,
+    logo: definition?.logo ?? "/integrations/sat.svg",
+    name: row.nombre?.trim() || definition?.name || "Integración",
+    status: normalizeStatus(row.estado),
+    tone: definition?.tone ?? "#01c38d",
+  };
+}
+
+export function IntegrationsHub({ initialRows = [] }: { initialRows?: IntegrationRow[] }) {
+  const initialItems = initialRows.length ? initialRows.map(integrationFromRow) : seed;
+  const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<(typeof categories)[number]>("Todas");
   const [statusFilter, setStatusFilter] = useState<"all" | IntegrationStatus>("all");
-  const [syncCount, setSyncCount] = useState(24);
+  const [syncCount, setSyncCount] = useState(() => initialItems.filter((item) => item.status === "active").length);
   const [showNewModal, setShowNewModal] = useState(false);
   const dialogRef = useRef<HTMLElement>(null);
   const closeNewModal = useCallback(() => setShowNewModal(false), []);

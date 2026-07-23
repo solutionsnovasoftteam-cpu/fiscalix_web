@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { createPlanSavedNotification } from "@/lib/notifications";
 import { basicPlanSelect, extendedPlanSelect, isMissingPlanColumnError, type PlanDbRow } from "@/lib/plans";
 import { canManagePlans } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
@@ -107,6 +108,12 @@ export async function POST(request: Request) {
     console.error("Error al guardar plan:", error.message);
     return NextResponse.json({ message: "No fue posible guardar el plan." }, { status: 500 });
   }
+
+  await createPlanSavedNotification({
+    action: body.databaseId ? "updated" : "created",
+    planName: nombre,
+    userId: user.id,
+  });
 
   return NextResponse.json({ plan: data });
 }

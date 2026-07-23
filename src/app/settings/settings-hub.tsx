@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 
 type Theme = "dark" | "light";
-type ActivityRow = {
+export type ActivityRow = {
   action: string;
   date: string;
   description: string;
@@ -13,13 +13,31 @@ type ActivityRow = {
   user: string;
 };
 
-const activitySeed: ActivityRow[] = [
-  { id: "a1", date: "31 May 2024, 09:14", user: "Ana Torres", action: "Actualización", module: "Empresa", description: "Se modificó la dirección fiscal." },
-  { id: "a2", date: "30 May 2024, 18:02", user: "Luis Pérez", action: "Seguridad", module: "Cuenta", description: "2FA activado en la cuenta." },
-  { id: "a3", date: "30 May 2024, 02:30", user: "Sistema", action: "Respaldo", module: "Respaldos", description: "Respaldo automático completado en AWS S3." },
-  { id: "a4", date: "29 May 2024, 11:45", user: "María González", action: "Preferencias", module: "Sistema", description: "Moneda principal cambiada a MXN." },
-  { id: "a5", date: "28 May 2024, 16:20", user: "Carlos Ruiz", action: "Usuarios", module: "Permisos", description: "Nuevo rol asignado a colaborador." },
-];
+export type SettingsCompany = {
+  address: string;
+  commercialName: string;
+  email: string;
+  legalName: string;
+  phone: string;
+  regime: string;
+  rfc: string;
+};
+
+export type SettingsInitialData = {
+  activity: ActivityRow[];
+  company: SettingsCompany;
+  userName: string;
+};
+
+const defaultCompany: SettingsCompany = {
+  address: "Pendiente de registrar",
+  commercialName: "Pendiente de registrar",
+  email: "Pendiente de registrar",
+  legalName: "Pendiente de registrar",
+  phone: "Pendiente de registrar",
+  regime: "Pendiente de registrar",
+  rfc: "Pendiente de registrar",
+};
 
 const quickLinks = [
   { id: "company", icon: "settings", title: "Información de la empresa", text: "Datos fiscales y contacto", target: "settings-company" },
@@ -37,7 +55,7 @@ const dateFmt = new Intl.DateTimeFormat("es-MX", {
   minute: "2-digit",
 });
 
-export function SettingsHub() {
+export function SettingsHub({ initialData }: { initialData?: SettingsInitialData }) {
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState("");
   const [editingCompany, setEditingCompany] = useState(false);
@@ -45,18 +63,10 @@ export function SettingsHub() {
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [twoFactor, setTwoFactor] = useState(true);
   const [theme, setTheme] = useState<Theme>("dark");
-  const [lastBackup, setLastBackup] = useState("31 May 2024, 02:30 AM");
-  const [activity, setActivity] = useState(activitySeed);
+  const [lastBackup, setLastBackup] = useState("Pendiente de realizar");
+  const [activity, setActivity] = useState<ActivityRow[]>(initialData?.activity ?? []);
 
-  const [company, setCompany] = useState({
-    commercialName: "Swissborg SA de CV",
-    legalName: "Swissborg SA de CV",
-    rfc: "SWI190101ABC",
-    regime: "601 - General de Ley Personas Morales",
-    address: "Av. Reforma 123, Col. Juárez, CDMX, CP 06600",
-    phone: "+52 55 1234 5678",
-    email: "contacto@swissborg.mx",
-  });
+  const [company, setCompany] = useState(initialData?.company ?? defaultCompany);
 
   const [companyDraft, setCompanyDraft] = useState(company);
 
@@ -96,7 +106,7 @@ export function SettingsHub() {
     const entry: ActivityRow = {
       id: `a-${Date.now()}`,
       date: dateFmt.format(new Date()),
-      user: "Tú",
+      user: initialData?.userName ?? "Tú",
       action: "Guardado",
       module: "Configuraciones",
       description: "Se guardaron los cambios del sistema.",

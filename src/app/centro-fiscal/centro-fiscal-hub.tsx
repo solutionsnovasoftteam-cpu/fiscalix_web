@@ -43,6 +43,13 @@ type TaxDue = {
   name: string;
 };
 
+export type CentroFiscalInitialData = {
+  docs: RecentDoc[];
+  events: FiscalEvent[];
+  movements: Movement[];
+  taxes: TaxDue[];
+};
+
 const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
 const monthFmt = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
 const dayFmt = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" });
@@ -77,6 +84,13 @@ const taxesSeed: TaxDue[] = [
   { id: "t3", name: "Retenciones salarios", dueDate: "2026-07-31", amount: 5000 },
 ];
 
+const emptyInitialData: CentroFiscalInitialData = {
+  docs: docsSeed,
+  events: eventsSeed,
+  movements: movementsSeed,
+  taxes: taxesSeed,
+};
+
 const monthShort = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
 const sparkPaths = {
@@ -104,15 +118,22 @@ function calendarCells(year: number, month: number) {
   return cells;
 }
 
-export function CentroFiscalHub({ serverNow }: { serverNow: string }) {
+export function CentroFiscalHub({
+  initialData = emptyInitialData,
+  serverNow,
+}: {
+  initialData?: CentroFiscalInitialData;
+  serverNow: string;
+}) {
   const baseDate = useMemo(() => new Date(serverNow), [serverNow]);
   const [calendarMonth, setCalendarMonth] = useState(baseDate.getMonth());
   const [calendarYear, setCalendarYear] = useState(baseDate.getFullYear());
   const [selectedDay, setSelectedDay] = useState<number | null>(baseDate.getDate());
   const [movementFilter, setMovementFilter] = useState<MovementFilter>("all");
-  const [movements, setMovements] = useState(movementsSeed);
-  const [events, setEvents] = useState(eventsSeed);
-  const [docs, setDocs] = useState(docsSeed);
+  const [movements, setMovements] = useState(initialData.movements);
+  const [events, setEvents] = useState(initialData.events);
+  const [docs, setDocs] = useState(initialData.docs);
+  const [taxes] = useState(initialData.taxes);
   const [feedback, setFeedback] = useState("");
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [newActivity, setNewActivity] = useState({ title: "", day: String(baseDate.getDate()) });
@@ -122,7 +143,7 @@ export function CentroFiscalHub({ serverNow }: { serverNow: string }) {
 
   const monthIncome = movements.filter((m) => m.type === "Ingreso").reduce((s, m) => s + m.amount, 0);
   const monthExpense = movements.filter((m) => m.type === "Gasto").reduce((s, m) => s + m.amount, 0);
-  const taxesDue = taxesSeed.reduce((s, t) => s + t.amount, 0);
+  const taxesDue = taxes.reduce((s, t) => s + t.amount, 0);
   const docsCount = docs.length + movements.filter((m) => m.type === "Ingreso").length;
 
   const stats = useMemo(
@@ -421,7 +442,7 @@ export function CentroFiscalHub({ serverNow }: { serverNow: string }) {
         <section className="cf-panel">
           <div className="cf-panel-head"><h2>Impuestos por vencer</h2></div>
           <ul className="cf-tax-list">
-            {taxesSeed.map((tax) => (
+            {taxes.map((tax) => (
               <li key={tax.id}>
                 <div>
                   <strong>{tax.name}</strong>

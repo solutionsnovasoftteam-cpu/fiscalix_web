@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { DashboardExportButton } from "@/app/dashboard/dashboard-export-button";
 import { Icon } from "@/components/Icon";
 import { getCurrentUser } from "@/lib/auth";
 import { canViewAdminDashboard } from "@/lib/roles";
@@ -81,6 +82,11 @@ const monthFormatter = new Intl.DateTimeFormat("es-MX", {
   month: "short",
 });
 
+const monthTooltipFormatter = new Intl.DateTimeFormat("es-MX", {
+  month: "long",
+  year: "numeric",
+});
+
 const billingStatusLabels: Record<string, string> = {
   pago_no_acreditado: "Pago no acreditado",
   pagado_exito_mes: "Pagado con éxito este mes",
@@ -108,6 +114,11 @@ function formatDate(value: string | null | undefined) {
   if (!value) return "Sin fecha";
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+}
+
+function formatMonthPeriod(key: string) {
+  const date = new Date(`${key}-01T00:00:00`);
+  return Number.isNaN(date.getTime()) ? key : monthTooltipFormatter.format(date);
 }
 
 function compareDatesDesc(a: string | null | undefined, b: string | null | undefined) {
@@ -179,6 +190,58 @@ function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[]) {
   }
 
   return months;
+}
+
+function buildFinanceLinePoints(
+  months: ReturnType<typeof buildMonthlySummary>,
+  field: "expenses" | "incomes",
+  maxValue: number,
+) {
+  const left = 86;
+  const right = 28;
+  const top = 24;
+  const bottom = 198;
+  const width = 680 - left - right;
+  const height = bottom - top;
+  const divisor = Math.max(1, months.length - 1);
+
+  return months.map((month, index) => {
+    const x = left + (width / divisor) * index;
+    const y = bottom - (Math.max(0, month[field]) / maxValue) * height;
+    return {
+      label: month.label,
+      value: month[field],
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+    };
+  });
+}
+
+function buildSvgPath(points: Array<{ x: number; y: number }>) {
+  return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+}
+
+function buildSvgAreaPath(points: Array<{ x: number; y: number }>) {
+  if (!points.length) return "";
+  const bottom = 198;
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  return `${buildSvgPath(points)} L ${lastPoint.x} ${bottom} L ${firstPoint.x} ${bottom} Z`;
+}
+
+function buildFinanceTicks(maxValue: number) {
+  const top = 24;
+  const bottom = 198;
+  const height = bottom - top;
+
+  return [1, 2 / 3, 1 / 3, 0].map((ratio) => ({
+    value: maxValue * ratio,
+    y: Number((bottom - height * ratio).toFixed(2)),
+  }));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
 }
 
 export default async function DashboardPage() {
@@ -281,6 +344,14 @@ export default async function DashboardPage() {
 
   const monthlySummary = buildMonthlySummary(incomes, expenses);
   const highestMonthlyValue = Math.max(0, ...monthlySummary.flatMap((month) => [month.incomes, month.expenses]));
+  const chartMaxValue = Math.max(1, highestMonthlyValue);
+  const incomeLinePoints = buildFinanceLinePoints(monthlySummary, "incomes", chartMaxValue);
+  const expenseLinePoints = buildFinanceLinePoints(monthlySummary, "expenses", chartMaxValue);
+  const incomeLinePath = buildSvgPath(incomeLinePoints);
+  const expenseLinePath = buildSvgPath(expenseLinePoints);
+  const incomeAreaPath = buildSvgAreaPath(incomeLinePoints);
+  const expenseAreaPath = buildSvgAreaPath(expenseLinePoints);
+  const financeTicks = buildFinanceTicks(chartMaxValue);
   const hasFinancialData = incomes.length > 0 || expenses.length > 0;
 
   const movements: Movement[] = [
@@ -322,6 +393,18 @@ export default async function DashboardPage() {
     })),
   ].slice(0, 4);
 
+  const exportData = {
+    generatedFor: [user.nombre, user.apellido].filter(Boolean).join(" ") || user.correo,
+    monthlySummary,
+    movements,
+    obligations: obligationItems,
+    stats: stats.map((stat) => ({
+      help: stat.help,
+      title: stat.title,
+      value: stat.value,
+    })),
+  };
+
   return (
     <main className="dashboard-content">
       <div className="welcome">
@@ -330,7 +413,7 @@ export default async function DashboardPage() {
           <h1>Hola, {firstName(user.nombre)} <span>👋</span></h1>
           <span>Aquí tienes el resumen de tu actividad fiscal.</span>
         </div>
-        <button className="primary-button compact" type="button"><Icon name="add" /> Registrar movimiento</button>
+        <DashboardExportButton data={exportData} />
       </div>
 
       {hasError && (
@@ -365,21 +448,97 @@ export default async function DashboardPage() {
             </select>
           </div>
           {hasFinancialData ? (
-            <div className="finance-summary">
-              {monthlySummary.map((month) => {
-                const incomeWidth = highestMonthlyValue ? Math.max(3, (month.incomes / highestMonthlyValue) * 100) : 0;
-                const expenseWidth = highestMonthlyValue ? Math.max(3, (month.expenses / highestMonthlyValue) * 100) : 0;
-                return (
-                  <div className="finance-month" key={month.key}>
-                    <span>{month.label}</span>
-                    <div>
-                      <i className="income-bar" style={{ width: `${incomeWidth}%` }} />
-                      <i className="expense-bar" style={{ width: `${expenseWidth}%` }} />
-                    </div>
-                    <small>{moneyFormatter.format(month.incomes - month.expenses)}</small>
-                  </div>
-                );
-              })}
+            <div className="finance-summary finance-line-summary">
+              <div className="finance-line-chart">
+                <svg aria-label="Gráfica de líneas de ingresos y gastos de los últimos seis meses" role="img" viewBox="0 0 680 252">
+                  <title>Ingresos y gastos de los últimos seis meses</title>
+                  <defs>
+                    <linearGradient id="finance-income-area" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#01c38d" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#01c38d" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="finance-expense-area" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#ff8b69" stopOpacity="0.18" />
+                      <stop offset="100%" stopColor="#ff8b69" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {financeTicks.map((tick) => (
+                    <g key={tick.y}>
+                      <line className="finance-grid-line" x1="86" x2="652" y1={tick.y} y2={tick.y} />
+                      <text className="finance-money-label" textAnchor="end" x="76" y={tick.y + 4}>
+                        {moneyFormatter.format(tick.value)}
+                      </text>
+                    </g>
+                  ))}
+                  {monthlySummary.map((month, index) => {
+                    const x = incomeLinePoints[index]?.x ?? 86;
+                    return (
+                      <g key={month.key}>
+                        <line className="finance-grid-line vertical" x1={x} x2={x} y1="24" y2="198" />
+                        <text className="finance-axis-label" textAnchor="middle" x={x} y="229">{month.label}</text>
+                      </g>
+                    );
+                  })}
+                  <path className="finance-area finance-area-income" d={incomeAreaPath} />
+                  <path className="finance-area finance-area-expense" d={expenseAreaPath} />
+                  <path className="finance-line-path finance-line-income" d={incomeLinePath} />
+                  <path className="finance-line-path finance-line-expense" d={expenseLinePath} />
+                  {incomeLinePoints.map((point, index) => (
+                    <g className="finance-point-group" key={`income-${point.label}`} style={{ animationDelay: `${520 + index * 90}ms` }}>
+                      <circle className="finance-point-halo finance-point-halo-income" cx={point.x} cy={point.y} r="9" />
+                      <circle className="finance-point finance-point-income" cx={point.x} cy={point.y} r="5">
+                        <title>{`${point.label} · Ingresos: ${moneyFormatter.format(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  ))}
+                  {expenseLinePoints.map((point, index) => (
+                    <g className="finance-point-group" key={`expense-${point.label}`} style={{ animationDelay: `${620 + index * 90}ms` }}>
+                      <circle className="finance-point-halo finance-point-halo-expense" cx={point.x} cy={point.y} r="9" />
+                      <circle className="finance-point finance-point-expense" cx={point.x} cy={point.y} r="5">
+                        <title>{`${point.label} · Gastos: ${moneyFormatter.format(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  ))}
+                  {monthlySummary.map((month, index) => {
+                    const incomePoint = incomeLinePoints[index];
+                    const expensePoint = expenseLinePoints[index];
+                    if (!incomePoint || !expensePoint) return null;
+
+                    const x = incomePoint.x;
+                    const tooltipWidth = 156;
+                    const tooltipX = clamp(x - tooltipWidth / 2, 92, 680 - tooltipWidth - 18);
+                    const balanceValue = month.incomes - month.expenses;
+
+                    return (
+                      <g
+                        aria-label={`${formatMonthPeriod(month.key)}. Ingresos ${moneyFormatter.format(month.incomes)}. Gastos ${moneyFormatter.format(month.expenses)}. Balance ${moneyFormatter.format(balanceValue)}.`}
+                        className="finance-hover-group"
+                        key={`hover-${month.key}`}
+                        tabIndex={0}
+                      >
+                        <rect className="finance-hover-zone" height="212" rx="18" width="66" x={x - 33} y="16" />
+                        <line className="finance-hover-guide" x1={x} x2={x} y1="24" y2="198" />
+                        <g className="finance-tooltip-anchor" transform={`translate(${tooltipX} 31)`}>
+                          <g className="finance-tooltip">
+                            <rect className="finance-tooltip-card" height="82" rx="12" width={tooltipWidth} />
+                            <text className="finance-tooltip-title" x="12" y="18">{formatMonthPeriod(month.key)}</text>
+                            <circle className="finance-tooltip-dot income" cx="15" cy="34" r="4" />
+                            <text className="finance-tooltip-label" x="25" y="38">Ingresos</text>
+                            <text className="finance-tooltip-value income" textAnchor="end" x={tooltipWidth - 12} y="38">{moneyFormatter.format(month.incomes)}</text>
+                            <circle className="finance-tooltip-dot expense" cx="15" cy="52" r="4" />
+                            <text className="finance-tooltip-label" x="25" y="56">Gastos</text>
+                            <text className="finance-tooltip-value expense" textAnchor="end" x={tooltipWidth - 12} y="56">{moneyFormatter.format(month.expenses)}</text>
+                            <text className="finance-tooltip-label balance" x="12" y="74">Balance</text>
+                            <text className={balanceValue >= 0 ? "finance-tooltip-value income" : "finance-tooltip-value expense"} textAnchor="end" x={tooltipWidth - 12} y="74">
+                              {moneyFormatter.format(balanceValue)}
+                            </text>
+                          </g>
+                        </g>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
               <div className="finance-legend">
                 <span><i className="income-bar" />Ingresos</span>
                 <span><i className="expense-bar" />Gastos</span>

@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { buildHistorySeed, getCurrentPayCycle, getQuincenaByOffset, type PayrollRun } from "@/app/payroll/payroll-dates";
 import { downloadPayrollPdf } from "@/app/payroll/payroll-pdf";
+import { notifyPdfDownload } from "@/lib/clientNotifications";
 
-type Employee = {
+export type PayrollEmployee = {
   department: string;
   id: string;
   initials: string;
@@ -15,10 +16,15 @@ type Employee = {
   status: "Activo" | "Baja";
 };
 
+export type PayrollHubInitialData = {
+  employees?: PayrollEmployee[];
+  history?: PayrollRun[];
+};
+
 const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
 const dateFmt = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-const employeesSeed: Employee[] = [
+const employeesSeed: PayrollEmployee[] = [
   { id: "e1", name: "Ana Torres", role: "Gerente RH", department: "Recursos Humanos", salary: 32000, status: "Activo", initials: "AT" },
   { id: "e2", name: "Luis Pérez", role: "Contador", department: "Finanzas", salary: 28500, status: "Activo", initials: "LP" },
   { id: "e3", name: "María González", role: "Diseñadora", department: "Marketing", salary: 25000, status: "Activo", initials: "MG" },
@@ -39,9 +45,9 @@ function initialsFrom(name: string) {
   return name.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
-export function PayrollHub() {
-  const [employees, setEmployees] = useState(employeesSeed);
-  const [history, setHistory] = useState(historySeed);
+export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialData }) {
+  const [employees, setEmployees] = useState(initialData?.employees?.length ? initialData.employees : employeesSeed);
+  const [history, setHistory] = useState(initialData?.history?.length ? initialData.history : historySeed);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -152,7 +158,7 @@ export function PayrollHub() {
     }
 
     const name = newEmployee.name.trim();
-    const employee: Employee = {
+    const employee: PayrollEmployee = {
       id: `e-${Date.now()}`,
       name,
       role: newEmployee.role.trim() || "Colaborador",
@@ -259,6 +265,7 @@ export function PayrollHub() {
 
     try {
       await downloadPayrollPdf(run);
+      await notifyPdfDownload("payroll", { folio: run.folio, recordCount: run.employees });
       setHistory((current) =>
         current.map((item) => (item.id === id ? { ...item, downloaded: true } : item)),
       );
@@ -306,10 +313,38 @@ export function PayrollHub() {
       </header>
 
       <section className="payroll-kpis" aria-label="Indicadores">
-        <article><small>Total empleados</small><strong>{activeEmployees.length}</strong><span>Activos</span></article>
-        <article className="is-accent"><small>Total a pagar</small><strong>{money.format(totalPayroll)}</strong><span>Quincena actual</span></article>
-        <article><small>Nóminas procesadas</small><strong>{history.filter((run) => run.status === "Pagado").length}</strong><span>Registradas</span></article>
-        <article><small>Próximo pago</small><strong>{payCycle.shortPayDay}</strong><span>{payCycle.shortPayYear}</span></article>
+        <article>
+          <small>Total empleados</small>
+          <strong>{activeEmployees.length}</strong>
+          <span className="payroll-kpi-caption">Activos</span>
+          <span className="payroll-kpi-icon">
+            <Icon name="person" />
+          </span>
+        </article>
+        <article className="is-accent">
+          <small>Total a pagar</small>
+          <strong>{money.format(totalPayroll)}</strong>
+          <span className="payroll-kpi-caption">Quincena actual</span>
+          <span className="payroll-kpi-icon">
+            <Icon name="payments" />
+          </span>
+        </article>
+        <article>
+          <small>Nóminas procesadas</small>
+          <strong>{history.filter((run) => run.status === "Pagado").length}</strong>
+          <span className="payroll-kpi-caption">Registradas</span>
+          <span className="payroll-kpi-icon">
+            <Icon name="fact_check" />
+          </span>
+        </article>
+        <article>
+          <small>Próximo pago</small>
+          <strong>{payCycle.shortPayDay}</strong>
+          <span className="payroll-kpi-caption">{payCycle.shortPayYear}</span>
+          <span className="payroll-kpi-icon">
+            <Icon name="event_note" />
+          </span>
+        </article>
       </section>
 
       <div className="payroll-layout">
@@ -436,7 +471,12 @@ export function PayrollHub() {
           {visibleHistory.map((run) => (
             <article className="payroll-history-card" key={run.id}>
               <header>
-                <strong>{run.folio}</strong>
+                <span className="payroll-history-title">
+                  <span className="payroll-history-icon">
+                    <Icon name={run.status === "Pagado" ? "check_circle" : "history"} />
+                  </span>
+                  <strong>{run.folio}</strong>
+                </span>
                 <span className={`payroll-status ${run.status === "Pagado" ? "active" : "pending"}`}>{run.status}</span>
               </header>
               <p>{run.period}</p>
