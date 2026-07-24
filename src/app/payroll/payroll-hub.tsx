@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
-import { buildHistorySeed, getCurrentPayCycle, getQuincenaByOffset, type PayrollRun } from "@/app/payroll/payroll-dates";
+import { getCurrentPayCycle, getQuincenaByOffset, type PayrollRun } from "@/app/payroll/payroll-dates";
 import { downloadPayrollPdf } from "@/app/payroll/payroll-pdf";
 import { notifyPdfDownload } from "@/lib/clientNotifications";
 
@@ -24,21 +24,6 @@ export type PayrollHubInitialData = {
 const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
 const dateFmt = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-const employeesSeed: PayrollEmployee[] = [
-  { id: "e1", name: "Ana Torres", role: "Gerente RH", department: "Recursos Humanos", salary: 32000, status: "Activo", initials: "AT" },
-  { id: "e2", name: "Luis Pérez", role: "Contador", department: "Finanzas", salary: 28500, status: "Activo", initials: "LP" },
-  { id: "e3", name: "María González", role: "Diseñadora", department: "Marketing", salary: 25000, status: "Activo", initials: "MG" },
-  { id: "e4", name: "Carlos Ruiz", role: "Desarrollador", department: "TI", salary: 35000, status: "Activo", initials: "CR" },
-  { id: "e5", name: "Elena Vargas", role: "Asistente Admin", department: "Operaciones", salary: 18500, status: "Activo", initials: "EV" },
-  { id: "e6", name: "Roberto Díaz", role: "Analista", department: "Finanzas", salary: 22000, status: "Activo", initials: "RD" },
-  { id: "e7", name: "Sofía Mendoza", role: "UX Lead", department: "TI", salary: 31000, status: "Activo", initials: "SM" },
-  { id: "e8", name: "Diego Herrera", role: "Ventas Sr.", department: "Comercial", salary: 27000, status: "Activo", initials: "DH" },
-  { id: "e9", name: "Patricia Luna", role: "Legal", department: "Compliance", salary: 29500, status: "Activo", initials: "PL" },
-  { id: "e10", name: "Jorge Castillo", role: "Soporte", department: "Operaciones", salary: 19800, status: "Activo", initials: "JC" },
-];
-
-const historySeed = buildHistorySeed();
-
 const PAGE_SIZE = 5;
 
 function initialsFrom(name: string) {
@@ -46,8 +31,8 @@ function initialsFrom(name: string) {
 }
 
 export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialData }) {
-  const [employees, setEmployees] = useState(initialData?.employees?.length ? initialData.employees : employeesSeed);
-  const [history, setHistory] = useState(initialData?.history?.length ? initialData.history : historySeed);
+  const [employees, setEmployees] = useState<PayrollEmployee[]>(() => initialData?.employees ?? []);
+  const [history, setHistory] = useState<PayrollRun[]>(() => initialData?.history ?? []);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [showAllHistory, setShowAllHistory] = useState(false);
@@ -108,6 +93,11 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
   }, [menuOpenId]);
 
   function generatePayroll() {
+    if (activeEmployees.length === 0) {
+      notify("Agrega empleados activos antes de generar una nómina.");
+      return;
+    }
+
     const quincena = getQuincenaByOffset(0);
     const folio = `NOM-${quincena.folioPart}-R${history.length + 1}`;
     setHistory((current) => [
@@ -129,6 +119,11 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
   }
 
   function createPaymentDraft() {
+    if (activeEmployees.length === 0) {
+      notify("Agrega empleados activos antes de crear un pago.");
+      return;
+    }
+
     const quincena = getQuincenaByOffset(0);
     const folio = `NOM-BOR-${quincena.folioPart}-${history.length + 1}`;
     setHistory((current) => [
@@ -394,32 +389,44 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
                 </tr>
               </thead>
               <tbody>
-                {pageItems.map((employee) => (
-                  <tr key={employee.id}>
-                    <td>
-                      <span className="payroll-avatar">
-                        {employee.initials}
-                      </span>
-                      <strong>{employee.name}</strong>
-                    </td>
-                    <td>{employee.role}</td>
-                    <td>{employee.department}</td>
-                    <td>{money.format(employee.salary)}</td>
-                    <td><span className={`payroll-status ${employee.status === "Activo" ? "active" : "inactive"}`}>{employee.status}</span></td>
-                    <td className="payroll-row-actions">
-                      <button
-                        aria-expanded={menuOpenId === employee.id}
-                        aria-haspopup="menu"
-                        aria-label={`Opciones de ${employee.name}`}
-                        className="payroll-icon-btn"
-                        onClick={(event) => openEmployeeMenu(event, employee.id)}
-                        type="button"
-                      >
-                        <span aria-hidden="true">⋯</span>
-                      </button>
+                {pageItems.length > 0 ? (
+                  pageItems.map((employee) => (
+                    <tr key={employee.id}>
+                      <td>
+                        <span className="payroll-avatar">
+                          {employee.initials}
+                        </span>
+                        <strong>{employee.name}</strong>
+                      </td>
+                      <td>{employee.role}</td>
+                      <td>{employee.department}</td>
+                      <td>{money.format(employee.salary)}</td>
+                      <td><span className={`payroll-status ${employee.status === "Activo" ? "active" : "inactive"}`}>{employee.status}</span></td>
+                      <td className="payroll-row-actions">
+                        <button
+                          aria-expanded={menuOpenId === employee.id}
+                          aria-haspopup="menu"
+                          aria-label={`Opciones de ${employee.name}`}
+                          className="payroll-icon-btn"
+                          onClick={(event) => openEmployeeMenu(event, employee.id)}
+                          type="button"
+                        >
+                          <span aria-hidden="true">⋯</span>
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td className="payroll-empty-cell" colSpan={6}>
+                      <div className="payroll-empty">
+                        <span><Icon name="person" /></span>
+                        <strong>No hay empleados registrados</strong>
+                        <small>Agrega empleados reales para comenzar a gestionar la nómina.</small>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -463,44 +470,54 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
             <h2>Historial de nóminas</h2>
             <p>{history.length} registros</p>
           </div>
-          <button className="payroll-btn payroll-btn-secondary" onClick={() => setShowAllHistory((value) => !value)} type="button">
-            {showAllHistory ? "Ver menos" : "Ver todas"}
-          </button>
+          {history.length > 4 ? (
+            <button className="payroll-btn payroll-btn-secondary" onClick={() => setShowAllHistory((value) => !value)} type="button">
+              {showAllHistory ? "Ver menos" : "Ver todas"}
+            </button>
+          ) : null}
         </div>
         <div className="payroll-history-grid">
-          {visibleHistory.map((run) => (
-            <article className="payroll-history-card" key={run.id}>
-              <header>
-                <span className="payroll-history-title">
-                  <span className="payroll-history-icon">
-                    <Icon name={run.status === "Pagado" ? "check_circle" : "history"} />
+          {visibleHistory.length > 0 ? (
+            visibleHistory.map((run) => (
+              <article className="payroll-history-card" key={run.id}>
+                <header>
+                  <span className="payroll-history-title">
+                    <span className="payroll-history-icon">
+                      <Icon name={run.status === "Pagado" ? "check_circle" : "history"} />
+                    </span>
+                    <strong>{run.folio}</strong>
                   </span>
-                  <strong>{run.folio}</strong>
-                </span>
-                <span className={`payroll-status ${run.status === "Pagado" ? "active" : "pending"}`}>{run.status}</span>
-              </header>
-              <p>{run.period}</p>
-              <small>Pago · {dateFmt.format(new Date(`${run.payDate}T00:00:00`))}</small>
-              <div className="payroll-history-meta">
-                <span>{run.employees} empleados</span>
-                <em>{money.format(run.paid)}</em>
-              </div>
-              {run.status === "Borrador" && (
-                <button className="payroll-btn payroll-btn-primary" onClick={() => processDraft(run.id)} type="button">
-                  <Icon name="payments" />
-                  Procesar borrador
+                  <span className={`payroll-status ${run.status === "Pagado" ? "active" : "pending"}`}>{run.status}</span>
+                </header>
+                <p>{run.period}</p>
+                <small>Pago · {dateFmt.format(new Date(`${run.payDate}T00:00:00`))}</small>
+                <div className="payroll-history-meta">
+                  <span>{run.employees} empleados</span>
+                  <em>{money.format(run.paid)}</em>
+                </div>
+                {run.status === "Borrador" && (
+                  <button className="payroll-btn payroll-btn-primary" onClick={() => processDraft(run.id)} type="button">
+                    <Icon name="payments" />
+                    Procesar borrador
+                  </button>
+                )}
+                <button
+                  className={`payroll-btn payroll-btn-secondary ${run.downloaded ? "is-done" : ""}`}
+                  onClick={() => downloadRun(run.id)}
+                  type="button"
+                >
+                  <Icon name="south" />
+                  {run.downloaded ? "PDF descargado" : "Descargar PDF"}
                 </button>
-              )}
-              <button
-                className={`payroll-btn payroll-btn-secondary ${run.downloaded ? "is-done" : ""}`}
-                onClick={() => downloadRun(run.id)}
-                type="button"
-              >
-                <Icon name="south" />
-                {run.downloaded ? "PDF descargado" : "Descargar PDF"}
-              </button>
-            </article>
-          ))}
+              </article>
+            ))
+          ) : (
+            <div className="payroll-empty payroll-history-empty">
+              <span><Icon name="history" /></span>
+              <strong>No hay nóminas registradas</strong>
+              <small>Cuando generes nóminas reales, aparecerán en este historial.</small>
+            </div>
+          )}
         </div>
       </section>
 
