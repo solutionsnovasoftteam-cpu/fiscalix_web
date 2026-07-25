@@ -9,7 +9,7 @@ import {
   mergePlansWithDbRows,
   type PlanDbRow,
 } from "@/lib/plans";
-import { canManagePlans } from "@/lib/roles";
+import { canManagePlans, USER_ROLES } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 type PlanQueryResult = {
@@ -35,11 +35,34 @@ export default async function PlansPage() {
   }
 
   const plans = mergePlansWithDbRows((planResult.data ?? []) as PlanDbRow[]);
+  const canSubscribePlans = user.rol === USER_ROLES.CLIENT;
+  let currentPlanDatabaseId: string | null = null;
+
+  if (canSubscribePlans) {
+    const { data: membership } = await supabase
+      .from("empresa_usuario")
+      .select("empresa_id")
+      .eq("usuario_id", user.id)
+      .limit(1)
+      .maybeSingle();
+
+    if (membership?.empresa_id) {
+      const { data: subscription } = await supabase
+        .from("suscripciones")
+        .select("plan_id")
+        .eq("empresa_id", membership.empresa_id)
+        .maybeSingle();
+
+      currentPlanDatabaseId = subscription?.plan_id ?? null;
+    }
+  }
 
   return (
     <AppShell activeHref="/plans" user={user}>
       <PlansManager
         canManagePlans={canManagePlans(user)}
+        canSubscribePlans={canSubscribePlans}
+        currentPlanDatabaseId={currentPlanDatabaseId}
         initialPlans={plans}
         initialStatus={planResult.error ? "No fue posible cargar los planes desde Supabase. Se muestra la configuración base." : ""}
       />

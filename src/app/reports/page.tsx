@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
 import { getCurrentUser } from "@/lib/auth";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
+import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type FinanceRow = {
   empresa_id: string | null;
@@ -23,9 +27,15 @@ function formatMonth(key: string) {
   return monthLabel.format(new Date(`${key}-01T00:00:00`));
 }
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const resolvedSearchParams = await searchParams;
+  const query = searchParamText(resolvedSearchParams, "q");
 
   let companyIds: string[] = [];
   let scopeError: unknown = null;
@@ -68,6 +78,18 @@ export default async function ReportsPage() {
   }
 
   const rows = [...periods.entries()].sort(([a], [b]) => b.localeCompare(a));
+  const filteredRows = rows.filter(([key, period]) => {
+    const balance = period.incomes - period.expenses;
+    return matchesSearch([
+      formatMonth(key),
+      key,
+      period.movements,
+      money.format(period.incomes),
+      money.format(period.expenses),
+      money.format(balance),
+    ], query);
+  });
+  const reportsPage = paginateItems(filteredRows, pageFromParam(resolvedSearchParams.page));
   const hasError = scopeError || incomeResult.error || expenseResult.error;
 
   return (
@@ -87,12 +109,27 @@ export default async function ReportsPage() {
         </section>
 
         <section className="reports-card">
-          <div className="reports-card-heading"><div><h2>Reporte mensual</h2><p>Ingresos, gastos y balance por periodo</p></div><span>{companyIds.length} {companyIds.length === 1 ? "empresa" : "empresas"}</span></div>
-          {rows.length ? (
-            <div className="reports-table-scroll"><table className="reports-table"><thead><tr><th>Periodo</th><th>Movimientos</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody>
-              {rows.map(([key, period]) => { const balance = period.incomes - period.expenses; return <tr key={key}><td>{formatMonth(key)}</td><td>{period.movements}</td><td className="positive">{money.format(period.incomes)}</td><td className="negative">{money.format(period.expenses)}</td><td className={balance >= 0 ? "positive" : "negative"}>{money.format(balance)}</td></tr>; })}
-            </tbody></table></div>
-          ) : <div className="reports-empty"><span><Icon name="bar_chart" /></span><strong>Aún no hay periodos para analizar</strong><small>Registra ingresos o gastos y el reporte se generará automáticamente.</small></div>}
+          <div className="reports-card-heading">
+            <div><h2>Reporte mensual</h2><p>Ingresos, gastos y balance por periodo</p></div>
+            <div className="table-card-actions">
+              <TableSearch label="Buscar reportes" pathname="/reports" placeholder="Buscar periodo, monto o balance..." searchParams={resolvedSearchParams} />
+              <span>{filteredRows.length} resultado{filteredRows.length === 1 ? "" : "s"}</span>
+            </div>
+          </div>
+          {filteredRows.length ? (
+            <>
+              <div className="reports-table-scroll"><table className="reports-table"><thead><tr><th>Periodo</th><th>Movimientos</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody>
+                {reportsPage.items.map(([key, period]) => { const balance = period.incomes - period.expenses; return <tr key={key}><td>{formatMonth(key)}</td><td>{period.movements}</td><td className="positive">{money.format(period.incomes)}</td><td className="negative">{money.format(period.expenses)}</td><td className={balance >= 0 ? "positive" : "negative"}>{money.format(balance)}</td></tr>; })}
+              </tbody></table></div>
+              <TablePagination
+                currentPage={reportsPage.currentPage}
+                end={reportsPage.end}
+                hrefForPage={(page) => pageHref("/reports", resolvedSearchParams, "page", page)}
+                start={reportsPage.start}
+                totalItems={filteredRows.length}
+              />
+            </>
+          ) : <div className="reports-empty"><span><Icon name="bar_chart" /></span><strong>{query ? "No encontramos reportes" : "Aún no hay periodos para analizar"}</strong><small>{query ? "Prueba con otro término de búsqueda." : "Registra ingresos o gastos y el reporte se generará automáticamente."}</small></div>}
         </section>
       </main>
     </AppShell>

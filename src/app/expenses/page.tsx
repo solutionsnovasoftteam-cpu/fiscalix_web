@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
 import { ExpenseActions } from "@/app/expenses/expense-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
+import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type ExpenseRow = {
   id: string;
@@ -132,9 +136,15 @@ async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeo
   };
 }
 
-export default async function ExpensesPage() {
+export default async function ExpensesPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const resolvedSearchParams = await searchParams;
+  const query = searchParamText(resolvedSearchParams, "q");
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
@@ -168,6 +178,16 @@ export default async function ExpensesPage() {
   const average = expenses.length ? total / expenses.length : 0;
   const highest = expenses.reduce((max, expense) => Math.max(max, asNumber(expense.monto)), 0);
   const usedCategories = new Set(expenses.map((expense) => expense.categoria_id || categoryLabel(expense))).size;
+  const filteredExpenses = expenses.filter((expense) => matchesSearch([
+    formatDate(expense.fecha_gasto),
+    expense.fecha_gasto,
+    companyLabel(expense),
+    expenseDescription(expense),
+    categoryLabel(expense),
+    asNumber(expense.monto),
+    moneyFormatter.format(asNumber(expense.monto)),
+  ], query));
+  const expensesPage = paginateItems(filteredExpenses, pageFromParam(resolvedSearchParams.page));
 
   return (
     <AppShell activeHref="/expenses" user={user}>
@@ -200,6 +220,15 @@ export default async function ExpensesPage() {
         )}
 
         <section className="expenses-table-card">
+          <div className="receipts-card-top">
+            <TableSearch
+              label="Buscar gastos"
+              pathname="/expenses"
+              placeholder="Buscar por empresa, descripción, categoría, fecha o monto..."
+              searchParams={resolvedSearchParams}
+            />
+            <span className="receipts-count">{filteredExpenses.length} resultado{filteredExpenses.length === 1 ? "" : "s"}</span>
+          </div>
           <div className="expenses-table-scroll">
             <table className="expenses-table">
               <thead>
@@ -212,8 +241,8 @@ export default async function ExpensesPage() {
                 </tr>
               </thead>
               <tbody>
-                {expenses.length ? (
-                  expenses.map((expense) => (
+                {filteredExpenses.length ? (
+                  expensesPage.items.map((expense) => (
                     <tr key={expense.id}>
                       <td>{formatDate(expense.fecha_gasto)}</td>
                       <td>{companyLabel(expense)}</td>
@@ -227,8 +256,8 @@ export default async function ExpensesPage() {
                     <td colSpan={5}>
                       <div className="expenses-empty">
                         <span><Icon name="trending_down" /></span>
-                        <strong>No hay gastos registrados</strong>
-                        <small>Cuando registres gastos en Supabase, aparecerán aquí automáticamente.</small>
+                        <strong>{query ? "No encontramos gastos" : "No hay gastos registrados"}</strong>
+                        <small>{query ? "Prueba con otro término de búsqueda." : "Cuando registres gastos en Supabase, aparecerán aquí automáticamente."}</small>
                       </div>
                     </td>
                   </tr>
@@ -236,6 +265,13 @@ export default async function ExpensesPage() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={expensesPage.currentPage}
+            end={expensesPage.end}
+            hrefForPage={(page) => pageHref("/expenses", resolvedSearchParams, "page", page)}
+            start={expensesPage.start}
+            totalItems={filteredExpenses.length}
+          />
         </section>
 
         <section className="expenses-stat-grid">

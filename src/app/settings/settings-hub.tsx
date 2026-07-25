@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { paginateItems, paginationRangeLabel, TABLE_PAGE_SIZE } from "@/lib/pagination";
 
 type Theme = "dark" | "light";
 export type ActivityRow = {
@@ -13,35 +14,14 @@ export type ActivityRow = {
   user: string;
 };
 
-export type SettingsCompany = {
-  address: string;
-  commercialName: string;
-  email: string;
-  legalName: string;
-  phone: string;
-  regime: string;
-  rfc: string;
-};
-
 export type SettingsInitialData = {
   activity: ActivityRow[];
-  company: SettingsCompany;
   userName: string;
 };
 
-const defaultCompany: SettingsCompany = {
-  address: "Pendiente de registrar",
-  commercialName: "Pendiente de registrar",
-  email: "Pendiente de registrar",
-  legalName: "Pendiente de registrar",
-  phone: "Pendiente de registrar",
-  regime: "Pendiente de registrar",
-  rfc: "Pendiente de registrar",
-};
-
 const quickLinks = [
-  { id: "company", icon: "settings", title: "Información de la empresa", text: "Datos fiscales y contacto", target: "settings-company" },
-  { id: "users", icon: "manage_accounts", title: "Usuarios y permisos", text: "Roles y accesos del equipo", target: "settings-company" },
+  { href: "/companies", id: "company", icon: "business", title: "Mi empresa", text: "Datos fiscales y contacto" },
+  { id: "users", icon: "manage_accounts", title: "Usuarios y permisos", text: "Roles y accesos del equipo", target: "settings-security" },
   { id: "security", icon: "security", title: "Seguridad", text: "Contraseña, 2FA y sesiones", target: "settings-security" },
   { id: "notifications", icon: "notifications", title: "Notificaciones", text: "Alertas y recordatorios", target: "settings-preferences" },
   { id: "backups", icon: "sync_alt", title: "Respaldos", text: "Copias y retención", target: "settings-backup" },
@@ -58,17 +38,12 @@ const dateFmt = new Intl.DateTimeFormat("es-MX", {
 export function SettingsHub({ initialData }: { initialData?: SettingsInitialData }) {
   const [query, setQuery] = useState("");
   const [feedback, setFeedback] = useState("");
-  const [editingCompany, setEditingCompany] = useState(false);
-  const [showAllActivity, setShowAllActivity] = useState(false);
+  const [activityPageNumber, setActivityPageNumber] = useState(1);
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
   const [twoFactor, setTwoFactor] = useState(true);
   const [theme, setTheme] = useState<Theme>("dark");
   const [lastBackup, setLastBackup] = useState("Pendiente de realizar");
   const [activity, setActivity] = useState<ActivityRow[]>(initialData?.activity ?? []);
-
-  const [company, setCompany] = useState(initialData?.company ?? defaultCompany);
-
-  const [companyDraft, setCompanyDraft] = useState(company);
 
   const [preferences, setPreferences] = useState({
     currency: "MXN - Peso Mexicano",
@@ -82,14 +57,14 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
     backupDestination: "Nube (AWS S3)",
   });
 
-  const visibleActivity = useMemo(() => {
+  const filteredActivity = useMemo(() => {
     const term = query.trim().toLowerCase();
-    const rows = showAllActivity ? activity : activity.slice(0, 4);
-    if (!term) return rows;
-    return rows.filter((row) =>
+    if (!term) return activity;
+    return activity.filter((row) =>
       [row.date, row.user, row.action, row.module, row.description].join(" ").toLowerCase().includes(term),
     );
-  }, [activity, query, showAllActivity]);
+  }, [activity, query]);
+  const activityPage = useMemo(() => paginateItems(filteredActivity, activityPageNumber, TABLE_PAGE_SIZE), [activityPageNumber, filteredActivity]);
 
   function notify(message: string) {
     setFeedback(message);
@@ -101,8 +76,6 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
   }
 
   function saveChanges() {
-    if (editingCompany) setCompany(companyDraft);
-    setEditingCompany(false);
     const entry: ActivityRow = {
       id: `a-${Date.now()}`,
       date: dateFmt.format(new Date()),
@@ -113,17 +86,6 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
     };
     setActivity((rows) => [entry, ...rows]);
     notify("Cambios guardados correctamente.");
-  }
-
-  function toggleEditCompany() {
-    if (editingCompany) {
-      setCompanyDraft(company);
-      setEditingCompany(false);
-      notify("Edición cancelada.");
-      return;
-    }
-    setCompanyDraft(company);
-    setEditingCompany(true);
   }
 
   function runBackup() {
@@ -166,7 +128,10 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
           <label className="settings-search">
             <Icon name="search" />
             <input
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActivityPageNumber(1);
+              }}
               placeholder="Buscar configuración..."
               type="search"
               value={query}
@@ -180,99 +145,30 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
 
       <section className="settings-quick" aria-label="Accesos rápidos">
         {quickLinks.map((link) => (
-          <button
-            className="settings-quick-card"
-            key={link.id}
-            onClick={() => scrollToSection(link.target)}
-            type="button"
-          >
+          "href" in link ? (
+            <a className="settings-quick-card" href={link.href} key={link.id}>
+              <span><Icon name={link.icon} /></span>
+              <strong>{link.title}</strong>
+              <small>{link.text}</small>
+              <em>Abrir <Icon name="arrow_forward" /></em>
+            </a>
+          ) : (
+            <button
+              className="settings-quick-card"
+              key={link.id}
+              onClick={() => scrollToSection(link.target)}
+              type="button"
+            >
             <span><Icon name={link.icon} /></span>
             <strong>{link.title}</strong>
             <small>{link.text}</small>
             <em>Gestionar <Icon name="keyboard_arrow_down" /></em>
-          </button>
+            </button>
+          )
         ))}
       </section>
 
       <div className="settings-grid">
-        <section className="settings-panel" id="settings-company">
-          <div className="settings-panel-head">
-            <h2>Información de la empresa</h2>
-            <span><Icon name="business" /></span>
-          </div>
-          <form className="settings-form" onSubmit={(event) => event.preventDefault()}>
-            <label>
-              Nombre comercial
-              <input
-                disabled={!editingCompany}
-                onChange={(event) => setCompanyDraft((value) => ({ ...value, commercialName: event.target.value }))}
-                value={editingCompany ? companyDraft.commercialName : company.commercialName}
-              />
-            </label>
-            <label>
-              Razón social
-              <input
-                disabled={!editingCompany}
-                onChange={(event) => setCompanyDraft((value) => ({ ...value, legalName: event.target.value }))}
-                value={editingCompany ? companyDraft.legalName : company.legalName}
-              />
-            </label>
-            <div className="settings-form-row">
-              <label>
-                RFC
-                <input
-                  disabled={!editingCompany}
-                  onChange={(event) => setCompanyDraft((value) => ({ ...value, rfc: event.target.value }))}
-                  value={editingCompany ? companyDraft.rfc : company.rfc}
-                />
-              </label>
-              <label>
-                Régimen fiscal
-                <select
-                  disabled={!editingCompany}
-                  onChange={(event) => setCompanyDraft((value) => ({ ...value, regime: event.target.value }))}
-                  value={editingCompany ? companyDraft.regime : company.regime}
-                >
-                  <option>601 - General de Ley Personas Morales</option>
-                  <option>612 - Personas Físicas con Actividades Empresariales</option>
-                  <option>626 - Régimen Simplificado de Confianza</option>
-                </select>
-              </label>
-            </div>
-            <label>
-              Dirección fiscal
-              <input
-                disabled={!editingCompany}
-                onChange={(event) => setCompanyDraft((value) => ({ ...value, address: event.target.value }))}
-                value={editingCompany ? companyDraft.address : company.address}
-              />
-            </label>
-            <div className="settings-form-row">
-              <label>
-                Teléfono
-                <input
-                  disabled={!editingCompany}
-                  onChange={(event) => setCompanyDraft((value) => ({ ...value, phone: event.target.value }))}
-                  value={editingCompany ? companyDraft.phone : company.phone}
-                />
-              </label>
-              <label>
-                Correo electrónico
-                <input
-                  disabled={!editingCompany}
-                  onChange={(event) => setCompanyDraft((value) => ({ ...value, email: event.target.value }))}
-                  type="email"
-                  value={editingCompany ? companyDraft.email : company.email}
-                />
-              </label>
-            </div>
-            <button className="settings-btn settings-btn-outline" onClick={toggleEditCompany} type="button">
-              <Icon name="edit" />
-              {editingCompany ? "Cancelar edición" : "Editar información"}
-            </button>
-          </form>
-        </section>
-
         <section className="settings-panel" id="settings-preferences">
           <div className="settings-panel-head">
             <h2>Preferencias del sistema</h2>
@@ -427,9 +323,7 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
             <h2>Actividad reciente en configuraciones</h2>
             <p>Historial de cambios realizados en el sistema</p>
           </div>
-          <button className="settings-link-btn" onClick={() => setShowAllActivity((value) => !value)} type="button">
-            {showAllActivity ? "Ver menos" : "Ver todo el historial"}
-          </button>
+          <span className="receipts-count">{filteredActivity.length} registro{filteredActivity.length === 1 ? "" : "s"}</span>
         </div>
         <div className="settings-table-wrap">
           <table className="settings-table">
@@ -444,12 +338,12 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
               </tr>
             </thead>
             <tbody>
-              {visibleActivity.length === 0 ? (
+              {filteredActivity.length === 0 ? (
                 <tr>
                   <td className="settings-empty" colSpan={6}>No hay registros que coincidan con tu búsqueda.</td>
                 </tr>
               ) : (
-                visibleActivity.map((row) => (
+                activityPage.items.map((row) => (
                   <tr key={row.id}>
                     <td>{row.date}</td>
                     <td>{row.user}</td>
@@ -482,6 +376,29 @@ export function SettingsHub({ initialData }: { initialData?: SettingsInitialData
             </tbody>
           </table>
         </div>
+        {filteredActivity.length > TABLE_PAGE_SIZE && (
+          <nav className="table-pagination" aria-label="Paginación de actividad">
+            <span>Mostrando {paginationRangeLabel(filteredActivity.length, activityPage.start, activityPage.end)}</span>
+            <div>
+              <button disabled={activityPage.currentPage === 1} onClick={() => setActivityPageNumber((value) => Math.max(1, value - 1))} type="button">
+                <Icon name="chevron_left" />
+              </button>
+              {Array.from({ length: activityPage.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button
+                  className={pageNumber === activityPage.currentPage ? "is-active" : undefined}
+                  key={pageNumber}
+                  onClick={() => setActivityPageNumber(pageNumber)}
+                  type="button"
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button disabled={activityPage.currentPage === activityPage.totalPages} onClick={() => setActivityPageNumber((value) => Math.min(activityPage.totalPages, value + 1))} type="button">
+                <Icon name="chevron_right" />
+              </button>
+            </div>
+          </nav>
+        )}
       </section>
     </div>
   );

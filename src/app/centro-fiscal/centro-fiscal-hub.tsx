@@ -2,6 +2,8 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { paginateItems, paginationRangeLabel } from "@/lib/pagination";
+import { matchesSearch } from "@/lib/tableSearch";
 import { useModal } from "@/lib/useModal";
 
 type MovementFilter = "all" | "ingresos" | "gastos" | "impuestos";
@@ -53,6 +55,8 @@ export type CentroFiscalInitialData = {
 const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
 const monthFmt = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
 const dayFmt = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" });
+const FISCAL_MOVEMENTS_PAGE_SIZE = 5;
+const RECENT_DOCS_PAGE_SIZE = 3;
 
 const movementsSeed: Movement[] = [
   { id: "m1", date: "2026-07-18", description: "Factura F-2026-156", category: "Ventas", type: "Ingreso", amount: 5200, status: "Registrado" },
@@ -130,6 +134,9 @@ export function CentroFiscalHub({
   const [calendarYear, setCalendarYear] = useState(baseDate.getFullYear());
   const [selectedDay, setSelectedDay] = useState<number | null>(baseDate.getDate());
   const [movementFilter, setMovementFilter] = useState<MovementFilter>("all");
+  const [movementQuery, setMovementQuery] = useState("");
+  const [movementPage, setMovementPage] = useState(1);
+  const [docsPage, setDocsPage] = useState(1);
   const [movements, setMovements] = useState(initialData.movements);
   const [events, setEvents] = useState(initialData.events);
   const [docs, setDocs] = useState(initialData.docs);
@@ -157,11 +164,29 @@ export function CentroFiscalHub({
   );
 
   const filteredMovements = useMemo(() => {
-    if (movementFilter === "all") return movements;
-    if (movementFilter === "ingresos") return movements.filter((m) => m.type === "Ingreso");
-    if (movementFilter === "gastos") return movements.filter((m) => m.type === "Gasto");
-    return movements.filter((m) => m.type === "Impuesto");
-  }, [movementFilter, movements]);
+    const byType = (() => {
+      if (movementFilter === "all") return movements;
+      if (movementFilter === "ingresos") return movements.filter((m) => m.type === "Ingreso");
+      if (movementFilter === "gastos") return movements.filter((m) => m.type === "Gasto");
+      return movements.filter((m) => m.type === "Impuesto");
+    })();
+
+    return byType.filter((movement) => matchesSearch([
+      dayFmt.format(new Date(`${movement.date}T12:00:00`)),
+      movement.date,
+      movement.description,
+      movement.category,
+      movement.type,
+      movement.status,
+      movement.amount,
+      money.format(movement.amount),
+    ], movementQuery));
+  }, [movementFilter, movementQuery, movements]);
+  const movementsPage = useMemo(
+    () => paginateItems(filteredMovements, movementPage, FISCAL_MOVEMENTS_PAGE_SIZE),
+    [filteredMovements, movementPage],
+  );
+  const paginatedDocs = useMemo(() => paginateItems(docs, docsPage, RECENT_DOCS_PAGE_SIZE), [docs, docsPage]);
 
   const monthEvents = events.filter((e) => e.month === calendarMonth && e.year === calendarYear);
   const eventDays = new Set(monthEvents.map((e) => e.day));
@@ -233,6 +258,7 @@ export function CentroFiscalHub({
         { id: `d-${Date.now()}`, title: "Nuevo comprobante", subtitle: "Generado ahora", amount: 4800, tone: "positive" },
         ...current,
       ]);
+      setDocsPage(1);
       notify("Comprobante registrado en movimientos.");
       return;
     }
@@ -246,10 +272,12 @@ export function CentroFiscalHub({
         { id: `d-${Date.now()}`, title: "Documento cargado", subtitle: "Archivo fiscal · ahora", amount: 0, tone: "positive" },
         ...current,
       ]);
+      setDocsPage(1);
       notify("Documento agregado a recientes.");
       return;
     }
     setMovementFilter("all");
+    setMovementPage(1);
     notify("Mostrando reporte completo de movimientos.");
   }
 
@@ -365,10 +393,10 @@ export function CentroFiscalHub({
         <section className="cf-panel">
           <div className="cf-panel-head">
             <h2>Documentos recientes</h2>
-            <button className="cf-link-btn" onClick={() => notify("Mostrando todos los documentos.")} type="button">Ver todos</button>
+            <span>{docs.length} documentos</span>
           </div>
           <ul className="cf-doc-list">
-            {docs.map((doc) => (
+            {paginatedDocs.items.map((doc) => (
               <li key={doc.id}>
                 <div>
                   <strong>{doc.title}</strong>
@@ -380,6 +408,29 @@ export function CentroFiscalHub({
               </li>
             ))}
           </ul>
+          {docs.length > RECENT_DOCS_PAGE_SIZE && (
+            <nav className="table-pagination cf-doc-pagination" aria-label="Paginación de documentos recientes">
+              <span>Mostrando {paginationRangeLabel(docs.length, paginatedDocs.start, paginatedDocs.end)}</span>
+              <div>
+                <button disabled={paginatedDocs.currentPage === 1} onClick={() => setDocsPage((value) => Math.max(1, value - 1))} type="button">
+                  <Icon name="chevron_left" />
+                </button>
+                {Array.from({ length: paginatedDocs.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                  <button
+                    className={pageNumber === paginatedDocs.currentPage ? "is-active" : undefined}
+                    key={pageNumber}
+                    onClick={() => setDocsPage(pageNumber)}
+                    type="button"
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                <button disabled={paginatedDocs.currentPage === paginatedDocs.totalPages} onClick={() => setDocsPage((value) => Math.min(paginatedDocs.totalPages, value + 1))} type="button">
+                  <Icon name="chevron_right" />
+                </button>
+              </div>
+            </nav>
+          )}
         </section>
       </div>
 
@@ -387,24 +438,47 @@ export function CentroFiscalHub({
         <section className="cf-panel cf-panel-wide">
           <div className="cf-panel-head">
             <h2>Movimientos recientes</h2>
-            <div className="cf-tabs" role="tablist" aria-label="Filtrar movimientos">
-              {([
-                ["all", "Todos"],
-                ["ingresos", "Ingresos"],
-                ["gastos", "Gastos"],
-                ["impuestos", "Impuestos"],
-              ] as const).map(([id, label]) => (
-                <button
-                  key={id}
-                  aria-selected={movementFilter === id}
-                  className={movementFilter === id ? "is-active" : undefined}
-                  onClick={() => setMovementFilter(id)}
-                  role="tab"
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="cf-table-tools">
+              <label className="table-search">
+                <Icon name="search" />
+                <input
+                  aria-label="Buscar movimientos fiscales"
+                  onChange={(event) => {
+                    setMovementQuery(event.target.value);
+                    setMovementPage(1);
+                  }}
+                  placeholder="Buscar movimiento, categoría, estado o monto..."
+                  type="search"
+                  value={movementQuery}
+                />
+                {movementQuery && (
+                  <button className="table-search-submit" onClick={() => { setMovementQuery(""); setMovementPage(1); }} type="button">
+                    Limpiar
+                  </button>
+                )}
+              </label>
+              <div className="cf-tabs" role="tablist" aria-label="Filtrar movimientos">
+                {([
+                  ["all", "Todos"],
+                  ["ingresos", "Ingresos"],
+                  ["gastos", "Gastos"],
+                  ["impuestos", "Impuestos"],
+                ] as const).map(([id, label]) => (
+                  <button
+                    key={id}
+                    aria-selected={movementFilter === id}
+                    className={movementFilter === id ? "is-active" : undefined}
+                    onClick={() => {
+                      setMovementFilter(id);
+                      setMovementPage(1);
+                    }}
+                    role="tab"
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
           <div className="cf-table-wrap">
@@ -420,23 +494,58 @@ export function CentroFiscalHub({
                 </tr>
               </thead>
               <tbody>
-                {filteredMovements.map((movement) => (
-                  <tr key={movement.id}>
-                    <td>{dayFmt.format(new Date(`${movement.date}T12:00:00`))}</td>
-                    <td>{movement.description}</td>
-                    <td>{movement.category}</td>
-                    <td>{movement.type}</td>
-                    <td>{money.format(movement.amount)}</td>
-                    <td>
-                      <span className={`cf-status ${movement.status === "Pagado" ? "is-paid" : "is-registered"}`}>
-                        {movement.status}
-                      </span>
+                {movementsPage.items.length ? (
+                  movementsPage.items.map((movement) => (
+                    <tr key={movement.id}>
+                      <td>{dayFmt.format(new Date(`${movement.date}T12:00:00`))}</td>
+                      <td>{movement.description}</td>
+                      <td>{movement.category}</td>
+                      <td>{movement.type}</td>
+                      <td>{money.format(movement.amount)}</td>
+                      <td>
+                        <span className={`cf-status ${movement.status === "Pagado" ? "is-paid" : "is-registered"}`}>
+                          {movement.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6}>
+                      <div className="reports-empty">
+                        <span><Icon name="sync_alt" /></span>
+                        <strong>{movementQuery ? "No encontramos movimientos" : "No hay movimientos para mostrar"}</strong>
+                        <small>{movementQuery ? "Prueba con otro término de búsqueda." : "Cambia el filtro o registra nueva actividad fiscal."}</small>
+                      </div>
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
+          {filteredMovements.length > FISCAL_MOVEMENTS_PAGE_SIZE && (
+            <nav className="table-pagination" aria-label="Paginación de movimientos fiscales">
+              <span>Mostrando {paginationRangeLabel(filteredMovements.length, movementsPage.start, movementsPage.end)}</span>
+              <div>
+                <button disabled={movementsPage.currentPage === 1} onClick={() => setMovementPage((value) => Math.max(1, value - 1))} type="button">
+                  <Icon name="chevron_left" />
+                </button>
+                {Array.from({ length: movementsPage.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                  <button
+                    className={pageNumber === movementsPage.currentPage ? "is-active" : undefined}
+                    key={pageNumber}
+                    onClick={() => setMovementPage(pageNumber)}
+                    type="button"
+                  >
+                    {pageNumber}
+                  </button>
+                ))}
+                <button disabled={movementsPage.currentPage === movementsPage.totalPages} onClick={() => setMovementPage((value) => Math.min(movementsPage.totalPages, value + 1))} type="button">
+                  <Icon name="chevron_right" />
+                </button>
+              </div>
+            </nav>
+          )}
         </section>
 
         <section className="cf-panel">

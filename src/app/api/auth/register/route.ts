@@ -2,6 +2,7 @@ import { getAuth } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 import { createSession, SESSION_COOKIE, SESSION_MAX_AGE, verifyToken } from "@/lib/auth";
 import { getFirebaseAdmin, normalizeEnvValue } from "@/lib/firebaseAdmin";
+import { assignFreePlanToNewUser } from "@/lib/defaultSubscription";
 import { supabase } from "@/lib/supabase";
 import { assignDefaultRoleToUser } from "@/lib/userRoles";
 
@@ -109,9 +110,17 @@ export async function POST(request: Request) {
     }
 
     await assignDefaultRoleToUser(uid);
+    const defaultPlan = await assignFreePlanToNewUser(data);
 
     const response = isJson
-      ? NextResponse.json({ success: true, message: "Cuenta creada correctamente", data }, { status: 201 })
+      ? NextResponse.json({
+        success: true,
+        message: defaultPlan.assigned
+          ? "Cuenta creada correctamente con Plan Free"
+          : "Cuenta creada correctamente",
+        data,
+        defaultPlan,
+      }, { status: 201 })
       : NextResponse.redirect(new URL("/dashboard", request.url), 303);
     if (idToken) {
       const sessionCookie = await createSession(idToken);

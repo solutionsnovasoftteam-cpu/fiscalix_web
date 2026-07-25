@@ -1,7 +1,10 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
 import { getCurrentUser } from "@/lib/auth";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
@@ -41,12 +44,13 @@ function formatDate(value: string) {
 export default async function ReceiptsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<PageSearchParams>;
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { q = "" } = await searchParams;
+  const resolvedSearchParams = await searchParams;
+  const q = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : "";
   const query = q.trim().toLowerCase();
   let companies: Company[] = [];
   let companiesError: unknown = null;
@@ -94,6 +98,7 @@ export default async function ReceiptsPage({
   const receipts = query
     ? allReceipts.filter((receipt) => [receipt.folio, receipt.company, receipt.concept, receipt.type].join(" ").toLowerCase().includes(query))
     : allReceipts;
+  const receiptsPage = paginateItems(receipts, pageFromParam(resolvedSearchParams.page));
   const hasError = companiesError || incomeResult.error || expenseResult.error;
 
   return (
@@ -117,33 +122,43 @@ export default async function ReceiptsPage({
 
         <section className="receipts-card">
           <div className="receipts-card-top">
-            <form className="receipts-search" action="/receipts" method="get">
-              <Icon name="search" />
-              <input defaultValue={q} name="q" placeholder="Buscar por folio, empresa, concepto o tipo..." type="search" />
-              {query && <button type="submit">Buscar</button>}
-            </form>
+            <TableSearch
+              label="Buscar comprobantes"
+              pathname="/receipts"
+              placeholder="Buscar por folio, empresa, concepto o tipo..."
+              searchParams={resolvedSearchParams}
+            />
             <span className="receipts-count">{receipts.length} resultado{receipts.length === 1 ? "" : "s"}</span>
           </div>
 
           {receipts.length ? (
-            <div className="receipts-table-wrap">
-              <table className="receipts-table">
-                <thead><tr><th>Folio</th><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Estado</th><th aria-label="Acciones" /></tr></thead>
-                <tbody>
-                  {receipts.map((receipt) => (
-                    <tr key={receipt.id}>
-                      <td><span className="receipt-folio">{receipt.folio}</span><small>{receipt.company}</small></td>
-                      <td>{formatDate(receipt.date)}</td>
-                      <td><strong>{receipt.concept}</strong></td>
-                      <td><span className={receipt.type === "Ingreso" ? "receipt-type income" : "receipt-type expense"}>{receipt.type}</span></td>
-                      <td className={receipt.type === "Ingreso" ? "receipt-amount income" : "receipt-amount expense"}>{money.format(receipt.amount)}</td>
-                      <td><span className="receipt-status"><i />Registrado</span></td>
-                      <td><button aria-label={`Ver ${receipt.folio}`} className="receipt-action" type="button"><Icon name="history" /></button><button aria-label={`Más opciones para ${receipt.folio}`} className="receipt-action" type="button"><Icon name="more_horiz" /></button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <div className="receipts-table-wrap">
+                <table className="receipts-table">
+                  <thead><tr><th>Folio</th><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Estado</th><th aria-label="Acciones" /></tr></thead>
+                  <tbody>
+                    {receiptsPage.items.map((receipt) => (
+                      <tr key={receipt.id}>
+                        <td><span className="receipt-folio">{receipt.folio}</span><small>{receipt.company}</small></td>
+                        <td>{formatDate(receipt.date)}</td>
+                        <td><strong>{receipt.concept}</strong></td>
+                        <td><span className={receipt.type === "Ingreso" ? "receipt-type income" : "receipt-type expense"}>{receipt.type}</span></td>
+                        <td className={receipt.type === "Ingreso" ? "receipt-amount income" : "receipt-amount expense"}>{money.format(receipt.amount)}</td>
+                        <td><span className="receipt-status"><i />Registrado</span></td>
+                        <td><button aria-label={`Ver ${receipt.folio}`} className="receipt-action" type="button"><Icon name="history" /></button><button aria-label={`Más opciones para ${receipt.folio}`} className="receipt-action" type="button"><Icon name="more_horiz" /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <TablePagination
+                currentPage={receiptsPage.currentPage}
+                end={receiptsPage.end}
+                hrefForPage={(page) => pageHref("/receipts", resolvedSearchParams, "page", page)}
+                start={receiptsPage.start}
+                totalItems={receipts.length}
+              />
+            </>
           ) : (
             <div className="receipts-empty"><span><Icon name="receipt_long" /></span><strong>{query ? "No encontramos comprobantes" : "Aún no hay comprobantes registrados"}</strong><small>{query ? "Prueba con otro término de búsqueda." : "Los ingresos y gastos registrados aparecerán aquí como comprobantes."}</small></div>
           )}

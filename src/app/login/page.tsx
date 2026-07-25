@@ -22,7 +22,7 @@ export default async function LoginPage({
           <LoginForm initialError={error ?? ""} initialErrorCode={code ?? ""} />
           <p className="register-copy">¿Aún no tienes una cuenta? <Link href="/register">Crear cuenta</Link></p>
         </div>
-        <p className="legal">Al continuar, aceptas nuestros <a href="#">Términos de servicio</a> y <a href="#">Aviso de privacidad</a>.</p>
+        <p className="legal">Al continuar, aceptas nuestros <Link href="/terms">Términos de servicio</Link> y <Link href="/privacy">Aviso de privacidad</Link>.</p>
       </section>
       </ViewTransition>
       <ViewTransition name="auth-visual" share="auth-visual-morph">

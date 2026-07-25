@@ -53,15 +53,21 @@ function textToList(value: string) {
 
 export function PlansManager({
   canManagePlans,
+  canSubscribePlans,
+  currentPlanDatabaseId,
   initialPlans,
   initialStatus = "",
 }: {
   canManagePlans: boolean;
+  canSubscribePlans: boolean;
+  currentPlanDatabaseId?: string | null;
   initialPlans: FiscalixPlan[];
   initialStatus?: string;
 }) {
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [plans, setPlans] = useState(initialPlans);
+  const [activePlanDatabaseId, setActivePlanDatabaseId] = useState(currentPlanDatabaseId ?? null);
+  const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState(initialStatus);
   const [isSaving, setIsSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -69,6 +75,11 @@ export function PlansManager({
   useModal({ busy: isSaving, dialogRef, onClose: closeEditor, open: draft !== null });
 
   const featuredPlan = useMemo(() => plans.find((plan) => plan.id === "plus") ?? plans[2], [plans]);
+  const headerEyebrow = canManagePlans ? "PLANES COMERCIALES" : "ELIGE TU PLAN";
+  const headerTitle = canManagePlans ? "Planes para usuarios finales" : "Encuentra el plan ideal para tu negocio";
+  const headerDescription = canManagePlans
+    ? "Consulta, compara y edita la oferta comercial de Fiscalix."
+    : "Compara las opciones disponibles y suscríbete al plan que mejor se adapte a tu operación.";
 
   function editPlan(plan: FiscalixPlan) {
     if (!canManagePlans) return;
@@ -142,85 +153,129 @@ export function PlansManager({
     window.location.reload();
   }
 
+  async function subscribeToPlan(plan: FiscalixPlan) {
+    if (!canSubscribePlans) return;
+    if (!plan.databaseId) {
+      setSavedMessage("Este plan todavía no está guardado en Supabase.");
+      return;
+    }
+
+    setSubscribingPlanId(plan.databaseId);
+    setSavedMessage("");
+
+    try {
+      const response = await fetch("/api/subscriptions", {
+        body: JSON.stringify({ planId: plan.databaseId }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const result = (await response.json()) as {
+        message?: string;
+        subscription?: { plan_id?: string | null };
+      };
+
+      if (!response.ok) throw new Error(result.message ?? "No fue posible suscribirte a este plan.");
+
+      setActivePlanDatabaseId(result.subscription?.plan_id ?? plan.databaseId);
+      setSavedMessage(result.message ?? `Te suscribiste correctamente al ${plan.name}.`);
+    } catch (error) {
+      setSavedMessage(error instanceof Error ? error.message : "No fue posible suscribirte a este plan.");
+    } finally {
+      setSubscribingPlanId(null);
+    }
+  }
+
   return (
     <main className="plans-content">
       <header className="plans-header">
         <div>
-          <p>PLANES COMERCIALES</p>
-          <h1>Planes para usuarios finales</h1>
-          <span>Consulta, compara y edita la oferta comercial de Fiscalix.</span>
+          <p>{headerEyebrow}</p>
+          <h1>{headerTitle}</h1>
+          <span>{headerDescription}</span>
         </div>
-        <button className="plans-reset-button" type="button" onClick={resetPlans}>
-          Recargar desde Supabase
-        </button>
+        {!canSubscribePlans ? (
+          <button className="plans-reset-button" type="button" onClick={resetPlans}>
+            Recargar desde Supabase
+          </button>
+        ) : null}
       </header>
 
       {savedMessage && <div className="plans-message" role="status">{savedMessage}</div>}
 
-      <section className="plans-overview">
-        <article>
-          <span><Icon name="payments" /></span>
-          <small>Plan destacado</small>
-          <strong>{featuredPlan?.name}</strong>
-          <p>{featuredPlan?.monthlyPrice} al mes</p>
-        </article>
-        <article>
-          <span><Icon name="business" /></span>
-          <small>Catálogo conectado</small>
-          <strong>{plans.filter((plan) => plan.source === "database").length} en Supabase</strong>
-          <p>Tabla planes; suscripciones asigna planes a empresas</p>
-        </article>
-        <article>
-          <span><Icon name="edit" /></span>
-          <small>{canManagePlans ? "Edición completa" : "Consulta disponible"}</small>
-          <strong>{canManagePlans ? "Oferta comercial" : "Planes comerciales"}</strong>
-          <p>{canManagePlans ? "Guarda precios, límites, beneficios y mensajes" : "Tu rol actual no puede modificar precios ni beneficios"}</p>
-        </article>
-      </section>
+      {!canSubscribePlans ? (
+        <section className="plans-overview">
+          <article>
+            <span><Icon name="payments" /></span>
+            <small>Plan destacado</small>
+            <strong>{featuredPlan?.name}</strong>
+            <p>{featuredPlan?.monthlyPrice} al mes</p>
+          </article>
+          <article>
+            <span><Icon name="business" /></span>
+            <small>Catálogo conectado</small>
+            <strong>{plans.filter((plan) => plan.source === "database").length} en Supabase</strong>
+            <p>Tabla planes; suscripciones asigna planes a empresas</p>
+          </article>
+          <article>
+            <span><Icon name="edit" /></span>
+            <small>{canManagePlans ? "Edición completa" : "Consulta disponible"}</small>
+            <strong>{canManagePlans ? "Oferta comercial" : "Planes comerciales"}</strong>
+            <p>{canManagePlans ? "Guarda precios, límites, beneficios y mensajes" : "Tu rol actual no puede modificar precios ni beneficios"}</p>
+          </article>
+        </section>
+      ) : null}
 
       <section className="plans-grid">
-        {plans.map((plan) => (
-          <article className={plan.id === "plus" ? "plan-card featured" : "plan-card"} key={plan.id}>
-            <div className="plan-card-top">
-              <span>{plan.badge}</span>
-              {canManagePlans && (
-                <button type="button" onClick={() => editPlan(plan)}><Icon name="edit" /> Editar</button>
-              )}
-            </div>
-            <h2>{plan.name}</h2>
-            <p>{plan.description}</p>
-            <div className="plan-db-limits">
-              <span>{plan.databaseId ? "Supabase" : "Base pendiente"}</span>
-              <b>{plan.companyLimit ?? "—"} empresa(s)</b>
-              <b>{plan.userLimit ?? "—"} usuario(s)</b>
-            </div>
-            <div className="plan-price">
-              <strong>{plan.monthlyPrice}</strong>
-              <small>Mensual</small>
-            </div>
-            <div className="plan-annual">
-              <span>{plan.annualPrice}</span>
-              <small>Anual sugerido</small>
-            </div>
-            <div className="plan-section">
-              <h3>Incluye</h3>
-              <ul>
-                {plan.includes.map((item) => (
-                  <li key={item}><Icon name="check" />{item}</li>
-                ))}
-              </ul>
-            </div>
-            <div className="plan-section muted">
-              <h3>Límites sugeridos</h3>
-              <ul>
-                {plan.limits.map((item) => (
-                  <li key={item}>{item}</li>
-                ))}
-              </ul>
-            </div>
-            <footer>{plan.objective}</footer>
-          </article>
-        ))}
+        {plans.map((plan) => {
+          const isCurrentPlan = Boolean(plan.databaseId && plan.databaseId === activePlanDatabaseId);
+          const isSubscribing = subscribingPlanId === plan.databaseId;
+
+          return (
+            <article className={plan.id === "plus" ? "plan-card featured" : "plan-card"} key={plan.id}>
+              <div className="plan-card-top">
+                <span>{plan.badge}</span>
+                {canManagePlans && (
+                  <button type="button" onClick={() => editPlan(plan)}><Icon name="edit" /> Editar</button>
+                )}
+              </div>
+              <h2>{plan.name}</h2>
+              <p>{plan.description}</p>
+              <div className="plan-db-limits">
+                <span>{plan.databaseId ? "Supabase" : "Base pendiente"}</span>
+                <b>{plan.companyLimit ?? "—"} empresa(s)</b>
+                <b>{plan.userLimit ?? "—"} usuario(s)</b>
+              </div>
+              <div className="plan-price">
+                <strong>{plan.monthlyPrice}</strong>
+                <small>Mensual</small>
+              </div>
+              <div className="plan-annual">
+                <span>{plan.annualPrice}</span>
+                <small>Anual sugerido</small>
+              </div>
+              <div className="plan-section">
+                <h3>Incluye</h3>
+                <ul>
+                  {plan.includes.map((item) => (
+                    <li key={item}><Icon name="check" />{item}</li>
+                  ))}
+                </ul>
+              </div>
+              <footer>{plan.objective}</footer>
+              {canSubscribePlans ? (
+                <button
+                  className={isCurrentPlan ? "plan-subscribe-button current" : "plan-subscribe-button"}
+                  disabled={isSubscribing || isCurrentPlan || !plan.databaseId}
+                  onClick={() => subscribeToPlan(plan)}
+                  type="button"
+                >
+                  <Icon name={isCurrentPlan ? "check_circle" : "payments"} />
+                  {isCurrentPlan ? "Plan actual" : isSubscribing ? "Suscribiendo..." : "Suscribirme a este plan"}
+                </button>
+              ) : null}
+            </article>
+          );
+        })}
       </section>
 
       {draft && (

@@ -1,10 +1,14 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
 import { IncomeActions } from "@/app/income/income-actions";
 import { getCurrentUser } from "@/lib/auth";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
+import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type IncomeRow = {
   id: string;
@@ -126,9 +130,15 @@ async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeo
   };
 }
 
-export default async function IncomePage() {
+export default async function IncomePage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const resolvedSearchParams = await searchParams;
+  const query = searchParamText(resolvedSearchParams, "q");
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
@@ -151,6 +161,16 @@ export default async function IncomePage() {
   const average = incomes.length ? total / incomes.length : 0;
   const categories = new Set(incomes.map((income) => income.categoria_id).filter(Boolean)).size;
   const uncategorized = incomes.filter((income) => !income.categoria_id).length;
+  const filteredIncomes = incomes.filter((income) => matchesSearch([
+    formatDate(income.fecha_ingreso),
+    income.fecha_ingreso,
+    companyLabel(income),
+    incomeDescription(income),
+    categoryLabel(income),
+    asNumber(income.monto),
+    moneyFormatter.format(asNumber(income.monto)),
+  ], query));
+  const incomePage = paginateItems(filteredIncomes, pageFromParam(resolvedSearchParams.page));
 
   return (
     <AppShell activeHref="/income" user={user}>
@@ -224,10 +244,12 @@ export default async function IncomePage() {
               <button type="button">Sin categoría</button>
             </div>
             <div className="income-tools">
-              <label>
-                <Icon name="search" />
-                <input placeholder="Buscar ingresos..." type="search" />
-              </label>
+              <TableSearch
+                label="Buscar ingresos"
+                pathname="/income"
+                placeholder="Buscar por empresa, descripción, categoría, fecha o monto..."
+                searchParams={resolvedSearchParams}
+              />
               <button type="button"><Icon name="filter_list" /> Filtrar</button>
             </div>
           </div>
@@ -244,8 +266,8 @@ export default async function IncomePage() {
                 </tr>
               </thead>
               <tbody>
-                {incomes.length ? (
-                  incomes.map((income) => (
+                {filteredIncomes.length ? (
+                  incomePage.items.map((income) => (
                     <tr key={income.id}>
                       <td>{formatDate(income.fecha_ingreso)}</td>
                       <td>{companyLabel(income)}</td>
@@ -259,8 +281,8 @@ export default async function IncomePage() {
                     <td colSpan={5}>
                       <div className="income-empty">
                         <span><Icon name="trending_up" /></span>
-                        <strong>No hay ingresos registrados</strong>
-                        <small>Cuando registres ingresos en Supabase, aparecerán aquí automáticamente.</small>
+                        <strong>{query ? "No encontramos ingresos" : "No hay ingresos registrados"}</strong>
+                        <small>{query ? "Prueba con otro término de búsqueda." : "Cuando registres ingresos en Supabase, aparecerán aquí automáticamente."}</small>
                       </div>
                     </td>
                   </tr>
@@ -268,6 +290,13 @@ export default async function IncomePage() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={incomePage.currentPage}
+            end={incomePage.end}
+            hrefForPage={(page) => pageHref("/income", resolvedSearchParams, "page", page)}
+            start={incomePage.start}
+            totalItems={filteredIncomes.length}
+          />
         </section>
       </main>
     </AppShell>

@@ -62,7 +62,7 @@ export function RegisterForm({ initialError = "" }: { initialError?: string }) {
         </label>
         <label>Confirmar contraseña<input name="confirmation" type={showPassword ? "text" : "password"} placeholder="Repite tu contraseña" autoComplete="new-password" minLength={6} required /></label>
       </div>
-      <label className="terms-check"><input type="checkbox" required /> <span>Acepto los <a href="#">Términos de servicio</a> y el <a href="#">Aviso de privacidad</a>.</span></label>
+      <label className="terms-check"><input type="checkbox" required /> <span>Acepto los <Link href="/terms">Términos de servicio</Link> y el <Link href="/privacy">Aviso de privacidad</Link>.</span></label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button" disabled={loading}>{loading ? "Creando cuenta..." : "Crear cuenta"}</button>
       <p className="register-copy">¿Ya tienes una cuenta? <Link href="/login">Iniciar sesión</Link></p>

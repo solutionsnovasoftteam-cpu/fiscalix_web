@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { type AdminDashboardUser } from "@/lib/adminUsers";
+import { paginateItems, paginationRangeLabel, TABLE_PAGE_SIZE } from "@/lib/pagination";
 import { canManageAdminUsers, canSuspendUserAccounts } from "@/lib/roles";
+import { matchesSearch } from "@/lib/tableSearch";
 import type { FiscalixUser } from "@/models/User";
 
 function formatDate(value: string | null) {
@@ -45,9 +47,25 @@ export function AdminUsersDashboard({
 }) {
   const [message, setMessage] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
   const canDelete = canManageAdminUsers(currentUser);
   const canSuspend = canSuspendUserAccounts(currentUser);
   const canShowActions = canDelete || canSuspend;
+  const filteredUsers = useMemo(() => users.filter((user) => matchesSearch([
+    fullName(user),
+    user.correo,
+    user.telefono,
+    user.rolLabel,
+    user.companyName,
+    user.planName,
+    user.billingStatusLabel,
+    formatMoney(user.billingAmount),
+    user.estado,
+    formatDate(user.nextBillingDate),
+    formatDate(user.fechaRegistro),
+  ], query)), [query, users]);
+  const usersPage = useMemo(() => paginateItems(filteredUsers, page, TABLE_PAGE_SIZE), [filteredUsers, page]);
 
   const stats = useMemo(() => {
     const active = users.filter((user) => user.estado === "activo").length;
@@ -136,7 +154,27 @@ export function AdminUsersDashboard({
             <h2>Usuarios registrados</h2>
             <p>{stats.suspended} cuenta(s) suspendida(s) dentro del alcance de tu rol.</p>
           </div>
-          <span>{canDelete ? "Acciones de superadmin habilitadas" : "Suspensión de clientes habilitada"}</span>
+          <div className="table-card-actions">
+            <label className="table-search">
+              <Icon name="search" />
+              <input
+                aria-label="Buscar usuarios"
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder="Buscar usuario, correo, empresa, plan o estado..."
+                type="search"
+                value={query}
+              />
+              {query && (
+                <button className="table-search-submit" onClick={() => { setQuery(""); setPage(1); }} type="button">
+                  Limpiar
+                </button>
+              )}
+            </label>
+            <span>{filteredUsers.length} resultado{filteredUsers.length === 1 ? "" : "s"}</span>
+          </div>
         </div>
 
         <div className="admin-table-scroll">
@@ -154,7 +192,7 @@ export function AdminUsersDashboard({
               </tr>
             </thead>
             <tbody>
-              {users.length ? users.map((user) => {
+              {filteredUsers.length ? usersPage.items.map((user) => {
                 const isSuspended = user.estado === "suspendido";
                 const isBusy = busyUserId === user.id;
 
@@ -211,8 +249,8 @@ export function AdminUsersDashboard({
                   <td colSpan={canShowActions ? 8 : 7}>
                     <div className="admin-empty">
                       <span><Icon name="manage_accounts" /></span>
-                      <strong>No hay usuarios para mostrar</strong>
-                      <small>Cuando existan usuarios dentro del alcance de tu rol aparecerán aquí.</small>
+                      <strong>{query ? "No encontramos usuarios" : "No hay usuarios para mostrar"}</strong>
+                      <small>{query ? "Prueba con otro término de búsqueda." : "Cuando existan usuarios dentro del alcance de tu rol aparecerán aquí."}</small>
                     </div>
                   </td>
                 </tr>
@@ -220,6 +258,29 @@ export function AdminUsersDashboard({
             </tbody>
           </table>
         </div>
+        {filteredUsers.length > TABLE_PAGE_SIZE && (
+          <nav className="table-pagination" aria-label="Paginación de usuarios">
+            <span>Mostrando {paginationRangeLabel(filteredUsers.length, usersPage.start, usersPage.end)}</span>
+            <div>
+              <button disabled={usersPage.currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button">
+                <Icon name="chevron_left" />
+              </button>
+              {Array.from({ length: usersPage.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button
+                  className={pageNumber === usersPage.currentPage ? "is-active" : undefined}
+                  key={pageNumber}
+                  onClick={() => setPage(pageNumber)}
+                  type="button"
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button disabled={usersPage.currentPage === usersPage.totalPages} onClick={() => setPage((value) => Math.min(usersPage.totalPages, value + 1))} type="button">
+                <Icon name="chevron_right" />
+              </button>
+            </div>
+          </nav>
+        )}
       </section>
     </main>
   );

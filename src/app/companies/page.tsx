@@ -87,7 +87,20 @@ export default async function CompaniesPage() {
             <h1>Mi empresa</h1>
             <span>Información de tu empresa registrada en la base de datos.</span>
           </div>
-          <CompanyFiscalEditor company={selectedCompany ? { id:selectedCompany.id, nombre:selectedCompany.nombre_comercial ?? "", regimeId:selectedFiscal?.regimen_id ?? "", rfc:selectedFiscal?.rfc || selectedCompany.rfc || "" } : null} regimes={regimes.map((regime) => ({ clave:regime.clave_sat, id:regime.id, nombre:regime.nombre }))} />
+          <CompanyFiscalEditor
+            company={selectedCompany ? {
+              address: "Pendiente de registrar",
+              email: fallback(user.correo),
+              id: selectedCompany.id,
+              legalName: fallback(selectedCompany.nombre_comercial),
+              nombre: selectedCompany.nombre_comercial ?? "",
+              phone: fallback(user.telefono),
+              regimeId: selectedFiscal?.regimen_id ?? "",
+              rfc: selectedFiscal?.rfc || selectedCompany.rfc || "",
+            } : null}
+            key={selectedCompany ? `${selectedCompany.id}-${selectedCompany.nombre_comercial ?? ""}-${selectedFiscal?.rfc ?? selectedCompany.rfc ?? ""}-${selectedFiscal?.regimen_id ?? ""}` : "company-editor-empty"}
+            regimes={regimes.map((regime) => ({ clave: regime.clave_sat, id: regime.id, nombre: regime.nombre }))}
+          />
         </header>
 
         {hasError && (

@@ -5,6 +5,7 @@ import { Icon } from "@/components/Icon";
 import { getCurrentPayCycle, getQuincenaByOffset, type PayrollRun } from "@/app/payroll/payroll-dates";
 import { downloadPayrollPdf } from "@/app/payroll/payroll-pdf";
 import { notifyPdfDownload } from "@/lib/clientNotifications";
+import { paginationRangeLabel } from "@/lib/pagination";
 
 export type PayrollEmployee = {
   department: string;
@@ -21,16 +22,47 @@ export type PayrollHubInitialData = {
   history?: PayrollRun[];
 };
 
+type PayrollEmployeeResponse = {
+  employee?: PayrollEmployee;
+  message?: string;
+  success?: boolean;
+};
+
+type PayrollRunResponse = {
+  message?: string;
+  run?: PayrollRun;
+  success?: boolean;
+};
+
 const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
 const dateFmt = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
-function initialsFrom(name: string) {
-  return name.split(" ").slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("");
+async function requestJson<T>(url: string, init: RequestInit) {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(init.headers ?? {}),
+    },
+  });
+  const payload = await response.json().catch(() => ({})) as T & { message?: string };
+
+  if (!response.ok) {
+    throw new Error(payload.message || "No fue posible completar la operación.");
+  }
+
+  return payload;
 }
 
-export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialData }) {
+export function PayrollHub({
+  databaseStatusMessage = "",
+  initialData,
+}: {
+  databaseStatusMessage?: string;
+  initialData?: PayrollHubInitialData;
+}) {
   const [employees, setEmployees] = useState<PayrollEmployee[]>(() => initialData?.employees ?? []);
   const [history, setHistory] = useState<PayrollRun[]>(() => initialData?.history ?? []);
   const [query, setQuery] = useState("");
@@ -41,6 +73,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [newEmployee, setNewEmployee] = useState({ name: "", role: "", department: "", salary: "" });
   const [editEmployee, setEditEmployee] = useState({ name: "", role: "", department: "", salary: "" });
 
@@ -60,8 +93,11 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const pageItems = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageStart = (currentPage - 1) * PAGE_SIZE;
+  const pageEnd = Math.min(pageStart + PAGE_SIZE, filtered.length);
+  const pageItems = filtered.slice(pageStart, pageEnd);
   const visibleHistory = showAllHistory ? history : history.slice(0, 4);
+  const isDatabaseBlocked = Boolean(databaseStatusMessage);
 
   function notify(message: string) {
     setFeedback(message);
@@ -92,7 +128,17 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     };
   }, [menuOpenId]);
 
-  function generatePayroll() {
+  async function savePayrollRun(run: Omit<PayrollRun, "downloaded" | "id">) {
+    const payload = await requestJson<PayrollRunResponse>("/api/payroll/runs", {
+      body: JSON.stringify(run),
+      method: "POST",
+    });
+
+    if (!payload.run) throw new Error(payload.message || "No fue posible guardar la nómina.");
+    return payload.run;
+  }
+
+  async function generatePayroll() {
     if (activeEmployees.length === 0) {
       notify("Agrega empleados activos antes de generar una nómina.");
       return;
@@ -100,9 +146,9 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
 
     const quincena = getQuincenaByOffset(0);
     const folio = `NOM-${quincena.folioPart}-R${history.length + 1}`;
-    setHistory((current) => [
-      {
-        id: `h-${Date.now()}`,
+    setIsSaving(true);
+    try {
+      const run = await savePayrollRun({
         folio,
         period: quincena.period,
         payDate: new Date().toISOString().slice(0, 10),
@@ -111,14 +157,17 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
         deductions,
         paid: totalPayroll,
         status: "Pagado",
-        downloaded: false,
-      },
-      ...current,
-    ]);
-    notify(`Nómina ${folio} generada por ${money.format(totalPayroll)}.`);
+      });
+      setHistory((current) => [run, ...current]);
+      notify(`Nómina ${run.folio} generada por ${money.format(run.paid)}.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible guardar la nómina.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function createPaymentDraft() {
+  async function createPaymentDraft() {
     if (activeEmployees.length === 0) {
       notify("Agrega empleados activos antes de crear un pago.");
       return;
@@ -126,9 +175,9 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
 
     const quincena = getQuincenaByOffset(0);
     const folio = `NOM-BOR-${quincena.folioPart}-${history.length + 1}`;
-    setHistory((current) => [
-      {
-        id: `draft-${Date.now()}`,
+    setIsSaving(true);
+    try {
+      const run = await savePayrollRun({
         folio,
         period: quincena.period,
         payDate: new Date().toISOString().slice(0, 10),
@@ -137,14 +186,17 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
         deductions,
         paid: totalPayroll,
         status: "Borrador",
-        downloaded: false,
-      },
-      ...current,
-    ]);
-    notify(`Borrador ${folio} creado. Puedes generarlo cuando estés listo.`);
+      });
+      setHistory((current) => [run, ...current]);
+      notify(`Borrador ${run.folio} creado. Puedes generarlo cuando estés listo.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible crear el borrador.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function addEmployee(event: React.FormEvent<HTMLFormElement>) {
+  async function addEmployee(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const salary = Number(newEmployee.salary);
     if (!newEmployee.name.trim() || !Number.isFinite(salary) || salary <= 0) {
@@ -153,21 +205,30 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     }
 
     const name = newEmployee.name.trim();
-    const employee: PayrollEmployee = {
-      id: `e-${Date.now()}`,
-      name,
-      role: newEmployee.role.trim() || "Colaborador",
-      department: newEmployee.department.trim() || "General",
-      salary,
-      status: "Activo",
-      initials: initialsFrom(name),
-    };
+    setIsSaving(true);
+    try {
+      const payload = await requestJson<PayrollEmployeeResponse>("/api/payroll/employees", {
+        body: JSON.stringify({
+          department: newEmployee.department,
+          name,
+          role: newEmployee.role,
+          salary,
+        }),
+        method: "POST",
+      });
 
-    setEmployees((current) => [employee, ...current]);
-    setNewEmployee({ name: "", role: "", department: "", salary: "" });
-    setShowEmployeeForm(false);
-    setPage(1);
-    notify(`${name} agregado a la plantilla.`);
+      if (!payload.employee) throw new Error(payload.message || "No fue posible guardar el empleado.");
+
+      setEmployees((current) => [payload.employee!, ...current]);
+      setNewEmployee({ name: "", role: "", department: "", salary: "" });
+      setShowEmployeeForm(false);
+      setPage(1);
+      notify(`${payload.employee.name} agregado a la plantilla.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible guardar el empleado.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function startEditEmployee(id: string) {
@@ -184,7 +245,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     closeMenu();
   }
 
-  function saveEmployeeEdit(event: React.FormEvent<HTMLFormElement>) {
+  async function saveEmployeeEdit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!editingEmployeeId) return;
     const salary = Number(editEmployee.salary);
@@ -194,43 +255,71 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     }
 
     const name = editEmployee.name.trim();
-    setEmployees((current) =>
-      current.map((employee) =>
-        employee.id === editingEmployeeId
-          ? {
-              ...employee,
-              name,
-              role: editEmployee.role.trim() || "Colaborador",
-              department: editEmployee.department.trim() || "General",
-              salary,
-              initials: initialsFrom(name),
-            }
-          : employee,
-      ),
-    );
-    setEditingEmployeeId(null);
-    setEditEmployee({ name: "", role: "", department: "", salary: "" });
-    notify(`${name} actualizado correctamente.`);
+    setIsSaving(true);
+    try {
+      const payload = await requestJson<PayrollEmployeeResponse>(`/api/payroll/employees/${editingEmployeeId}`, {
+        body: JSON.stringify({
+          department: editEmployee.department,
+          name,
+          role: editEmployee.role,
+          salary,
+        }),
+        method: "PATCH",
+      });
+
+      if (!payload.employee) throw new Error(payload.message || "No fue posible actualizar el empleado.");
+
+      setEmployees((current) => current.map((employee) => employee.id === editingEmployeeId ? payload.employee! : employee));
+      setEditingEmployeeId(null);
+      setEditEmployee({ name: "", role: "", department: "", salary: "" });
+      notify(`${payload.employee.name} actualizado correctamente.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible actualizar el empleado.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function removeEmployee(id: string) {
+  async function removeEmployee(id: string) {
     const employee = employees.find((item) => item.id === id);
-    setEmployees((current) => current.filter((item) => item.id !== id));
-    if (editingEmployeeId === id) setEditingEmployeeId(null);
-    closeMenu();
-    notify(employee ? `${employee.name} eliminado de la plantilla.` : "Empleado eliminado.");
+    setIsSaving(true);
+    try {
+      await requestJson<{ message?: string; success?: boolean }>(`/api/payroll/employees/${id}`, {
+        method: "DELETE",
+      });
+      setEmployees((current) => current.filter((item) => item.id !== id));
+      if (editingEmployeeId === id) setEditingEmployeeId(null);
+      closeMenu();
+      notify(employee ? `${employee.name} eliminado de la plantilla.` : "Empleado eliminado.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible eliminar el empleado.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
-  function toggleEmployeeStatus(id: string) {
-    setEmployees((current) =>
-      current.map((employee) =>
-        employee.id === id
-          ? { ...employee, status: employee.status === "Activo" ? "Baja" : "Activo" }
-          : employee,
-      ),
-    );
-    closeMenu();
-    notify("Estado del empleado actualizado.");
+  async function toggleEmployeeStatus(id: string) {
+    const employee = employees.find((item) => item.id === id);
+    if (!employee) return;
+
+    const nextStatus = employee.status === "Activo" ? "baja" : "activo";
+    setIsSaving(true);
+    try {
+      const payload = await requestJson<PayrollEmployeeResponse>(`/api/payroll/employees/${id}`, {
+        body: JSON.stringify({ status: nextStatus }),
+        method: "PATCH",
+      });
+
+      if (!payload.employee) throw new Error(payload.message || "No fue posible actualizar el estado.");
+
+      setEmployees((current) => current.map((item) => item.id === id ? payload.employee! : item));
+      closeMenu();
+      notify("Estado del empleado actualizado.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible actualizar el estado.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function openEmployeeMenu(event: React.MouseEvent<HTMLButtonElement>, id: string) {
@@ -243,12 +332,22 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     setMenuPosition({ top: rect.bottom + 6, left: Math.max(12, rect.right - 148) });
   }
 
-  function processDraft(id: string) {
-    setHistory((current) =>
-      current.map((run) => (run.id === id ? { ...run, status: "Pagado" } : run)),
-    );
+  async function processDraft(id: string) {
     const run = history.find((item) => item.id === id);
-    notify(run ? `${run.folio} procesado y marcado como pagado.` : "Borrador procesado.");
+    setIsSaving(true);
+    try {
+      const payload = await requestJson<PayrollRunResponse>(`/api/payroll/runs/${id}`, {
+        body: JSON.stringify({ status: "Pagado" }),
+        method: "PATCH",
+      });
+      if (!payload.run) throw new Error(payload.message || "No fue posible procesar el borrador.");
+      setHistory((current) => current.map((item) => (item.id === id ? payload.run! : item)));
+      notify(`${payload.run.folio} procesado y marcado como pagado.`);
+    } catch (error) {
+      notify(error instanceof Error ? error.message : run ? `No fue posible procesar ${run.folio}.` : "No fue posible procesar el borrador.");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function downloadRun(id: string) {
@@ -261,6 +360,10 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
     try {
       await downloadPayrollPdf(run);
       await notifyPdfDownload("payroll", { folio: run.folio, recordCount: run.employees });
+      await requestJson<PayrollRunResponse>(`/api/payroll/runs/${id}`, {
+        body: JSON.stringify({ downloaded: true }),
+        method: "PATCH",
+      });
       setHistory((current) =>
         current.map((item) => (item.id === id ? { ...item, downloaded: true } : item)),
       );
@@ -278,6 +381,12 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
         <div className="payroll-feedback" role="status">
           <Icon name="check_circle" />
           {feedback}
+        </div>
+      )}
+      {databaseStatusMessage && (
+        <div className="payroll-feedback payroll-feedback-warning" role="alert">
+          <Icon name="info" />
+          {databaseStatusMessage}
         </div>
       )}
 
@@ -300,7 +409,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
               value={query}
             />
           </label>
-          <button className="payroll-btn payroll-btn-primary" onClick={createPaymentDraft} type="button">
+          <button className="payroll-btn payroll-btn-primary" disabled={isSaving || isDatabaseBlocked} onClick={createPaymentDraft} type="button">
             <Icon name="add" />
             Nuevo pago
           </button>
@@ -347,9 +456,9 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
           <div className="payroll-panel-head">
             <div>
               <h2>Empleados</h2>
-              <p>{filtered.length} en plantilla · página {currentPage} de {totalPages}</p>
+              <p>{paginationRangeLabel(filtered.length, pageStart, pageEnd)} en plantilla · página {currentPage} de {totalPages}</p>
             </div>
-            <button className="payroll-btn payroll-btn-secondary" onClick={() => { setShowEmployeeForm((open) => !open); setEditingEmployeeId(null); }} type="button">
+            <button className="payroll-btn payroll-btn-secondary" disabled={isSaving || isDatabaseBlocked} onClick={() => { setShowEmployeeForm((open) => !open); setEditingEmployeeId(null); }} type="button">
               <Icon name="add" />
               {showEmployeeForm ? "Cancelar" : "Nuevo empleado"}
             </button>
@@ -361,8 +470,8 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
               <input onChange={(event) => setEditEmployee((value) => ({ ...value, role: event.target.value }))} placeholder="Puesto" value={editEmployee.role} />
               <input onChange={(event) => setEditEmployee((value) => ({ ...value, department: event.target.value }))} placeholder="Departamento" value={editEmployee.department} />
               <input min="1" onChange={(event) => setEditEmployee((value) => ({ ...value, salary: event.target.value }))} placeholder="Sueldo bruto" required step="0.01" type="number" value={editEmployee.salary} />
-              <button className="payroll-btn payroll-btn-primary" type="submit">Guardar cambios</button>
-              <button className="payroll-btn payroll-btn-secondary" onClick={() => setEditingEmployeeId(null)} type="button">Cancelar edición</button>
+              <button className="payroll-btn payroll-btn-primary" disabled={isSaving} type="submit">Guardar cambios</button>
+              <button className="payroll-btn payroll-btn-secondary" disabled={isSaving} onClick={() => setEditingEmployeeId(null)} type="button">Cancelar edición</button>
             </form>
           )}
 
@@ -372,7 +481,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
               <input onChange={(event) => setNewEmployee((value) => ({ ...value, role: event.target.value }))} placeholder="Puesto" value={newEmployee.role} />
               <input onChange={(event) => setNewEmployee((value) => ({ ...value, department: event.target.value }))} placeholder="Departamento" value={newEmployee.department} />
               <input min="1" onChange={(event) => setNewEmployee((value) => ({ ...value, salary: event.target.value }))} placeholder="Sueldo bruto" required step="0.01" type="number" value={newEmployee.salary} />
-              <button className="payroll-btn payroll-btn-primary" type="submit">Guardar empleado</button>
+              <button className="payroll-btn payroll-btn-primary" disabled={isSaving} type="submit">Guardar empleado</button>
             </form>
           )}
 
@@ -408,6 +517,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
                           aria-haspopup="menu"
                           aria-label={`Opciones de ${employee.name}`}
                           className="payroll-icon-btn"
+                          disabled={isSaving}
                           onClick={(event) => openEmployeeMenu(event, employee.id)}
                           type="button"
                         >
@@ -457,7 +567,7 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
             <li><span>Percepciones</span><strong>{money.format(perceptions)}</strong></li>
             <li><span>Deducciones</span><strong>{money.format(deductions)}</strong></li>
           </ul>
-          <button className="payroll-btn payroll-btn-primary payroll-btn-block" onClick={generatePayroll} type="button">
+          <button className="payroll-btn payroll-btn-primary payroll-btn-block" disabled={isSaving || isDatabaseBlocked} onClick={generatePayroll} type="button">
             <Icon name="payments" />
             Generar nómina
           </button>
@@ -496,13 +606,14 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
                   <em>{money.format(run.paid)}</em>
                 </div>
                 {run.status === "Borrador" && (
-                  <button className="payroll-btn payroll-btn-primary" onClick={() => processDraft(run.id)} type="button">
+                  <button className="payroll-btn payroll-btn-primary" disabled={isSaving} onClick={() => processDraft(run.id)} type="button">
                     <Icon name="payments" />
                     Procesar borrador
                   </button>
                 )}
                 <button
                   className={`payroll-btn payroll-btn-secondary ${run.downloaded ? "is-done" : ""}`}
+                  disabled={isSaving}
                   onClick={() => downloadRun(run.id)}
                   type="button"
                 >
@@ -527,13 +638,13 @@ export function PayrollHub({ initialData }: { initialData?: PayrollHubInitialDat
           role="menu"
           style={{ position: "fixed", left: menuPosition.left, top: menuPosition.top, zIndex: 100 }}
         >
-          <button onClick={() => startEditEmployee(openMenuEmployee.id)} role="menuitem" type="button">
+          <button disabled={isSaving} onClick={() => startEditEmployee(openMenuEmployee.id)} role="menuitem" type="button">
             Editar empleado
           </button>
-          <button onClick={() => toggleEmployeeStatus(openMenuEmployee.id)} role="menuitem" type="button">
+          <button disabled={isSaving} onClick={() => toggleEmployeeStatus(openMenuEmployee.id)} role="menuitem" type="button">
             {openMenuEmployee.status === "Activo" ? "Marcar baja" : "Reactivar"}
           </button>
-          <button onClick={() => removeEmployee(openMenuEmployee.id)} role="menuitem" type="button">
+          <button disabled={isSaving} onClick={() => removeEmployee(openMenuEmployee.id)} role="menuitem" type="button">
             Eliminar empleado
           </button>
         </div>

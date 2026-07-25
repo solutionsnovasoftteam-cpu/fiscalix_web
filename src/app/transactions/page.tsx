@@ -1,9 +1,13 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
 import { getCurrentUser } from "@/lib/auth";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
+import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type Relation<T> = T | T[] | null;
 
@@ -59,9 +63,15 @@ function formatDate(value: string) {
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
 }
 
-export default async function TransactionsPage() {
+export default async function TransactionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const resolvedSearchParams = await searchParams;
+  const query = searchParamText(resolvedSearchParams, "q");
 
   let companies: Company[] = [];
   let companiesError: unknown = null;
@@ -127,6 +137,17 @@ export default async function TransactionsPage() {
 
   const totalIncome = movements.filter((movement) => movement.type === "Ingreso").reduce((sum, movement) => sum + movement.amount, 0);
   const totalExpense = movements.filter((movement) => movement.type === "Gasto").reduce((sum, movement) => sum + movement.amount, 0);
+  const filteredMovements = movements.filter((movement) => matchesSearch([
+    formatDate(movement.date),
+    movement.date,
+    movement.concept,
+    movement.company,
+    movement.category,
+    movement.type,
+    movement.amount,
+    money.format(movement.amount),
+  ], query));
+  const movementsPage = paginateItems(filteredMovements, pageFromParam(resolvedSearchParams.page));
   const hasError = companiesError || incomeResult.error || expenseResult.error;
 
   return (
@@ -155,32 +176,44 @@ export default async function TransactionsPage() {
         <section className="reports-card">
           <div className="reports-card-heading">
             <div><h2>Todos los movimientos</h2><p>Los ingresos y gastos se ordenan automáticamente por fecha.</p></div>
-            <span>{companies.length} {companies.length === 1 ? "empresa" : "empresas"}</span>
+            <div className="table-card-actions">
+              <TableSearch label="Buscar movimientos" pathname="/transactions" placeholder="Buscar movimiento, empresa, categoría o monto..." searchParams={resolvedSearchParams} />
+              <span>{filteredMovements.length} resultado{filteredMovements.length === 1 ? "" : "s"}</span>
+            </div>
           </div>
 
-          {movements.length ? (
-            <div className="reports-table-scroll">
-              <table className="reports-table">
-                <thead><tr><th>Fecha</th><th>Movimiento</th><th>Empresa</th><th>Categoría</th><th>Tipo</th><th>Monto</th></tr></thead>
-                <tbody>
-                  {movements.map((movement) => (
-                    <tr key={movement.id}>
-                      <td>{formatDate(movement.date)}</td>
-                      <td>{movement.concept}</td>
-                      <td>{movement.company}</td>
-                      <td>{movement.category}</td>
-                      <td><span className={movement.type === "Ingreso" ? "admin-status" : "admin-status suspended"}>{movement.type}</span></td>
-                      <td className={movement.type === "Ingreso" ? "positive" : "negative"}>{movement.type === "Ingreso" ? "+" : "−"}{money.format(movement.amount)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          {filteredMovements.length ? (
+            <>
+              <div className="reports-table-scroll">
+                <table className="reports-table">
+                  <thead><tr><th>Fecha</th><th>Movimiento</th><th>Empresa</th><th>Categoría</th><th>Tipo</th><th>Monto</th></tr></thead>
+                  <tbody>
+                    {movementsPage.items.map((movement) => (
+                      <tr key={movement.id}>
+                        <td>{formatDate(movement.date)}</td>
+                        <td>{movement.concept}</td>
+                        <td>{movement.company}</td>
+                        <td>{movement.category}</td>
+                        <td><span className={movement.type === "Ingreso" ? "admin-status" : "admin-status suspended"}>{movement.type}</span></td>
+                        <td className={movement.type === "Ingreso" ? "positive" : "negative"}>{movement.type === "Ingreso" ? "+" : "−"}{money.format(movement.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <TablePagination
+                currentPage={movementsPage.currentPage}
+                end={movementsPage.end}
+                hrefForPage={(page) => pageHref("/transactions", resolvedSearchParams, "page", page)}
+                start={movementsPage.start}
+                totalItems={filteredMovements.length}
+              />
+            </>
           ) : (
             <div className="reports-empty">
               <span><Icon name="sync_alt" /></span>
-              <strong>Aún no hay movimientos registrados</strong>
-              <small>Los ingresos y gastos que registres aparecerán aquí en un solo historial.</small>
+              <strong>{query ? "No encontramos movimientos" : "Aún no hay movimientos registrados"}</strong>
+              <small>{query ? "Prueba con otro término de búsqueda." : "Los ingresos y gastos que registres aparecerán aquí en un solo historial."}</small>
             </div>
           )}
         </section>
