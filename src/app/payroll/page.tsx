@@ -18,7 +18,7 @@ export default async function PayrollPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { companyId, error: companyError } = await getPrimaryPayrollCompanyId(user.id);
+  const { companyId, error: companyError } = await getPrimaryPayrollCompanyId(user);
   let initialData: PayrollHubInitialData | undefined;
   let databaseStatusMessage = "";
 

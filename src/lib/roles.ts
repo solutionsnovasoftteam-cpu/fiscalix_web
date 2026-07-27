@@ -38,6 +38,10 @@ export function canManagePlans(user: { rol?: unknown } | null | undefined) {
   return isSuperAdminRole(user?.rol);
 }
 
+export function canManageIntegrations(user: { rol?: unknown } | null | undefined) {
+  return isAdminRole(user?.rol);
+}
+
 export function canViewAdminDashboard(user: { rol?: unknown } | null | undefined) {
   return isAdminRole(user?.rol);
 }

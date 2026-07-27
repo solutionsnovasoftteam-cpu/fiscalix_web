@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { CentroFiscalHub, type CentroFiscalInitialData } from "@/app/centro-fiscal/centro-fiscal-hub";
+import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 type Relation<T> = T | T[] | null;
@@ -14,6 +14,7 @@ type IncomeRow = {
   fecha_ingreso: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ExpenseRow = {
@@ -23,6 +24,7 @@ type ExpenseRow = {
   fecha_gasto: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ObligationRow = {
@@ -58,56 +60,68 @@ function taxEstimate(name: string, base: number) {
   return base * 0.03;
 }
 
-async function getCompanyIds(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  if (canViewAdminDashboard(user)) {
-    const { data } = await supabase.from("empresas").select("id").neq("estado", "suspendida");
-    return (data ?? []).map((company) => company.id);
-  }
-
-  const { data } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id);
-
-  return [...new Set((data ?? []).map((membership) => membership.empresa_id).filter(Boolean))] as string[];
-}
-
 export default async function CentroFiscalPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const now = new Date();
-  const companyIds = await getCompanyIds(user);
+  const { companyIds } = await getAccessibleCompanyIds(user);
   const monthStart = dateKey(new Date(now.getFullYear(), now.getMonth(), 1));
 
-  const [incomeResult, expenseResult, obligationResult] = companyIds.length
-    ? await Promise.all([
-      supabase
-        .from("ingresos")
-        .select("id,concepto,monto,fecha_ingreso,empresa_id,categorias_financieras(nombre)")
-        .in("empresa_id", companyIds)
-        .order("fecha_ingreso", { ascending: false })
-        .limit(80),
-      supabase
-        .from("gastos")
-        .select("id,concepto,monto,fecha_gasto,empresa_id,categorias_financieras(nombre)")
-        .in("empresa_id", companyIds)
-        .order("fecha_gasto", { ascending: false })
-        .limit(80),
-      supabase
-        .from("obligaciones_fiscales")
-        .select("id,empresa_id,nombre,periodicidad,descripcion,activa")
-        .in("empresa_id", companyIds)
-        .eq("activa", true),
-    ])
-    : [
-      { data: [] as IncomeRow[], error: null },
-      { data: [] as ExpenseRow[], error: null },
-      { data: [] as ObligationRow[], error: null },
-    ];
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationResult] = await Promise.all([
+    companyIds.length
+      ? supabase
+          .from("ingresos")
+          .select("id,concepto,monto,fecha_ingreso,empresa_id,categorias_financieras(nombre)")
+          .in("empresa_id", companyIds)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(80)
+      : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .order("fecha_ingreso", { ascending: false })
+      .limit(80),
+    companyIds.length
+      ? supabase
+          .from("gastos")
+          .select("id,concepto,monto,fecha_gasto,empresa_id,categorias_financieras(nombre)")
+          .in("empresa_id", companyIds)
+          .order("fecha_gasto", { ascending: false })
+          .limit(80)
+      : Promise.resolve({ data: [] as ExpenseRow[], error: null }),
+    supabase
+      .from("gastos")
+      .select("id,concepto,monto,usuario_id,fecha_gasto,empresa_id,categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .order("fecha_gasto", { ascending: false })
+      .limit(80),
+    companyIds.length
+      ? supabase
+          .from("obligaciones_fiscales")
+          .select("id,empresa_id,nombre,periodicidad,descripcion,activa")
+          .in("empresa_id", companyIds)
+          .eq("activa", true)
+      : Promise.resolve({ data: [] as ObligationRow[], error: null }),
+  ]);
 
-  const incomes = (incomeResult.data ?? []) as IncomeRow[];
-  const expenses = (expenseResult.data ?? []) as ExpenseRow[];
+  const incomesById = new Map<string, IncomeRow>();
+  const expensesById = new Map<string, ExpenseRow>();
+  for (const income of [
+    ...((companyIncomeResult.data ?? []) as IncomeRow[]),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[]),
+  ]) {
+    incomesById.set(income.id, income);
+  }
+  for (const expense of [
+    ...((companyExpenseResult.data ?? []) as ExpenseRow[]),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as ExpenseRow[]),
+  ]) {
+    expensesById.set(expense.id, expense);
+  }
+  const incomes = [...incomesById.values()];
+  const expenses = [...expensesById.values()];
   const obligations = (obligationResult.data ?? []) as ObligationRow[];
   const currentMonthIncome = incomes
     .filter((income) => income.fecha_ingreso && income.fecha_ingreso >= monthStart)

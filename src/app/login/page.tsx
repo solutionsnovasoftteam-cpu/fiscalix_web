@@ -12,6 +12,7 @@ export default async function LoginPage({
 }) {
   if (await getCurrentUser()) redirect("/dashboard");
   const { code, error } = await searchParams;
+  const supportEmail = process.env.GMAIL_SUPPORT_EMAIL?.trim() || "solutionsnovasoftteam@gmail.com";
   return (
     <main className="login-page">
       <ViewTransition name="auth-panel" share="auth-panel-morph">
@@ -19,7 +20,7 @@ export default async function LoginPage({
         <div className="login-card">
           <Brand />
           <div className="login-heading"><span>Bienvenido de nuevo</span><h1>Inicia sesión en tu cuenta</h1><p>Administra tus obligaciones fiscales de forma simple y segura.</p></div>
-          <LoginForm initialError={error ?? ""} initialErrorCode={code ?? ""} />
+          <LoginForm initialError={error ?? ""} initialErrorCode={code ?? ""} supportEmail={supportEmail} />
           <p className="register-copy">¿Aún no tienes una cuenta? <Link href="/register">Crear cuenta</Link></p>
         </div>
         <p className="legal">Al continuar, aceptas nuestros <Link href="/terms">Términos de servicio</Link> y <Link href="/privacy">Aviso de privacidad</Link>.</p>

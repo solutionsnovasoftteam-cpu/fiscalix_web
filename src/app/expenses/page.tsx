@@ -4,9 +4,9 @@ import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { ExpenseActions } from "@/app/expenses/expense-actions";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
@@ -20,12 +20,6 @@ type ExpenseRow = {
   categoria_id: string | null;
   empresas: { nombre_comercial: string | null } | { nombre_comercial: string | null }[] | null;
   categorias_financieras: { nombre: string | null; tipo: string | null } | { nombre: string | null; tipo: string | null }[] | null;
-};
-
-type CompanyRow = {
-  estado: string | null;
-  id: string;
-  nombre_comercial: string | null;
 };
 
 type CategoryRow = {
@@ -96,44 +90,6 @@ function fallback(value: string | null | undefined) {
 function isExpenseCategory(category: CategoryRow) {
   const normalized = category.tipo?.trim().toLowerCase();
   return !normalized || ["gasto", "gastos", "egreso", "egresos", "expense", "expenses"].includes(normalized);
-}
-
-function isMissingColumnError(error: { code?: string; message?: string } | null | undefined, columnName: string) {
-  const message = error?.message?.toLowerCase() ?? "";
-  return error?.code === "42703" || message.includes(columnName.toLowerCase());
-}
-
-async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  if (canViewAdminDashboard(user)) {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial,estado")
-      .order("nombre_comercial", { ascending: true });
-
-    return {
-      companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-      error,
-    };
-  }
-
-  const { data: memberships, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id);
-
-  const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-  if (!companyIds.length || membershipError) return { companies: [] as CompanyRow[], error: membershipError };
-
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .in("id", companyIds)
-    .order("nombre_comercial", { ascending: true });
-
-  return {
-    companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-    error,
-  };
 }
 
 export default async function ExpensesPage({

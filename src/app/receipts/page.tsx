@@ -3,12 +3,11 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
+import { ReceiptsTableActions } from "@/app/receipts/receipts-table-actions";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
-
-type Company = { id: string; nombre_comercial: string | null };
 
 type FinancialRecord = {
   concepto: string | null;
@@ -52,30 +51,20 @@ export default async function ReceiptsPage({
   const resolvedSearchParams = await searchParams;
   const q = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : "";
   const query = q.trim().toLowerCase();
-  let companies: Company[] = [];
-  let companiesError: unknown = null;
-
-  if (canViewAdminDashboard(user)) {
-    const result = await supabase.from("empresas").select("id,nombre_comercial").neq("estado", "suspendida");
-    companies = (result.data ?? []) as Company[];
-    companiesError = result.error;
-  } else {
-    const result = await supabase
-      .from("empresa_usuario")
-      .select("empresa_id,empresas(id,nombre_comercial)")
-      .eq("usuario_id", user.id);
-    companies = ((result.data ?? []).flatMap((membership) => membership.empresas ?? []) as Company[]);
-    companiesError = result.error;
-  }
+  const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || "Sin empresa"]));
-  const [incomeResult, expenseResult] = companyIds.length
-    ? await Promise.all([
-      supabase.from("ingresos").select("id,concepto,monto,fecha_ingreso,empresa_id").in("empresa_id", companyIds).order("fecha_ingreso", { ascending: false }).limit(100),
-      supabase.from("gastos").select("id,concepto,monto,fecha_gasto,empresa_id").in("empresa_id", companyIds).order("fecha_gasto", { ascending: false }).limit(100),
-    ])
-    : [{ data: [] as FinancialRecord[], error: null }, { data: [] as FinancialRecord[], error: null }];
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
+    companyIds.length
+      ? supabase.from("ingresos").select("id,concepto,monto,fecha_ingreso,empresa_id").in("empresa_id", companyIds).order("fecha_ingreso", { ascending: false }).limit(100)
+      : Promise.resolve({ data: [] as FinancialRecord[], error: null }),
+    supabase.from("ingresos").select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id").eq("usuario_id", user.id).order("fecha_ingreso", { ascending: false }).limit(100),
+    companyIds.length
+      ? supabase.from("gastos").select("id,concepto,monto,fecha_gasto,empresa_id").in("empresa_id", companyIds).order("fecha_gasto", { ascending: false }).limit(100)
+      : Promise.resolve({ data: [] as FinancialRecord[], error: null }),
+    supabase.from("gastos").select("id,concepto,monto,usuario_id,fecha_gasto,empresa_id").eq("usuario_id", user.id).order("fecha_gasto", { ascending: false }).limit(100),
+  ]);
 
   function receiptFrom(record: FinancialRecord, type: Receipt["type"]): Receipt {
     const folio = `${type === "Ingreso" ? "ING" : "GAS"}-${record.id.slice(0, 8).toUpperCase()}`;
@@ -90,16 +79,32 @@ export default async function ReceiptsPage({
     };
   }
 
-  const incomes = ((incomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>)
-    .map((record) => receiptFrom({ ...record, fecha: record.fecha_ingreso }, "Ingreso"));
-  const expenses = ((expenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>)
-    .map((record) => receiptFrom({ ...record, fecha: record.fecha_gasto }, "Gasto"));
+  const incomesById = new Map<string, Receipt>();
+  const expensesById = new Map<string, Receipt>();
+  for (const record of [
+    ...((companyIncomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>),
+  ]) {
+    incomesById.set(record.id, receiptFrom({ ...record, fecha: record.fecha_ingreso }, "Ingreso"));
+  }
+  for (const record of [
+    ...((companyExpenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>),
+  ]) {
+    expensesById.set(record.id, receiptFrom({ ...record, fecha: record.fecha_gasto }, "Gasto"));
+  }
+  const incomes = [...incomesById.values()];
+  const expenses = [...expensesById.values()];
   const allReceipts = [...incomes, ...expenses].filter((receipt) => receipt.date).sort((a, b) => b.date.localeCompare(a.date));
   const receipts = query
     ? allReceipts.filter((receipt) => [receipt.folio, receipt.company, receipt.concept, receipt.type].join(" ").toLowerCase().includes(query))
     : allReceipts;
   const receiptsPage = paginateItems(receipts, pageFromParam(resolvedSearchParams.page));
-  const hasError = companiesError || incomeResult.error || expenseResult.error;
+  const hasError = companiesError
+    || companyIncomeResult.error
+    || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error)
+    || companyExpenseResult.error
+    || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error);
 
   return (
     <AppShell activeHref="/receipts" user={user}>
@@ -145,7 +150,7 @@ export default async function ReceiptsPage({
                         <td><span className={receipt.type === "Ingreso" ? "receipt-type income" : "receipt-type expense"}>{receipt.type}</span></td>
                         <td className={receipt.type === "Ingreso" ? "receipt-amount income" : "receipt-amount expense"}>{money.format(receipt.amount)}</td>
                         <td><span className="receipt-status"><i />Registrado</span></td>
-                        <td><button aria-label={`Ver ${receipt.folio}`} className="receipt-action" type="button"><Icon name="history" /></button><button aria-label={`Más opciones para ${receipt.folio}`} className="receipt-action" type="button"><Icon name="more_horiz" /></button></td>
+                        <td><ReceiptsTableActions receipt={receipt} /></td>
                       </tr>
                     ))}
                   </tbody>

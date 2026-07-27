@@ -21,9 +21,10 @@ const nav = [
 ] as const;
 
 const adminNav = ["Administración", "/admin", "manage_accounts"] as const;
+const supportNav = ["Aclaraciones", "/support", "support_agent"] as const;
 
 export function Sidebar({ activeHref = "/dashboard", user }: { activeHref?: string; user: FiscalixUser }) {
-  const items = canViewAdminDashboard(user) ? [...nav, adminNav] : nav;
+  const items = canViewAdminDashboard(user) ? [...nav, supportNav, adminNav] : nav;
 
   return (
     <aside className="sidebar">

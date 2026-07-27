@@ -10,7 +10,7 @@ interface FirebaseLoginResponse {
 }
 
 const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
-const SUSPENDED_ACCOUNT_MESSAGE = "Tu cuenta fue suspendida por razones de seguridad. Contacta a un administrador para realizar las aclaraciones correspondientes.";
+const SUSPENDED_ACCOUNT_MESSAGE = "Tu cuenta fue suspendida. Contacta a solutionsnovasoftteam@gmail.com para hacer las aclaraciones correspondientes.";
 
 const firebaseMessages: Record<string, string> = {
   EMAIL_NOT_FOUND: "No existe una cuenta con este correo.",

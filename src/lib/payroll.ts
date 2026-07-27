@@ -1,6 +1,6 @@
 import "server-only";
 
-import { canViewAdminDashboard } from "@/lib/roles";
+import { canAccessCompany, getPrimaryAccessibleCompany } from "@/lib/access-control";
 import { supabase } from "@/lib/supabase";
 import type { getCurrentUser } from "@/lib/auth";
 
@@ -78,39 +78,20 @@ export function mapPayrollRunRow(run: PayrollRunRow, employeeCount: number, fall
   };
 }
 
-export async function getPrimaryPayrollCompanyId(userId: string) {
-  const { data, error } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", userId)
-    .limit(1);
+export async function getPrimaryPayrollCompanyId(user: CurrentUser) {
+  const { company, error } = await getPrimaryAccessibleCompany(user);
 
   if (error) return { companyId: null, error };
-  return { companyId: data?.[0]?.empresa_id ?? null, error: null };
+  return { companyId: company?.id ?? null, error: null };
 }
 
 export async function canAccessPayrollCompany(user: CurrentUser, companyId: string) {
-  const { data: company, error: companyError } = await supabase
-    .from("empresas")
-    .select("id,estado")
-    .eq("id", companyId)
-    .maybeSingle();
-
-  if (companyError || !company || company.estado === "suspendida") return false;
-  if (canViewAdminDashboard(user)) return true;
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id)
-    .eq("empresa_id", companyId)
-    .maybeSingle();
-
-  return !membershipError && Boolean(membership);
+  const { allowed } = await canAccessCompany(user, companyId);
+  return allowed;
 }
 
 export async function getPayrollCompanyIdOrError(user: CurrentUser) {
-  const { companyId, error } = await getPrimaryPayrollCompanyId(user.id);
+  const { companyId, error } = await getPrimaryPayrollCompanyId(user);
 
   if (error) return { error: "No fue posible consultar la empresa del usuario.", status: 500 as const };
   if (!companyId) return { error: "No hay una empresa ligada a tu perfil para registrar nómina.", status: 400 as const };

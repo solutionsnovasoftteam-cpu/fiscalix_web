@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getCompanyIfAccessible } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { createFinancialRecordNotification } from "@/lib/notifications";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 type ExpenseRequestBody = {
@@ -24,26 +24,6 @@ function isExpenseCategoryType(value: string | null | undefined) {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return true;
   return ["gasto", "gastos", "egreso", "egresos", "expense", "expenses"].includes(normalized);
-}
-
-async function getAllowedCompanyName(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>, empresaId: string) {
-  const { data: company, error: companyError } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .eq("id", empresaId)
-    .maybeSingle();
-
-  if (companyError || !company || company.estado === "suspendida") return null;
-  if (canViewAdminDashboard(user)) return company.nombre_comercial || "Sin empresa";
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id)
-    .eq("empresa_id", empresaId)
-    .maybeSingle();
-
-  return !membershipError && membership ? company.nombre_comercial || "Sin empresa" : null;
 }
 
 export async function POST(request: Request) {
@@ -101,10 +81,14 @@ export async function POST(request: Request) {
   let selectedCompanyName = empresaNombreOtro || null;
 
   if (!isOtherCompany) {
-    selectedCompanyName = await getAllowedCompanyName(user, empresaId);
-    if (!selectedCompanyName) {
+    const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
+    if (accessError) {
+      return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
+    }
+    if (!company) {
       return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
     }
+    selectedCompanyName = company.nombre_comercial || "Sin empresa";
   }
 
   const storedConcept = isOtherCompany ? [empresaNombreOtro, concepto].filter(Boolean).join(" · ") : concepto;

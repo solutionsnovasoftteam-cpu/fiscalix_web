@@ -3,16 +3,11 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
+import { getAccessibleCompanies } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
-
-type Company = {
-  id: string;
-  nombre_comercial: string | null;
-};
 
 type TaxObligation = {
   activa: boolean | null;
@@ -104,26 +99,7 @@ export default async function TaxesPage({
   const ivaQuery = searchParamText(resolvedSearchParams, "ivaQ");
   const taxQuery = searchParamText(resolvedSearchParams, "taxQ");
 
-  let companies: Company[] = [];
-  let companiesError: unknown = null;
-
-  if (canViewAdminDashboard(user)) {
-    const result = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial")
-      .neq("estado", "suspendida")
-      .order("nombre_comercial");
-    companies = (result.data ?? []) as Company[];
-    companiesError = result.error;
-  } else {
-    const result = await supabase
-      .from("empresa_usuario")
-      .select("empresa_id,empresas(id,nombre_comercial)")
-      .eq("usuario_id", user.id);
-    companies = ((result.data ?? [])
-      .flatMap((membership) => membership.empresas ?? []) as Company[]);
-    companiesError = result.error;
-  }
+  const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
   const companyNameById = new Map(companies.map((company) => [company.id, label(company.nombre_comercial, "Sin empresa")]));
@@ -221,7 +197,7 @@ export default async function TaxesPage({
           <div className="reports-card-heading">
             <div>
               <h2>IVA estimado por empresa</h2>
-              <p>Se calcula como 16% de los ingresos registrados por empresa. Es una estimación informativa basada en tus datos de Supabase.</p>
+              <p>Se calcula como 16% de los ingresos registrados por empresa. Es una estimación informativa basada en tus datos de Fiscalix.</p>
             </div>
             <div className="table-card-actions">
               <TableSearch

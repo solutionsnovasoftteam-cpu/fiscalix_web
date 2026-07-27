@@ -56,7 +56,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Solo el superadministrador puede editar planes." }, { status: 403 });
   }
 
-  const body = (await request.json()) as PlanPayload;
+  let body: PlanPayload;
+  try {
+    body = (await request.json()) as PlanPayload;
+  } catch {
+    return NextResponse.json({ message: "Solicitud inválida." }, { status: 400 });
+  }
+
   const nombre = typeof body.name === "string" ? body.name.trim() : "";
   const precioMensual = cleanPrice(body.monthlyAmount);
   const precioAnual = cleanPrice(body.annualAmount);

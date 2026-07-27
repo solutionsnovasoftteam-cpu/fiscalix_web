@@ -71,7 +71,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const authorization = await authorizeTarget(id, "suspend");
     if (authorization.error) return authorization.error;
 
-    const body = (await request.json()) as UserAction;
+    let body: UserAction;
+    try {
+      body = (await request.json()) as UserAction;
+    } catch {
+      return NextResponse.json({ message: "Solicitud inválida." }, { status: 400 });
+    }
+
     const nextStatus = body.action === "activate" ? "activo" : body.action === "suspend" ? "suspendido" : null;
 
     if (!nextStatus) {

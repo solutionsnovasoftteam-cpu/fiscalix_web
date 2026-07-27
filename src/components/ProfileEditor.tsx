@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { FormEvent, useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
@@ -17,12 +17,15 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [emailValue, setEmailValue] = useState(correo);
   const [message, setMessage] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useModal({ busy, dialogRef, onClose: close, open });
 
-  async function submit(event: React.FormEvent<HTMLFormElement>) {
+  const emailChanged = emailValue.trim().toLowerCase() !== correo.toLowerCase();
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
@@ -32,6 +35,8 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
       const response = await fetch("/api/users", {
         body: JSON.stringify({
           apellido: form.get("apellido"),
+          correo: form.get("correo"),
+          currentPassword: form.get("currentPassword"),
           nombre: form.get("nombre"),
           telefono: form.get("telefono"),
         }),
@@ -53,7 +58,7 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
     <div className="profile-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <section aria-labelledby="profile-editor-title" aria-modal="true" className="profile-editor" ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="profile-editor-heading">
-          <div><span>PERFIL PERSONAL</span><h2 id="profile-editor-title">Editar información</h2><p>Actualiza los datos visibles en tu cuenta.</p></div>
+          <div><span>PERFIL PERSONAL</span><h2 id="profile-editor-title">Editar información</h2><p>Actualiza tus datos visibles y tu correo de acceso.</p></div>
           <button aria-label="Cerrar" disabled={busy} onClick={() => setOpen(false)} type="button"><Icon name="close" /></button>
         </div>
         <form onSubmit={submit}>
@@ -61,7 +66,31 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
             <label>Nombre<input defaultValue={nombre} maxLength={80} name="nombre" required /></label>
             <label>Apellido<input defaultValue={apellido} maxLength={80} name="apellido" required /></label>
             <label className="wide">Teléfono<input defaultValue={telefono} inputMode="tel" maxLength={25} name="telefono" placeholder="Ej. 55 1234 5678" /></label>
-            <label className="wide">Correo electrónico<input defaultValue={correo} disabled type="email" /><small>El correo de acceso no se cambia desde el perfil.</small></label>
+            <label className="wide">
+              Correo electrónico
+              <input
+                autoComplete="email"
+                maxLength={160}
+                name="correo"
+                onChange={(event) => setEmailValue(event.target.value)}
+                required
+                type="email"
+                value={emailValue}
+              />
+              <small>Si cambias el correo, tendrás que confirmar tu contraseña actual.</small>
+            </label>
+            <label className="wide">
+              Contraseña actual
+              <input
+                autoComplete="current-password"
+                disabled={!emailChanged || busy}
+                name="currentPassword"
+                placeholder={emailChanged ? "Confirma tu contraseña actual" : "Solo necesaria si cambias el correo"}
+                required={emailChanged}
+                type="password"
+              />
+              <small>La usamos únicamente para validar que tú solicitaste el cambio.</small>
+            </label>
           </div>
           {message && <p className="profile-editor-message" role="alert">{message}</p>}
           <div className="profile-editor-actions"><button disabled={busy} onClick={() => setOpen(false)} type="button">Cancelar</button><button className="primary-button" disabled={busy} type="submit">{busy ? "Guardando..." : "Guardar cambios"}</button></div>
@@ -73,7 +102,7 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
 
   return (
     <>
-      <button onClick={() => { setMessage(""); setOpen(true); }} type="button">Editar información</button>
+      <button onClick={() => { setEmailValue(correo); setMessage(""); setOpen(true); }} type="button">Editar información</button>
       {portalTarget && modal ? createPortal(modal, portalTarget) : null}
     </>
   );

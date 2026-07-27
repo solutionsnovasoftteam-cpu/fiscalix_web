@@ -253,11 +253,13 @@ export function ExpenseActions({
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
+  const singleRegisteredCompany = companies.length === 1 ? companies[0] : null;
+  const defaultCompanyId = singleRegisteredCompany?.id ?? "";
   const [exportOpen, setExportOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState("");
+  const [selectedCompany, setSelectedCompany] = useState(defaultCompanyId);
   const [saving, setSaving] = useState(false);
 
   function notify(value: string) {
@@ -268,8 +270,13 @@ export function ExpenseActions({
   function closeModal() {
     if (saving) return;
     formRef.current?.reset();
-    setSelectedCompany("");
+    setSelectedCompany(defaultCompanyId);
     setModalOpen(false);
+  }
+
+  function openModal() {
+    setSelectedCompany(defaultCompanyId);
+    setModalOpen(true);
   }
 
   function openExportModal() {
@@ -342,7 +349,7 @@ export function ExpenseActions({
       }
 
       formRef.current?.reset();
-      setSelectedCompany("");
+      setSelectedCompany(defaultCompanyId);
       setModalOpen(false);
       notify(payload.message || "Gasto registrado correctamente.");
       router.refresh();
@@ -375,18 +382,28 @@ export function ExpenseActions({
         <form className="expenses-form" onSubmit={submitExpense} ref={formRef}>
             <label>
               Empresa
-              <select
-                name="empresaId"
-                onChange={(event) => setSelectedCompany(event.target.value)}
-                required
-                value={selectedCompany}
-              >
-                <option disabled value="">Selecciona una empresa</option>
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>{company.nombre}</option>
-                ))}
-                <option value={OTHER_COMPANY_VALUE}>Otro</option>
-              </select>
+              {singleRegisteredCompany ? (
+                <>
+                  <input name="empresaId" readOnly type="hidden" value={singleRegisteredCompany.id} />
+                  <div className="expenses-static-field">
+                    <strong>{singleRegisteredCompany.nombre}</strong>
+                    <span>Predeterminada</span>
+                  </div>
+                </>
+              ) : (
+                <select
+                  name="empresaId"
+                  onChange={(event) => setSelectedCompany(event.target.value)}
+                  required
+                  value={selectedCompany}
+                >
+                  <option disabled value="">Selecciona una empresa</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>{company.nombre}</option>
+                  ))}
+                  <option value={OTHER_COMPANY_VALUE}>Otro</option>
+                </select>
+              )}
             </label>
 
             {selectedCompany === OTHER_COMPANY_VALUE && (
@@ -498,7 +515,7 @@ export function ExpenseActions({
           )}
         </div>
 
-        <button className="primary-button compact" onClick={() => setModalOpen(true)} type="button">
+        <button className="primary-button compact" onClick={openModal} type="button">
           Nuevo gasto <Icon name="add" />
         </button>
       </div>

@@ -3,15 +3,16 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
+import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type FinanceRow = {
   empresa_id: string | null;
   fecha: string;
+  id: string;
   monto: number | string;
 };
 
@@ -37,27 +38,33 @@ export default async function ReportsPage({
   const resolvedSearchParams = await searchParams;
   const query = searchParamText(resolvedSearchParams, "q");
 
-  let companyIds: string[] = [];
-  let scopeError: unknown = null;
-  if (canViewAdminDashboard(user)) {
-    const result = await supabase.from("empresas").select("id").neq("estado", "suspendida");
-    companyIds = (result.data ?? []).map((item) => item.id);
-    scopeError = result.error;
-  } else {
-    const result = await supabase.from("empresa_usuario").select("empresa_id").eq("usuario_id", user.id);
-    companyIds = [...new Set((result.data ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-    scopeError = result.error;
-  }
+  const { companyIds, error: scopeError } = await getAccessibleCompanyIds(user);
 
-  const [incomeResult, expenseResult] = companyIds.length
-    ? await Promise.all([
-        supabase.from("ingresos").select("empresa_id,fecha_ingreso,monto").in("empresa_id", companyIds).order("fecha_ingreso", { ascending: false }),
-        supabase.from("gastos").select("empresa_id,fecha_gasto,monto").in("empresa_id", companyIds).order("fecha_gasto", { ascending: false }),
-      ])
-    : [{ data: [], error: null }, { data: [], error: null }];
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
+    companyIds.length
+      ? supabase.from("ingresos").select("id,empresa_id,fecha_ingreso,monto").in("empresa_id", companyIds).order("fecha_ingreso", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("ingresos").select("id,empresa_id,usuario_id,fecha_ingreso,monto").eq("usuario_id", user.id).order("fecha_ingreso", { ascending: false }),
+    companyIds.length
+      ? supabase.from("gastos").select("id,empresa_id,fecha_gasto,monto").in("empresa_id", companyIds).order("fecha_gasto", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    supabase.from("gastos").select("id,empresa_id,usuario_id,fecha_gasto,monto").eq("usuario_id", user.id).order("fecha_gasto", { ascending: false }),
+  ]);
 
-  const incomes: FinanceRow[] = (incomeResult.data ?? []).map((row) => ({ empresa_id: row.empresa_id, fecha: row.fecha_ingreso, monto: row.monto }));
-  const expenses: FinanceRow[] = (expenseResult.data ?? []).map((row) => ({ empresa_id: row.empresa_id, fecha: row.fecha_gasto, monto: row.monto }));
+  const incomeRows = [
+    ...((companyIncomeResult.data ?? []) as Array<{ empresa_id: string | null; fecha_ingreso: string; id: string; monto: number | string }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<{ empresa_id: string | null; fecha_ingreso: string; id: string; monto: number | string }>),
+  ];
+  const expenseRows = [
+    ...((companyExpenseResult.data ?? []) as Array<{ empresa_id: string | null; fecha_gasto: string; id: string; monto: number | string }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<{ empresa_id: string | null; fecha_gasto: string; id: string; monto: number | string }>),
+  ];
+  const incomesById = new Map<string, FinanceRow>();
+  const expensesById = new Map<string, FinanceRow>();
+  for (const row of incomeRows) incomesById.set(row.id, { empresa_id: row.empresa_id, fecha: row.fecha_ingreso, id: row.id, monto: row.monto });
+  for (const row of expenseRows) expensesById.set(row.id, { empresa_id: row.empresa_id, fecha: row.fecha_gasto, id: row.id, monto: row.monto });
+  const incomes = [...incomesById.values()];
+  const expenses = [...expensesById.values()];
   const totalIncome = incomes.reduce((sum, row) => sum + number(row.monto), 0);
   const totalExpense = expenses.reduce((sum, row) => sum + number(row.monto), 0);
   const periods = new Map<string, { expenses: number; incomes: number; movements: number }>();
@@ -90,7 +97,11 @@ export default async function ReportsPage({
     ], query);
   });
   const reportsPage = paginateItems(filteredRows, pageFromParam(resolvedSearchParams.page));
-  const hasError = scopeError || incomeResult.error || expenseResult.error;
+  const hasError = scopeError
+    || companyIncomeResult.error
+    || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error)
+    || companyExpenseResult.error
+    || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error);
 
   return (
     <AppShell activeHref="/reports" user={user}>

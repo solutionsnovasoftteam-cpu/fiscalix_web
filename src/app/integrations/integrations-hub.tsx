@@ -12,6 +12,7 @@ type IntegrationCategory = "Almacenamiento" | "Bancos" | "Contabilidad" | "Factu
 type Integration = {
   autoSync: boolean;
   category: IntegrationCategory;
+  databaseId?: string | null;
   description: string;
   id: string;
   lastSync: string | null;
@@ -22,11 +23,18 @@ type Integration = {
 };
 
 export type IntegrationRow = {
+  auto_sync?: boolean | null;
   estado: string | null;
   id: string;
   nombre: string | null;
   partner: string | null;
   tipo: string | null;
+  ultima_sincronizacion?: string | null;
+};
+
+type IntegrationApiResponse = {
+  integration?: IntegrationRow;
+  message?: string;
 };
 
 const categories = ["Todas", "Contabilidad", "Facturación", "Bancos", "Almacenamiento", "Pagos", "Otros"] as const;
@@ -104,11 +112,12 @@ function integrationFromRow(row: IntegrationRow): Integration {
   const id = row.partner || definition?.id || row.id;
 
   return {
-    autoSync: normalizeStatus(row.estado) === "active",
+    autoSync: typeof row.auto_sync === "boolean" ? row.auto_sync : normalizeStatus(row.estado) === "active",
     category: normalizeCategory(row.tipo, definition?.category ?? "Otros"),
+    databaseId: row.id,
     description: definition?.description ?? "Integración registrada en Supabase.",
     id,
-    lastSync: null,
+    lastSync: row.ultima_sincronizacion ?? null,
     logo: definition?.logo ?? "/integrations/sat.svg",
     name: row.nombre?.trim() || definition?.name || "Integración",
     status: normalizeStatus(row.estado),
@@ -116,7 +125,12 @@ function integrationFromRow(row: IntegrationRow): Integration {
   };
 }
 
-export function IntegrationsHub({ initialRows = [] }: { initialRows?: IntegrationRow[] }) {
+type IntegrationsHubProps = {
+  canManage?: boolean;
+  initialRows?: IntegrationRow[];
+};
+
+export function IntegrationsHub({ canManage = false, initialRows = [] }: IntegrationsHubProps) {
   const initialItems = initialRows.length ? initialRows.map(integrationFromRow) : seed;
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
@@ -124,6 +138,8 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
   const [statusFilter, setStatusFilter] = useState<"all" | IntegrationStatus>("all");
   const [syncCount, setSyncCount] = useState(() => initialItems.filter((item) => item.status === "active").length);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [message, setMessage] = useState("");
+  const [busyId, setBusyId] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
   const closeNewModal = useCallback(() => setShowNewModal(false), []);
   useModal({ dialogRef, onClose: closeNewModal, open: showNewModal });
@@ -150,44 +166,189 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
     syncs: syncCount,
   }), [items, syncCount]);
 
-  function toggleAutoSync(id: string) {
-    setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, autoSync: !item.autoSync } : item)),
-    );
+  function notify(value: string) {
+    setMessage(value);
+    window.setTimeout(() => setMessage(""), 3200);
   }
 
-  function syncNow(id: string) {
+  function serializeIntegration(item: Integration) {
+    return {
+      autoSync: item.autoSync,
+      category: item.category,
+      databaseId: item.databaseId,
+      id: item.id,
+      lastSync: item.lastSync,
+      name: item.name,
+      partner: item.id,
+      status: item.status,
+    };
+  }
+
+  function mergeSavedIntegration(row: IntegrationRow | undefined, fallback: Integration) {
+    if (!row) return fallback;
+    const saved = integrationFromRow(row);
+
+    return {
+      ...fallback,
+      ...saved,
+      autoSync: typeof row.auto_sync === "boolean" ? saved.autoSync : fallback.autoSync,
+      lastSync: row.ultima_sincronizacion ?? fallback.lastSync,
+    };
+  }
+
+  async function persistIntegration(
+    item: Integration,
+    action: "activate" | "auto_sync" | "configure" | "sync",
+    nextItem: Integration,
+    successMessage: string,
+  ) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return null;
+    }
+
+    setBusyId(item.id);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/integrations/${encodeURIComponent(item.id)}`, {
+        body: JSON.stringify({
+          action,
+          autoSync: nextItem.autoSync,
+          databaseId: item.databaseId,
+          integration: serializeIntegration(nextItem),
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "PATCH",
+      });
+      const payload = (await response.json().catch(() => ({}))) as IntegrationApiResponse;
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No fue posible guardar la integración.");
+      }
+
+      const saved = mergeSavedIntegration(payload.integration, nextItem);
+      setItems((current) => current.map((entry) => (entry.id === item.id ? saved : entry)));
+      notify(payload.message || successMessage);
+      return saved;
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible guardar la integración.");
+      return null;
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function toggleAutoSync(id: string) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return;
+    }
+
+    const item = items.find((entry) => entry.id === id);
+    if (!item || item.status !== "active" || busyId) return;
+
+    const nextItem = { ...item, autoSync: !item.autoSync };
+    await persistIntegration(item, "auto_sync", nextItem, "Auto-sync actualizado.");
+  }
+
+  async function syncNow(id: string) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return;
+    }
+
+    const item = items.find((entry) => entry.id === id);
+    if (!item || busyId) return;
+
     const now = new Date().toISOString();
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "active", lastSync: now } : item,
-      ),
+    const saved = await persistIntegration(
+      item,
+      "sync",
+      { ...item, status: "active", lastSync: now },
+      "Sincronización simulada guardada.",
     );
-    setSyncCount((count) => count + 1);
+
+    if (saved) setSyncCount((count) => count + 1);
   }
 
-  function activate(id: string) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "active", lastSync: item.lastSync ?? new Date().toISOString() } : item,
-      ),
+  async function activate(id: string) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return;
+    }
+
+    const item = items.find((entry) => entry.id === id);
+    if (!item || busyId) return;
+
+    await persistIntegration(
+      item,
+      "activate",
+      { ...item, status: "active" },
+      "Integración activada correctamente.",
     );
   }
 
-  function configure(id: string) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "active", autoSync: true, lastSync: new Date().toISOString() } : item,
-      ),
+  async function configure(id: string) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return;
+    }
+
+    const item = items.find((entry) => entry.id === id);
+    if (!item || busyId) return;
+
+    const now = new Date().toISOString();
+    const saved = await persistIntegration(
+      item,
+      "configure",
+      { ...item, status: "active", autoSync: true, lastSync: now },
+      "Integración configurada correctamente.",
     );
-    setSyncCount((count) => count + 1);
+
+    if (saved) setSyncCount((count) => count + 1);
   }
 
-  function addIntegration(entry: Integration) {
-    setItems((current) => [...current, { ...entry, status: "pending", autoSync: false, lastSync: null }]);
-    setShowNewModal(false);
-    setCategory("Todas");
-    setStatusFilter("all");
+  async function addIntegration(entry: Integration) {
+    if (!canManage) {
+      notify("Solo administradores pueden gestionar integraciones.");
+      return;
+    }
+
+    if (busyId) return;
+
+    setBusyId(entry.id);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/integrations", {
+        body: JSON.stringify({ integration: serializeIntegration(entry) }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => ({}))) as IntegrationApiResponse;
+
+      if (!response.ok) {
+        throw new Error(payload.message || "No fue posible agregar la integración.");
+      }
+
+      const nextItem = mergeSavedIntegration(payload.integration, {
+        ...entry,
+        status: "pending",
+        autoSync: false,
+        lastSync: null,
+      });
+
+      setItems((current) => [...current, nextItem]);
+      setShowNewModal(false);
+      setCategory("Todas");
+      setStatusFilter("all");
+      notify(payload.message || "Integración agregada correctamente.");
+    } catch (error) {
+      notify(error instanceof Error ? error.message : "No fue posible agregar la integración.");
+    } finally {
+      setBusyId("");
+    }
   }
 
   return (
@@ -208,10 +369,12 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
               value={query}
             />
           </label>
-          <button className="integrations-new" onClick={() => setShowNewModal(true)} type="button">
-            <Icon name="add" />
-            Nueva integración
-          </button>
+          {canManage ? (
+            <button className="integrations-new" onClick={() => setShowNewModal(true)} type="button">
+              <Icon name="add" />
+              Nueva integración
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -283,7 +446,10 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
 
       <section className="integrations-grid" aria-label="Lista de integraciones">
         {filtered.length ? (
-          filtered.map((item) => (
+          filtered.map((item) => {
+            const isBusy = busyId === item.id;
+
+            return (
             <article className={`integrations-card status-${item.status}`} key={item.id}>
               <div className="integrations-card-top">
                 <span className="integrations-logo" style={{ background: `${item.tone}22` }}>
@@ -310,38 +476,47 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
               </div>
 
               <div className="integrations-card-actions">
-                <label className="integrations-toggle">
-                  <input
-                    checked={item.autoSync}
-                    disabled={item.status !== "active"}
-                    onChange={() => toggleAutoSync(item.id)}
-                    type="checkbox"
-                  />
-                  <span />
-                  Auto-sync
-                </label>
+                {canManage ? (
+                  <>
+                    <label className="integrations-toggle">
+                      <input
+                        checked={item.autoSync}
+                        disabled={item.status !== "active" || isBusy}
+                        onChange={() => toggleAutoSync(item.id)}
+                        type="checkbox"
+                      />
+                      <span />
+                      Auto-sync
+                    </label>
 
-                {item.status === "active" && (
-                  <button className="integrations-action primary" onClick={() => syncNow(item.id)} type="button">
-                    <Icon name="sync_alt" />
-                    Sincronizar
-                  </button>
-                )}
-                {item.status === "pending" && (
-                  <button className="integrations-action" onClick={() => configure(item.id)} type="button">
-                    <Icon name="settings" />
-                    Configurar
-                  </button>
-                )}
-                {item.status === "inactive" && (
-                  <button className="integrations-action" onClick={() => activate(item.id)} type="button">
-                    <Icon name="check_circle" />
-                    Activar
-                  </button>
+                    {item.status === "active" && (
+                      <button className="integrations-action primary" disabled={isBusy} onClick={() => syncNow(item.id)} type="button">
+                        <Icon name="sync_alt" />
+                        {isBusy ? "Guardando..." : "Sincronizar"}
+                      </button>
+                    )}
+                    {item.status === "pending" && (
+                      <button className="integrations-action" disabled={isBusy} onClick={() => configure(item.id)} type="button">
+                        <Icon name="settings" />
+                        {isBusy ? "Guardando..." : "Configurar"}
+                      </button>
+                    )}
+                    {item.status === "inactive" && (
+                      <button className="integrations-action" disabled={isBusy} onClick={() => activate(item.id)} type="button">
+                        <Icon name="check_circle" />
+                        {isBusy ? "Guardando..." : "Activar"}
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span className="integrations-managed-note">
+                    Integración administrada por Fiscalix
+                  </span>
                 )}
               </div>
             </article>
-          ))
+            );
+          })
         ) : (
           <div className="integrations-empty">
             <span><Icon name="search" /></span>
@@ -383,7 +558,13 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
             {availableCatalog.length ? (
               <div className="integrations-modal-grid">
                 {availableCatalog.map((entry) => (
-                  <button className="integrations-modal-item" key={entry.id} onClick={() => addIntegration(entry)} type="button">
+                  <button
+                    className="integrations-modal-item"
+                    disabled={busyId === entry.id}
+                    key={entry.id}
+                    onClick={() => addIntegration(entry)}
+                    type="button"
+                  >
                     <span className="integrations-logo" style={{ background: `${entry.tone}22` }}>
                       <Image alt="" height={46} src={entry.logo} width={46} />
                     </span>
@@ -392,7 +573,7 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
                       <small>{entry.description}</small>
                       <em>{entry.category}</em>
                     </div>
-                    <Icon name="add" />
+                    {busyId === entry.id ? <Icon name="sync_alt" /> : <Icon name="add" />}
                   </button>
                 ))}
               </div>
@@ -407,6 +588,9 @@ export function IntegrationsHub({ initialRows = [] }: { initialRows?: Integratio
         </div>,
         document.body,
       )}
+      {message && typeof document !== "undefined"
+        ? createPortal(<div className="expenses-action-toast" role="status">{message}</div>, document.body)
+        : null}
     </main>
   );
 }

@@ -4,9 +4,9 @@ import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { IncomeActions } from "@/app/income/income-actions";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
@@ -14,17 +14,12 @@ type IncomeRow = {
   id: string;
   concepto: string;
   monto: number | string;
+  usuario_id?: string | null;
   fecha_ingreso: string;
   empresa_id: string | null;
   categoria_id: string | null;
   empresas: { nombre_comercial: string | null } | { nombre_comercial: string | null }[] | null;
   categorias_financieras: { nombre: string | null; tipo: string | null } | { nombre: string | null; tipo: string | null }[] | null;
-};
-
-type CompanyRow = {
-  estado: string | null;
-  id: string;
-  nombre_comercial: string | null;
 };
 
 type CategoryRow = {
@@ -97,39 +92,6 @@ function isIncomeCategory(category: CategoryRow) {
   return !normalized || ["ingreso", "ingresos", "income", "incomes", "revenue", "venta", "ventas"].includes(normalized);
 }
 
-async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  if (canViewAdminDashboard(user)) {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial,estado")
-      .order("nombre_comercial", { ascending: true });
-
-    return {
-      companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-      error,
-    };
-  }
-
-  const { data: memberships, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id);
-
-  const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-  if (!companyIds.length || membershipError) return { companies: [] as CompanyRow[], error: membershipError };
-
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .in("id", companyIds)
-    .order("nombre_comercial", { ascending: true });
-
-  return {
-    companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-    error,
-  };
-}
-
 export default async function IncomePage({
   searchParams,
 }: {
@@ -143,7 +105,7 @@ export default async function IncomePage({
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
 
-  const [incomeResult, categoriesResult] = await Promise.all([
+  const [companyIncomeResult, userIncomeResult, categoriesResult] = await Promise.all([
     companyIds.length
       ? supabase
           .from("ingresos")
@@ -152,10 +114,21 @@ export default async function IncomePage({
           .order("fecha_ingreso", { ascending: false })
           .limit(50)
       : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
+      .eq("usuario_id", user.id)
+      .order("fecha_ingreso", { ascending: false })
+      .limit(50),
     supabase.from("categorias_financieras").select("id,nombre,tipo").order("nombre", { ascending: true }),
   ]);
 
-  const incomes = (incomeResult.data ?? []) as IncomeRow[];
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
+  const incomesById = new Map<string, IncomeRow>();
+  for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) {
+    incomesById.set(income.id, income);
+  }
+  const incomes = Array.from(incomesById.values()).sort((a, b) => String(b.fecha_ingreso ?? "").localeCompare(String(a.fecha_ingreso ?? ""))).slice(0, 50);
   const incomeCategories = ((categoriesResult.data ?? []) as CategoryRow[]).filter(isIncomeCategory);
   const total = incomes.reduce((sum, income) => sum + asNumber(income.monto), 0);
   const average = incomes.length ? total / incomes.length : 0;
@@ -194,7 +167,7 @@ export default async function IncomePage({
           />
         </header>
 
-        {(companiesError || incomeResult.error || categoriesResult.error) && (
+        {(companiesError || companyIncomeResult.error || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error) || categoriesResult.error) && (
           <section className="income-alert" role="alert">
             <strong>No fue posible cargar los ingresos.</strong>
             <span>Revisa la conexión con Supabase o los permisos de la tabla ingresos.</span>

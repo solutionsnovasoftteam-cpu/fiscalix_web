@@ -1,18 +1,12 @@
 import { redirect } from "next/navigation";
 import { DashboardExportButton } from "@/app/dashboard/dashboard-export-button";
 import { Icon } from "@/components/Icon";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { firstName } from "@/lib/utils";
 
 type Relation<T> = T | T[] | null;
-
-type CompanyRow = {
-  estado: string | null;
-  id: string;
-  nombre_comercial: string | null;
-};
 
 type FinanceRelation = {
   nombre: string | null;
@@ -26,6 +20,7 @@ type IncomeRow = {
   fecha_ingreso: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ExpenseRow = {
@@ -36,6 +31,7 @@ type ExpenseRow = {
   fecha_gasto: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ObligationRow = {
@@ -127,39 +123,6 @@ function compareDatesDesc(a: string | null | undefined, b: string | null | undef
 
 function compareDatesAsc(a: string | null | undefined, b: string | null | undefined) {
   return String(a ?? "").localeCompare(String(b ?? ""));
-}
-
-async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  if (canViewAdminDashboard(user)) {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial,estado")
-      .order("nombre_comercial", { ascending: true });
-
-    return {
-      companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-      error,
-    };
-  }
-
-  const { data: memberships, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id);
-
-  const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-  if (!companyIds.length || membershipError) return { companies: [] as CompanyRow[], error: membershipError };
-
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .in("id", companyIds)
-    .order("nombre_comercial", { ascending: true });
-
-  return {
-    companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-    error,
-  };
 }
 
 function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[]) {
@@ -258,42 +221,67 @@ export default async function DashboardPage() {
   const companyIds = companies.map((company) => company.id);
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || "Sin empresa"]));
 
-  const [incomeResult, expenseResult, obligationsResult, subscriptionsResult] = companyIds.length
-    ? await Promise.all([
-        supabase
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationsResult, subscriptionsResult] = await Promise.all([
+    companyIds.length
+      ? supabase
           .from("ingresos")
           .select("id,concepto,monto,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
           .in("empresa_id", companyIds)
           .gte("fecha_ingreso", sixMonthStart)
-          .order("fecha_ingreso", { ascending: false }),
-        supabase
+          .order("fecha_ingreso", { ascending: false })
+      : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .gte("fecha_ingreso", sixMonthStart)
+      .order("fecha_ingreso", { ascending: false }),
+    companyIds.length
+      ? supabase
           .from("gastos")
           .select("id,concepto,monto,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
           .in("empresa_id", companyIds)
           .gte("fecha_gasto", sixMonthStart)
-          .order("fecha_gasto", { ascending: false }),
-        supabase
+          .order("fecha_gasto", { ascending: false })
+      : Promise.resolve({ data: [] as ExpenseRow[], error: null }),
+    supabase
+      .from("gastos")
+      .select("id,concepto,monto,usuario_id,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .gte("fecha_gasto", sixMonthStart)
+      .order("fecha_gasto", { ascending: false }),
+    companyIds.length
+      ? supabase
           .from("obligaciones_fiscales")
           .select("id,empresa_id,nombre,periodicidad,descripcion,activa")
           .in("empresa_id", companyIds)
-          .eq("activa", true),
-        supabase
+          .eq("activa", true)
+      : Promise.resolve({ data: [] as ObligationRow[], error: null }),
+    companyIds.length
+      ? supabase
           .from("suscripciones")
           .select("id,empresa_id,estado_pago,fecha_proxima_facturacion,planes(nombre)")
-          .in("empresa_id", companyIds),
-      ])
-    : [
-        { data: [] as IncomeRow[], error: null },
-        { data: [] as ExpenseRow[], error: null },
-        { data: [] as ObligationRow[], error: null },
-        { data: [] as SubscriptionRow[], error: null },
-      ];
+          .in("empresa_id", companyIds)
+      : Promise.resolve({ data: [] as SubscriptionRow[], error: null }),
+  ]);
 
-  const incomes = (incomeResult.data ?? []) as IncomeRow[];
-  const expenses = (expenseResult.data ?? []) as ExpenseRow[];
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
+  const userExpenses = isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as ExpenseRow[];
+  const incomesById = new Map<string, IncomeRow>();
+  const expensesById = new Map<string, ExpenseRow>();
+  for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) incomesById.set(income.id, income);
+  for (const expense of [...((companyExpenseResult.data ?? []) as ExpenseRow[]), ...userExpenses]) expensesById.set(expense.id, expense);
+  const incomes = Array.from(incomesById.values());
+  const expenses = Array.from(expensesById.values());
   const obligations = (obligationsResult.data ?? []) as ObligationRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
-  const hasError = companiesError || incomeResult.error || expenseResult.error || obligationsResult.error || subscriptionsResult.error;
+  const hasError = companiesError
+    || companyIncomeResult.error
+    || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error)
+    || companyExpenseResult.error
+    || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error)
+    || obligationsResult.error
+    || subscriptionsResult.error;
 
   const monthIncomes = incomes.filter((income) => income.fecha_ingreso && income.fecha_ingreso >= currentMonthStart && income.fecha_ingreso < nextMonthStart);
   const monthExpenses = expenses.filter((expense) => expense.fecha_gasto && expense.fecha_gasto >= currentMonthStart && expense.fecha_gasto < nextMonthStart);

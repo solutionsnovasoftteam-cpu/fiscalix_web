@@ -3,18 +3,13 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 
 type Relation<T> = T | T[] | null;
-
-type Company = {
-  id: string;
-  nombre_comercial: string | null;
-};
 
 type FinanceRow = {
   categorias_financieras: Relation<{ nombre: string | null }>;
@@ -73,50 +68,58 @@ export default async function TransactionsPage({
   const resolvedSearchParams = await searchParams;
   const query = searchParamText(resolvedSearchParams, "q");
 
-  let companies: Company[] = [];
-  let companiesError: unknown = null;
-
-  if (canViewAdminDashboard(user)) {
-    const result = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial")
-      .neq("estado", "suspendida");
-    companies = (result.data ?? []) as Company[];
-    companiesError = result.error;
-  } else {
-    const result = await supabase
-      .from("empresa_usuario")
-      .select("empresa_id,empresas(id,nombre_comercial)")
-      .eq("usuario_id", user.id);
-    companies = ((result.data ?? [])
-      .flatMap((membership) => membership.empresas ?? []) as Company[]);
-    companiesError = result.error;
-  }
+  const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || "Sin empresa"]));
 
-  const [incomeResult, expenseResult] = companyIds.length
-    ? await Promise.all([
-      supabase
-        .from("ingresos")
-        .select("id,concepto,monto,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
-        .in("empresa_id", companyIds)
-        .order("fecha_ingreso", { ascending: false })
-        .limit(100),
-      supabase
-        .from("gastos")
-        .select("id,concepto,monto,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
-        .in("empresa_id", companyIds)
-        .order("fecha_gasto", { ascending: false })
-        .limit(100),
-    ])
-    : [{ data: [] as FinanceRow[], error: null }, { data: [] as FinanceRow[], error: null }];
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
+    companyIds.length
+      ? supabase
+          .from("ingresos")
+          .select("id,concepto,monto,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+          .in("empresa_id", companyIds)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(100)
+      : Promise.resolve({ data: [] as FinanceRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .order("fecha_ingreso", { ascending: false })
+      .limit(100),
+    companyIds.length
+      ? supabase
+          .from("gastos")
+          .select("id,concepto,monto,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+          .in("empresa_id", companyIds)
+          .order("fecha_gasto", { ascending: false })
+          .limit(100)
+      : Promise.resolve({ data: [] as FinanceRow[], error: null }),
+    supabase
+      .from("gastos")
+      .select("id,concepto,monto,usuario_id,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .order("fecha_gasto", { ascending: false })
+      .limit(100),
+  ]);
 
-  const incomes = ((incomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>)
-    .map((income) => ({ ...income, fecha: income.fecha_ingreso }));
-  const expenses = ((expenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>)
-    .map((expense) => ({ ...expense, fecha: expense.fecha_gasto }));
+  const incomesById = new Map<string, FinanceRow>();
+  const expensesById = new Map<string, FinanceRow>();
+  for (const income of [
+    ...((companyIncomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>),
+  ]) {
+    incomesById.set(income.id, { ...income, fecha: income.fecha_ingreso });
+  }
+  for (const expense of [
+    ...((companyExpenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>),
+  ]) {
+    expensesById.set(expense.id, { ...expense, fecha: expense.fecha_gasto });
+  }
+  const incomes = [...incomesById.values()];
+  const expenses = [...expensesById.values()];
 
   function toMovement(row: FinanceRow, type: Movement["type"]): Movement {
     return {
@@ -148,7 +151,11 @@ export default async function TransactionsPage({
     money.format(movement.amount),
   ], query));
   const movementsPage = paginateItems(filteredMovements, pageFromParam(resolvedSearchParams.page));
-  const hasError = companiesError || incomeResult.error || expenseResult.error;
+  const hasError = companiesError
+    || companyIncomeResult.error
+    || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error)
+    || companyExpenseResult.error
+    || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error);
 
   return (
     <AppShell activeHref="/transactions" user={user}>

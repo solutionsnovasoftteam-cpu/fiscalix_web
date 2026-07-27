@@ -3,8 +3,8 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { getAccessibleCompanyIds } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 import { firstName, initials } from "@/lib/utils";
 
@@ -27,14 +27,7 @@ export default async function ProfilePage() {
   const phone = fallback(user.telefono);
   const state = fallback(user.estado, "Cuenta activa");
 
-  let companyIds: string[] = [];
-  if (canViewAdminDashboard(user)) {
-    const { data } = await supabase.from("empresas").select("id").neq("estado", "suspendida");
-    companyIds = (data ?? []).map((item) => item.id);
-  } else {
-    const { data } = await supabase.from("empresa_usuario").select("empresa_id").eq("usuario_id", user.id);
-    companyIds = [...new Set((data ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-  }
+  const { companyIds } = await getAccessibleCompanyIds(user);
 
   const [incomeResult, expenseResult, obligationResult, fiscalResult] = companyIds.length
     ? await Promise.all([

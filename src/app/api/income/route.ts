@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { getCompanyIfAccessible, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { createFinancialRecordNotification } from "@/lib/notifications";
-import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
 
 type IncomeRequestBody = {
@@ -24,26 +24,6 @@ function isIncomeCategoryType(value: string | null | undefined) {
   const normalized = value?.trim().toLowerCase();
   if (!normalized) return true;
   return ["ingreso", "ingresos", "income", "incomes", "revenue", "venta", "ventas"].includes(normalized);
-}
-
-async function getAllowedCompanyName(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>, empresaId: string) {
-  const { data: company, error: companyError } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .eq("id", empresaId)
-    .maybeSingle();
-
-  if (companyError || !company || company.estado === "suspendida") return null;
-  if (canViewAdminDashboard(user)) return company.nombre_comercial || "Sin empresa";
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id)
-    .eq("empresa_id", empresaId)
-    .maybeSingle();
-
-  return !membershipError && membership ? company.nombre_comercial || "Sin empresa" : null;
 }
 
 export async function POST(request: Request) {
@@ -101,10 +81,14 @@ export async function POST(request: Request) {
   let selectedCompanyName = empresaNombreOtro || null;
 
   if (!isOtherCompany) {
-    selectedCompanyName = await getAllowedCompanyName(user, empresaId);
-    if (!selectedCompanyName) {
+    const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
+    if (accessError) {
+      return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
+    }
+    if (!company) {
       return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
     }
+    selectedCompanyName = company.nombre_comercial || "Sin empresa";
   }
 
   const storedConcept = isOtherCompany ? [empresaNombreOtro, concepto].filter(Boolean).join(" · ") : concepto;
@@ -118,11 +102,21 @@ export async function POST(request: Request) {
       fecha_ingreso: fechaIngreso,
       id: randomUUID(),
       monto,
+      usuario_id: user.id,
     })
     .select("id")
     .single();
 
   if (error || !data) {
+    if (isMissingColumnError(error, "usuario_id")) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Falta agregar la columna usuario_id en la tabla ingresos. Ejecuta el SQL scripts/income-independent-schema.sql en Supabase.",
+        },
+        { status: 500 },
+      );
+    }
     return NextResponse.json({ success: false, message: "No fue posible guardar el ingreso." }, { status: 500 });
   }
 

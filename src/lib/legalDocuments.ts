@@ -191,41 +191,114 @@ export const termsDocument: LegalDocumentData = {
       ],
     },
     {
-      title: "18. Cancelaciones, cambios de plan y devoluciones",
+      title: "18. Suspensión de cuentas y solicitudes de autoridades",
+      paragraphs: [
+        "Esta sección establece reglas generales aplicables a la restricción temporal de cuentas, conservación de información y atención de solicitudes realizadas por autoridades competentes en México, incluyendo la Fiscalía u otras autoridades administrativas, ministeriales, jurisdiccionales o regulatorias.",
+        "La suspensión de una cuenta por investigación, revisión interna, solicitud de autoridad o medida preventiva no implica, por sí misma, que Fiscalix, NovaSoft o el cliente propietario u operador de la plataforma consideren culpable al usuario, ni constituye una determinación legal sobre los hechos investigados.",
+      ],
+      subsections: [
+        {
+          title: "Causas de suspensión temporal",
+          paragraphs: [
+            "Fiscalix podrá suspender temporalmente el acceso de una cuenta cuando exista falta de pago, pago no acreditado, uso posiblemente fraudulento o ilícito, riesgo para la seguridad de la cuenta, otros usuarios o la plataforma, incumplimiento de estos Términos, uso de datos falsos, suplantación de identidad, intento de vulnerar, alterar o utilizar indebidamente la plataforma, solicitud u orden de autoridad competente o petición expresa del propio usuario.",
+            "La suspensión deberá impedir el inicio de sesión y podrá cerrar sesiones activas o revocar accesos, sin eliminar automáticamente la información almacenada en la cuenta.",
+          ],
+        },
+        {
+          title: "Conservación de datos durante una suspensión",
+          paragraphs: [
+            "Durante una suspensión, los datos vinculados a la cuenta permanecerán almacenados y protegidos. No deberán ser eliminados, alterados o modificados cuando exista una obligación contractual, fiscal, administrativa, de seguridad, de auditoría, de defensa de derechos o una solicitud de autoridad competente.",
+            "Fiscalix podrá conservar respaldos, registros de acceso, movimientos, comprobantes, documentos, reportes, notificaciones, bitácoras y demás información relacionada con la cuenta, limitada al tiempo necesario para atender la causa de suspensión y las obligaciones aplicables.",
+            "Cuando deje de existir una causa válida de conservación, la información deberá tratarse conforme al Aviso de privacidad, las políticas de eliminación aplicables y la legislación vigente.",
+          ],
+        },
+        {
+          title: "Solicitudes dirigidas al cliente propietario de Fiscalix",
+          paragraphs: [
+            "Cuando la Fiscalía u otra autoridad competente dirija una solicitud formal al cliente propietario u operador comercial de Fiscalix, el flujo general será: autoridad competente → cliente propietario de Fiscalix → NovaSoft → cliente propietario de Fiscalix → autoridad competente.",
+            "En ese supuesto, el cliente propietario deberá verificar la solicitud y enviar a NovaSoft una instrucción escrita. NovaSoft actuará como proveedor técnico, preservará la información, extraerá únicamente los datos solicitados y los entregará de forma segura al cliente propietario, para que este responda oficialmente a la autoridad y obtenga el acuse o constancia correspondiente.",
+            "NovaSoft no decidirá por cuenta propia entregar información cuando la solicitud esté dirigida exclusivamente al cliente propietario de Fiscalix, salvo que exista obligación legal directa, instrucción documentada o mandato emitido por autoridad competente.",
+          ],
+        },
+        {
+          title: "Solicitudes dirigidas directamente a NovaSoft",
+          paragraphs: [
+            "Cuando la Fiscalía u otra autoridad competente solicite información directamente a NovaSoft, el flujo general será: autoridad competente → NovaSoft → autoridad competente.",
+            "NovaSoft deberá verificar que la solicitud sea formal, que provenga de una autoridad competente, que identifique al funcionario solicitante y que señale los datos del procedimiento, expediente o carpeta correspondiente. Antes de entregar información, NovaSoft podrá someter la solicitud a revisión jurídica.",
+            "NovaSoft deberá preservar los datos para evitar su eliminación o modificación, informar al cliente propietario de Fiscalix cuando legalmente sea posible, entregar únicamente la información especificada, evitar entregar acceso general a la plataforma, bases de datos o cuentas de otros usuarios, utilizar medios seguros de entrega, obtener acuse o constancia de recepción y conservar una bitácora de la solicitud, responsables, fechas, destinatarios e información entregada.",
+            "La simple solicitud de información no suspenderá automáticamente una cuenta. La suspensión procederá cuando sea ordenada expresamente por la autoridad, autorizada por el cliente responsable de Fiscalix o necesaria ante un riesgo urgente, verificable y proporcional para la seguridad de la plataforma u otros usuarios.",
+          ],
+        },
+        {
+          title: "Alcance limitado de la información entregada",
+          paragraphs: [
+            "Fiscalix y NovaSoft aplicarán el principio de entrega limitada. Solo se entregarán los datos relacionados con la cuenta, usuario, empresa, periodo, movimiento, documento o información expresamente señalada en la solicitud válida.",
+            "No se entregará toda la base de datos, credenciales maestras, cuentas de administrador general, acceso a información de otros usuarios ni permisos amplios para editar o eliminar datos.",
+            "Cuando legalmente sea necesario proporcionar acceso temporal, este deberá ser de solo lectura, limitado a la cuenta o información investigada, con fecha de expiración, registro de consultas y descargas, y sin permisos para modificar o eliminar información.",
+          ],
+        },
+        {
+          title: "Notificación al usuario",
+          paragraphs: [
+            "Fiscalix podrá notificar al usuario que su cuenta se encuentra temporalmente restringida y explicar de forma general que debe comunicarse con el área de soporte o administración correspondiente. El aviso deberá ser neutral y no deberá acusar al usuario de haber cometido un delito.",
+            "Un mensaje neutral podrá indicar: “Su cuenta se encuentra temporalmente restringida. Para recibir información sobre el estado de su cuenta, comuníquese con el área de soporte de Fiscalix.”",
+            "No se notificará al usuario cuando la autoridad ordene mantener la solicitud en confidencialidad, cuando la notificación pueda afectar una investigación o cuando exista una prohibición legal de informar.",
+          ],
+        },
+        {
+          title: "Reactivación de cuentas",
+          paragraphs: [
+            "La cuenta podrá reactivarse cuando desaparezca la causa de suspensión, el usuario regularice su pago o incumplimiento, el cliente responsable autorice la reactivación, la autoridad informe que la restricción puede levantarse o se determine que la actividad detectada no representaba un riesgo.",
+            "La reactivación podrá condicionarse a validaciones de identidad, actualización de datos, cumplimiento de medidas de seguridad, confirmación administrativa o cualquier requisito razonable relacionado con la causa de suspensión.",
+          ],
+        },
+        {
+          title: "Responsabilidades de Fiscalix, NovaSoft y el cliente propietario",
+          paragraphs: [
+            "El cliente propietario u operador comercial de Fiscalix será responsable de la operación comercial, administrativa y legal de la plataforma frente a sus usuarios finales, salvo en aquello que corresponda directamente a NovaSoft por contrato, ley aplicable o actos propios.",
+            "NovaSoft actuará como proveedor técnico y, cuando corresponda, como encargado del tratamiento de información bajo instrucciones documentadas. NovaSoft no deberá utilizar la información tratada o entregada para fines distintos a operación, soporte, mantenimiento, seguridad, cumplimiento contractual o atención de una solicitud válida.",
+            "Las solicitudes de autoridades deberán ser atendidas únicamente por personal autorizado. Toda conservación, extracción o entrega de datos deberá quedar registrada y limitarse a lo estrictamente necesario.",
+            "Las disposiciones anteriores constituyen reglas generales de operación y podrán ajustarse para cumplir una solicitud legal específica. Fiscalix y NovaSoft podrán solicitar la revisión de asesores jurídicos antes de suspender una cuenta, conservar información o entregar datos a una autoridad.",
+          ],
+        },
+      ],
+    },
+    {
+      title: "19. Cancelaciones, cambios de plan y devoluciones",
       paragraphs: [
         "El usuario podrá solicitar cancelación o cambio de plan conforme a los mecanismos disponibles en Fiscalix o los canales de soporte. Las condiciones específicas podrán depender del plan, periodo contratado, promociones, uso consumido, reglas de facturación y legislación aplicable.",
         "Fiscalix informará, antes de la contratación, las características relevantes del servicio, precio, forma de pago, periodicidad, condiciones de cancelación y medios de contacto. Lo anterior se entenderá sin perjuicio de los derechos irrenunciables que correspondan a consumidores conforme a la legislación mexicana.",
       ],
     },
     {
-      title: "19. Limitación de responsabilidad",
+      title: "20. Limitación de responsabilidad",
       paragraphs: [
         "En la máxima medida permitida por la ley, Fiscalix no será responsable por daños indirectos, pérdida de utilidades, pérdida de oportunidad, interrupción de negocio, errores derivados de información incorrecta capturada por el usuario, decisiones tomadas sin revisión profesional, fallas de terceros o uso de resultados sin validación.",
         "Nada en estos Términos limita derechos irrenunciables de consumidores, responsabilidades que no puedan excluirse legalmente, obligaciones de seguridad de datos personales o daños causados por dolo, mala fe o negligencia grave cuando así lo determine la autoridad competente.",
       ],
     },
     {
-      title: "20. Indemnización",
+      title: "21. Indemnización",
       paragraphs: [
         "El usuario acepta sacar en paz y a salvo a Fiscalix frente a reclamaciones, sanciones, daños, gastos o responsabilidades derivadas de información cargada sin autorización, incumplimiento de estos Términos, uso ilegal de la plataforma, vulneración de derechos de terceros, datos falsos o uso de Fiscalix para fines distintos a los permitidos.",
       ],
     },
     {
-      title: "21. Modificaciones a estos Términos",
+      title: "22. Modificaciones a estos Términos",
       paragraphs: [
         "Fiscalix podrá actualizar estos Términos para reflejar cambios legales, operativos, tecnológicos, comerciales o de seguridad. La versión vigente se publicará en el sitio y podrá indicarse la fecha de entrada en vigor.",
         "Cuando los cambios sean materiales, Fiscalix procurará notificar al usuario por medios razonables. El uso continuado del servicio después de la publicación de cambios implicará aceptación de la versión actualizada, salvo que la ley exija un consentimiento distinto.",
       ],
     },
     {
-      title: "22. Ley aplicable y solución de controversias",
+      title: "23. Ley aplicable y solución de controversias",
       paragraphs: [
         "Estos Términos se interpretarán conforme a las leyes aplicables en México. Las partes procurarán resolver cualquier controversia mediante atención directa, soporte, conciliación o medios alternativos antes de acudir a instancias formales.",
         "Cuando el usuario tenga carácter de consumidor, podrá ejercer los derechos que le reconozca la Ley Federal de Protección al Consumidor y acudir a las autoridades competentes, incluyendo PROFECO, en los supuestos que correspondan.",
       ],
     },
     {
-      title: "23. Prevalencia e interpretación",
+      title: "24. Prevalencia e interpretación",
       paragraphs: [
         "Si alguna disposición de estos Términos resulta inválida, ilegal o inexigible, las demás disposiciones conservarán su validez. La omisión de Fiscalix en exigir el cumplimiento de alguna obligación no constituirá renuncia a ejercer derechos posteriormente.",
         "En caso de conflicto entre estos Términos y condiciones específicas de un plan, contrato firmado o política complementaria, prevalecerá el documento que otorgue mayor protección al usuario cuando así lo exija la legislación aplicable; en los demás casos se atenderá al documento más específico.",
