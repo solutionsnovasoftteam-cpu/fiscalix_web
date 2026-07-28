@@ -6,7 +6,7 @@ html,body { margin:0; min-height:100%; }
 body { color:var(--navy); background:var(--surface); font-family:var(--font-jakarta,"Plus Jakarta Sans"),ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 h1,h2,h3,h4,h5,h6 { font-family:var(--font-manrope,"Manrope"),ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
 a { color:inherit; text-decoration:none; }
-button,input,select { font:inherit; }
+button,input,select,textarea { font:inherit; }
 button,a { -webkit-tap-highlight-color:transparent; }
 button { cursor:pointer; }
 .g-icon { display:inline-flex; align-items:center; justify-content:center; width:1.2em; height:1.2em; flex:none; color:currentColor; line-height:1; }
@@ -76,6 +76,7 @@ button { cursor:pointer; }
 .profile-action { display:flex; align-items:center; gap:10px; margin:0 18px 16px; padding:13px 14px; border:0; border-radius:8px; background:#ffffff0a; color:#e7ebef; font-size:12px; font-weight:800; }.profile-action span { color:var(--blue); }.profile-action b { margin-left:auto; font-size:18px; }
 .activity-list { display:grid; gap:13px; padding:17px 18px 7px; }.activity-row { display:grid; grid-template-columns:34px minmax(0,1fr) auto; align-items:center; gap:12px; }.activity-row>span { display:grid; place-items:center; width:30px; height:30px; border-radius:9px; background:#01c38d18; color:var(--blue); box-shadow:0 0 12px #01c38d26; }.activity-row strong,.activity-row small { display:block; }.activity-row strong { color:white; font-size:12px; }.activity-row small,.activity-row time { color:#a7b3c6; font-size:10px; }.activity-row time { white-space:nowrap; }
 .summary-card { grid-column:span 2; }.profile-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; padding:16px 18px 18px; }.summary-tile { position:relative; min-height:106px; padding:15px; border:1px solid #ffffff10; border-radius:9px; background:#ffffff09; overflow:hidden; text-decoration:none; transition:border-color .2s ease,background .2s ease,transform .2s ease; }.summary-tile:hover { border-color:#01c38d55; background:#01c38d0d; transform:translateY(-2px); }.summary-tile small,.summary-tile span { color:#a7b3c6; font-size:10px; }.summary-tile strong { display:block; margin:13px 0 8px; color:white; font-size:24px; }.summary-tile b { position:absolute; right:12px; bottom:10px; display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#01c38d18; color:var(--blue); }
+.profile-preferences-card { grid-column:auto; align-self:start; }.profile-preferences-card .profile-card-heading{min-height:52px;padding:14px 16px}.profile-preferences-card .profile-card-heading h2{font-size:14px}.profile-preferences-form { gap:10px;padding:14px 16px 16px; }.profile-preferences-form label{gap:6px;font-size:10px}.profile-preferences-form select{height:38px;padding:0 11px;font-size:11px}.profile-preferences-card .settings-theme{gap:7px;font-size:10px}.profile-preferences-card .settings-theme-options button{min-height:30px;padding:0 11px}.profile-preferences-feedback { display:inline-flex; align-items:center; min-height:24px; padding:0 9px; border:1px solid #01c38d55; border-radius:999px; background:#01c38d1f; color:#42f2bd; font-size:9px; font-weight:900; }.profile-preferences-rate{margin:0;padding:10px 12px;border:1px solid color-mix(in srgb, var(--accent) 28%, transparent);border-radius:14px;background:color-mix(in srgb, var(--accent) 9%, var(--surface));color:var(--muted);font-size:11px;line-height:1.45}
 .quick-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:17px 18px 18px; }.quick-grid button { min-height:48px; display:flex; align-items:center; gap:10px; justify-content:flex-start; padding:0 14px; border:1px solid #ffffff10; border-radius:8px; background:#ffffff09; color:white; font-size:11px; font-weight:800; }.quick-grid span { color:var(--blue); font-size:18px; }
 .settings-list { display:grid; padding:5px 18px 18px; }.settings-row { display:grid; grid-template-columns:28px minmax(0,.85fr) minmax(0,1.15fr); align-items:center; gap:11px; min-height:48px; border-bottom:1px solid #ffffff0c; }.settings-row:last-child { border-bottom:0; }.settings-row>span { color:var(--blue); font-size:17px; text-shadow:0 0 14px #01c38d66; }.settings-row small { color:#a7b3c6; font-size:10px; }.settings-row strong { color:white; font-size:11px; line-height:1.45; }
 .expenses-content { min-height:calc(100vh - 79px); max-width:1500px; margin:auto; padding:31px 34px 55px; color:white; background:radial-gradient(circle at 82% 0%,#01c38d1c 0%,transparent 25%),linear-gradient(180deg,#191E29 0%,#132D46 100%); }
@@ -111,6 +112,7 @@ button { cursor:pointer; }
 .admin-content { min-height:calc(100vh - 79px); max-width:1500px; margin:auto; padding:31px 34px 55px; color:white; background:radial-gradient(circle at 83% 0%,#01c38d24 0%,transparent 24%),linear-gradient(180deg,#191E29 0%,#132D46 100%); }.admin-header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; margin-bottom:22px; }.admin-header p { margin:0 0 7px; color:var(--blue); font-size:11px; font-weight:900; letter-spacing:1.5px; }.admin-header h1 { margin:0 0 7px; color:white; font-size:30px; line-height:1; }.admin-header span { color:#c9cdd3; font-size:12px; }.admin-message { margin-bottom:16px; padding:12px 14px; border:1px solid #01c38d55; border-radius:9px; background:#01c38d16; color:#dff9f1; font-size:12px; font-weight:800; }.admin-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:17px; margin-bottom:17px; }.admin-stat-grid article { min-height:112px; display:flex; align-items:center; gap:16px; padding:18px; border:1px solid #ffffff12; border-radius:11px; background:linear-gradient(145deg,#ffffff0d,#ffffff07); box-shadow:0 20px 42px #00000026,inset 0 0 0 1px #ffffff05; -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px); }.admin-stat-grid article>span { display:grid; place-items:center; width:43px; height:43px; flex:none; border-radius:12px; background:#01c38d1d; color:var(--blue); font-size:19px; box-shadow:0 0 20px #01c38d26; }.admin-stat-grid small { color:#a7b3c6; font-size:10px; }.admin-stat-grid strong { display:block; margin-top:5px; color:white; font-size:23px; }.admin-table-card { border:1px solid #ffffff12; border-radius:11px; background:linear-gradient(145deg,#132d46d9,#191e29ea); box-shadow:0 26px 54px #0000002e; overflow:hidden; -webkit-backdrop-filter:blur(20px); backdrop-filter:blur(20px); }.admin-table-heading { min-height:78px; display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 22px; border-bottom:1px solid #ffffff0d; background:#ffffff07; }.admin-table-heading h2 { margin:0 0 5px; color:white; font-size:15px; }.admin-table-heading p { margin:0; color:#a7b3c6; font-size:10px; }.admin-table-heading>span { color:var(--blue); font-size:10px; font-weight:900; }.admin-table-scroll { overflow:auto; }.admin-table { width:100%; min-width:1180px; border-collapse:collapse; }.admin-table th,.admin-table td { padding:15px 20px; text-align:left; border-bottom:1px solid #ffffff0b; }.admin-table th { color:#d8dee8; font-size:10px; font-weight:900; letter-spacing:.4px; }.admin-table td { color:#f5f6f7; font-size:11px; vertical-align:middle; }.admin-table td strong,.admin-table td small { display:block; }.admin-table td strong { color:white; font-size:12px; }.admin-table td small { margin-top:4px; color:#a7b3c6; font-size:10px; }.admin-table tbody tr:hover { background:#ffffff08; }.admin-role-pill,.admin-status,.admin-billing-status { display:inline-flex; align-items:center; min-height:25px; padding:0 9px; border-radius:999px; background:#01c38d17; color:var(--blue); font-size:10px; font-weight:900; }.admin-status { background:#dff9f1; color:#008d67; text-transform:capitalize; }.admin-status.suspended { background:#ffcf7020; color:#ffcf70; }.admin-billing-status.success { background:#01c38d24; color:#42f2bd; }.admin-billing-status.warning { background:#ffcf7020; color:#ffcf70; }.admin-billing-status.danger { background:#ff6b6b18; color:#ff9a9a; }.admin-actions { display:flex; gap:8px; }.admin-actions button { min-width:82px; height:32px; border:1px solid #01c38d4d; border-radius:7px; background:#01c38d12; color:var(--blue); font-size:10px; font-weight:900; }.admin-actions button.danger { border-color:#ff6b6b55; background:#ff6b6b14; color:#ff9a9a; }.admin-actions button:disabled { opacity:.55; cursor:wait; }.admin-empty { min-height:235px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:#c9cdd3; text-align:center; }.admin-empty>span { display:grid; place-items:center; width:50px; height:50px; border-radius:50%; background:#01c38d18; color:var(--blue); font-size:22px; box-shadow:0 0 24px #01c38d30; }.admin-empty strong { color:white; font-size:14px; }.admin-empty small { color:#a7b3c6; font-size:11px; }
 @media (max-width:1200px) { .profile-grid{grid-template-columns:1fr 1fr}.activity-card,.quick-card{grid-column:auto}.summary-card{grid-column:1/-1}.profile-summary-grid{grid-template-columns:repeat(4,1fr)}.plans-grid{grid-template-columns:repeat(2,1fr)} }
 @media (max-width:1000px) { .profile-hero{grid-template-columns:1fr}.profile-grid{grid-template-columns:1fr}.summary-card{grid-column:auto}.profile-summary-grid{grid-template-columns:repeat(2,1fr)}.expenses-stat-grid,.income-stat-grid,.companies-summary-grid,.plans-overview,.admin-stat-grid{grid-template-columns:repeat(2,1fr)}.income-toolbar{align-items:flex-start;flex-direction:column}.income-tools{width:100%}.income-tools label{flex:1;min-width:0}.company-info-grid{grid-template-columns:1fr}.company-info-list + .company-info-list{border-left:0;border-top:1px solid #ffffff12}.obligations-list{grid-template-columns:1fr 1fr} }
+@media (max-width:1000px) { .profile-preferences-card{grid-column:auto} }
 @media (max-width:1000px) { .login-page,.login-page:not(.register-page){height:auto;min-height:100dvh;overflow:visible;grid-template-columns:1fr}.login-page:not(.register-page) .login-panel{grid-column:1}.login-visual{display:none}.stats-grid{grid-template-columns:repeat(2,1fr)} }
 @media (max-width:880px) { .movement-row,.table-head{grid-template-columns:minmax(0,2fr) 90px minmax(110px,1fr)}.movement-row time,.table-head span:nth-child(3){display:none} }
 @media (max-width:760px) { .app-shell{display:block}.sidebar{position:static;width:100%;height:auto}.sidebar-brand,.main-nav,.sidebar-user{display:none}.app-main{width:100%}.topbar{height:64px;padding:0 18px}.search input{width:150px}.topbar-logout{display:block}.topbar-logout button span:last-child{display:none}.dashboard-content{padding:24px 17px}.welcome{align-items:flex-start;gap:20px}.stats-grid,.dashboard-grid{grid-template-columns:1fr}.movements{grid-column:auto}.login-panel{padding:35px 24px}.login-heading{margin-top:48px}.legal{text-align:center}.table-head{grid-template-columns:2fr 1fr 1fr}.table-head span:nth-child(3){display:none} }
@@ -958,3 +960,1013 @@ button { cursor:pointer; }
 .notifications-empty small{max-width:260px;color:#a7b3c6;font-size:10px;line-height:1.5}
 .notifications-empty button{height:34px;margin-top:4px;padding:0 12px;border:0;border-radius:8px;background:var(--button-gradient);color:#132d46;font-size:10px;font-weight:900;box-shadow:0 10px 20px #00000028,0 6px 14px #01c38d26}
 @media (max-width:760px){.notifications-panel{right:-46px}.notifications-panel::before{right:63px}}
+
+/* Modo claro: la paleta actual se conserva como modo oscuro por defecto */
+:root[data-theme="light"]{
+  --light-bg:#f4f7fb;
+  --light-panel:#ffffff;
+  --light-panel-soft:#eef5fb;
+  --light-panel-muted:#e7eef6;
+  --light-border:#d8e3ef;
+  --light-border-strong:#c5d4e4;
+  --light-text:#132d46;
+  --light-text-strong:#0b1722;
+  --light-muted:#5f6f84;
+  --light-muted-soft:#8190a3;
+  --light-shadow:0 22px 54px #132d4617;
+  color-scheme:light;
+}
+
+:root[data-theme="light"] body{background:var(--light-bg);color:var(--light-text)}
+:root[data-theme="light"] .app-shell{background:var(--light-bg)}
+:root[data-theme="light"] .app-main,
+:root[data-theme="light"] .topbar{background:#f8fbff!important;color:var(--light-text);border-color:var(--light-border)}
+:root[data-theme="light"] .topbar{box-shadow:0 12px 28px #132d4608}
+:root[data-theme="light"] .search,
+:root[data-theme="light"] .search input{color:var(--light-muted)}
+:root[data-theme="light"] .search input::placeholder{color:#7b8ba0}
+:root[data-theme="light"] .sidebar{background:#ffffff!important;border-color:var(--light-border);box-shadow:10px 0 28px #132d4608}
+:root[data-theme="light"] .sidebar-brand{background:#ffffff!important;border-color:var(--light-border)}
+:root[data-theme="light"] .main-nav{background:#ffffff!important;scrollbar-color:#01c38d66 #edf3f8}
+:root[data-theme="light"] .nav-link{color:#52657d;background:transparent}
+:root[data-theme="light"] .nav-link:hover{background:#e9f7f4;color:#0f8d70}
+:root[data-theme="light"] .nav-link.active{border-color:#01c38d3d;background:#dff8f0;color:#007f63;box-shadow:inset 0 0 0 1px #01c38d1e}
+:root[data-theme="light"] .nav-link span{color:inherit}
+:root[data-theme="light"] .avatar,
+:root[data-theme="light"] .avatar.small{background:#d9f7ee;color:#007f63}
+:root[data-theme="light"] .profile-link:hover,
+:root[data-theme="light"] .profile-link:focus-visible{color:white}
+
+:root[data-theme="light"] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page){
+  color:var(--light-text);
+  background:radial-gradient(circle at 80% 0%,#01c38d1f 0%,transparent 30%),linear-gradient(180deg,#f8fbff 0%,#edf4fa 100%)!important;
+}
+:root[data-theme="light"] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page)::before{display:none}
+:root[data-theme="light"] :is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header,.support-hero) h1,
+:root[data-theme="light"] :is(.receipts-title h1,.integrations-hero-copy h1,.settings-header h1,.payroll-header h1,.profile-copy h1,.support-hero h1){color:var(--light-text-strong)!important}
+:root[data-theme="light"] :is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header,.support-hero) span,
+:root[data-theme="light"] :is(.settings-header>div:first-child>span,.payroll-header>div:first-child>span,.integrations-hero-copy span,.receipts-title>div>span,.profile-copy p,.support-hero span){color:var(--light-muted)!important}
+:root[data-theme="light"] :is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header,.support-hero)>div:first-child>p,
+:root[data-theme="light"] :is(.settings-eyebrow,.payroll-eyebrow,.receipts-title p,.integrations-hero-copy p,.support-hero p){color:#00a979!important}
+
+:root[data-theme="light"] :is(.stat-card,.panel,.profile-card,.company-card,.expenses-table-card,.income-table-card,.reports-card,.plan-card,.plans-editor-card,.admin-table-card,.receipts-card,.integrations-toolbar,.integrations-card,.settings-panel,.payroll-panel,.cf-panel,.support-inbox-panel,.support-detail-panel,.support-summary article,.support-setup-card){
+  border-color:var(--light-border)!important;
+  background:linear-gradient(145deg,#ffffff 0%,#eef5fb 100%)!important;
+  color:var(--light-text)!important;
+  box-shadow:var(--light-shadow)!important;
+}
+:root[data-theme="light"] :is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head,.support-inbox-panel>header,.support-detail-panel>header){
+  border-color:var(--light-border)!important;
+  background:#f2f7fb!important;
+}
+:root[data-theme="light"] :is(h1,h2,h3,.stat-card strong,.panel h2,.panel strong,.profile-card-heading h2,.profile-copy>span,.profile-copy li,.verified-card h2,.info-row strong,.settings-row strong,.security-list li,.activity-row strong,.summary-tile strong,.settings-row strong,.company-card h2,.company-info-list strong,.expenses-table-card strong,.income-table-card strong,.reports-card h2,.plan-card h3,.admin-table td strong,.receipts-table td,.integrations-card h3,.settings-panel-head h2,.settings-quick-card strong,.settings-security-row strong,.settings-list-link span,.settings-backup strong,.settings-destination strong,.payroll-panel h2,.cf-panel h2,.support-inbox-panel h2,.support-detail-panel h2,.support-message strong,.support-empty strong,.support-summary strong){
+  color:var(--light-text-strong)!important;
+}
+:root[data-theme="light"] :is(p,small,.stat-card small,.panel p,.panel small,.profile-copy p,.info-row small,.settings-row small,.activity-row small,.summary-tile span,.company-info-list span,.expenses-table-card small,.income-table-card small,.reports-card p,.plan-card p,.admin-table td small,.receipts-table th,.integrations-card small,.settings-panel-head p,.settings-quick-card small,.settings-security-row small,.settings-backup p,.payroll-panel small,.cf-panel small,.support-message small,.support-message p,.support-empty small,.support-summary small){
+  color:var(--light-muted)!important;
+}
+:root[data-theme="light"] :is(.stat-card,.panel,.profile-card,.company-card,.reports-card,.plan-card,.settings-panel,.payroll-panel,.cf-panel) :is(.icon-tile,.panel-icon,.verified-shield,.receipts-summary article>span,.integrations-stats article>span,.settings-quick-card>span,.settings-panel-head>span,.support-summary article>span,.support-setup-card>span){
+  background:#01c38d18!important;
+  color:#00966f!important;
+}
+
+:root[data-theme="light"] :is(.settings-search,.receipts-search,.integrations-search,.payroll-search,.support-search,.expenses-export-button,.settings-btn-outline,.payroll-btn-secondary,.settings-theme-options button,.integrations-tabs button,.integrations-filters button,.payroll-pages button){
+  border-color:var(--light-border)!important;
+  background:#ffffff!important;
+  color:var(--light-muted)!important;
+  box-shadow:0 10px 22px #132d4608;
+}
+:root[data-theme="light"] :is(.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input,.settings-form input,.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form input,.payroll-form select,.expenses-form input,.expenses-form select){
+  border-color:var(--light-border)!important;
+  background:#ffffff!important;
+  color:var(--light-text)!important;
+}
+:root[data-theme="light"] :is(.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input,.expenses-form input)::placeholder{color:#7f8ea1!important}
+:root[data-theme="light"] :is(.settings-form input:disabled,.settings-form select:disabled){background:#eef4fa!important;color:#7c8ba0!important}
+:root[data-theme="light"] :is(.settings-form label,.settings-prefs label,.settings-backup label,.settings-list-select,.expenses-form label,.settings-theme,.settings-prefs label span){color:var(--light-text)!important}
+:root[data-theme="light"] :is(.settings-security-row,.settings-list-link,.settings-list-select,.settings-destination,.expenses-static-field){
+  border-color:var(--light-border)!important;
+  background:#f8fbff!important;
+  color:var(--light-text)!important;
+}
+:root[data-theme="light"] :is(.settings-theme-options button.is-active,.integrations-tabs button.is-active,.integrations-filters button.is-active,.payroll-pages button.is-active){
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#007f63!important;
+}
+
+:root[data-theme="light"] :is(.settings-table,.receipts-table,.payroll-table,.admin-table,.expenses-table,.income-table){background:transparent;color:var(--light-text)}
+:root[data-theme="light"] :is(.settings-table th,.receipts-table th,.payroll-table th,.admin-table th,.expenses-table th,.income-table th){
+  color:#687a90!important;
+  border-color:var(--light-border)!important;
+}
+:root[data-theme="light"] :is(.settings-table td,.receipts-table td,.payroll-table td,.admin-table td,.expenses-table td,.income-table td){
+  color:var(--light-text)!important;
+  border-color:#e1e9f2!important;
+}
+:root[data-theme="light"] :is(.settings-table tbody tr:hover,.receipts-table tbody tr:hover,.payroll-table tbody tr:hover,.admin-table tbody tr:hover,.expenses-table tbody tr:hover,.income-table tbody tr:hover){background:#e9f7f4!important}
+:root[data-theme="light"] :is(.settings-menu,.payroll-menu,.expenses-export-menu,.notifications-panel){
+  border-color:var(--light-border)!important;
+  background:#fffffffa!important;
+  color:var(--light-text)!important;
+  box-shadow:0 22px 48px #132d4624!important;
+}
+:root[data-theme="light"] :is(.settings-menu button,.payroll-menu button,.expenses-export-menu button,.notification-item){color:var(--light-text)!important}
+:root[data-theme="light"] :is(.settings-menu button:hover,.payroll-menu button:hover,.expenses-export-menu button:hover,.notification-item:hover){background:#e9f7f4!important;color:#007f63!important}
+
+:root[data-theme="light"] .notifications-panel::before{border-color:var(--light-border)!important;background:#ffffff!important}
+:root[data-theme="light"] .notifications-panel-head{border-color:var(--light-border)!important;background:#f2f7fb!important}
+:root[data-theme="light"] .notifications-panel-head h2,
+:root[data-theme="light"] .notification-item-copy strong,
+:root[data-theme="light"] .notifications-empty strong{color:var(--light-text-strong)!important}
+:root[data-theme="light"] .notification-item-copy small,
+:root[data-theme="light"] .notification-item time,
+:root[data-theme="light"] .notifications-empty small{color:var(--light-muted)!important}
+:root[data-theme="light"] .notifications-panel-body{scrollbar-color:#01c38d66 #edf3f8}
+:root[data-theme="light"] .notifications-panel-body::-webkit-scrollbar-track{background:#edf3f8}
+:root[data-theme="light"] .notifications-panel-body::-webkit-scrollbar-thumb{border-color:#edf3f8}
+
+:root[data-theme="light"] :is(.expenses-modal,.profile-editor,.plans-editor-card,.receipts-detail-modal,.integrations-modal,.cf-modal,.auth-modal){
+  border-color:var(--light-border)!important;
+  background:linear-gradient(145deg,#ffffff,#eef5fb)!important;
+  color:var(--light-text)!important;
+  box-shadow:0 34px 90px #132d4628!important;
+}
+:root[data-theme="light"] :is(.expenses-modal>header,.profile-editor-heading,.plans-editor-heading,.receipts-detail-modal>header,.integrations-modal>header,.cf-modal>header){
+  border-color:var(--light-border)!important;
+  background:#f2f7fb!important;
+}
+:root[data-theme="light"] :is(.expenses-modal>header h2,.profile-editor-heading h2,.plans-editor-heading h2,.receipts-detail-modal>header h2,.integrations-modal>header h2,.cf-modal>header h2,.expenses-modal-empty strong){color:var(--light-text-strong)!important}
+:root[data-theme="light"] :is(.expenses-modal>header span,.profile-editor-heading p,.plans-editor-heading p,.receipts-detail-modal>header span,.integrations-modal>header span,.cf-modal>header span,.expenses-modal-empty small){color:var(--light-muted)!important}
+:root[data-theme="light"] :is(.expenses-modal>header button,.profile-editor-heading>button,.receipts-detail-modal>header button,.integrations-modal>header button,.cf-modal>header button){
+  border-color:var(--light-border)!important;
+  background:#ffffff!important;
+  color:var(--light-text)!important;
+}
+
+:root[data-theme="light"] .finance-grid-line{stroke:#132d4615}
+:root[data-theme="light"] .finance-grid-line.vertical{stroke:#132d460d}
+:root[data-theme="light"] .finance-axis-label{fill:#52657d}
+:root[data-theme="light"] .finance-money-label{fill:#697b91}
+:root[data-theme="light"] .finance-point{stroke:#ffffff}
+:root[data-theme="light"] .finance-tooltip-card{fill:#fffffffa;stroke:#01c38d66}
+:root[data-theme="light"] .finance-tooltip-title{fill:#132d46}
+:root[data-theme="light"] .finance-tooltip-label{fill:#63758a}
+:root[data-theme="light"] .finance-tooltip-label.balance{fill:#132d46}
+
+/* Respaldo del modo claro: cubre pantallas que heredan estilos desde body o reglas oscuras con mayor especificidad */
+body[data-theme="light"]{
+  --light-bg:#f4f7fb;
+  --light-panel:#ffffff;
+  --light-panel-soft:#eef5fb;
+  --light-border:#d8e3ef;
+  --light-text:#132d46;
+  --light-text-strong:#0b1722;
+  --light-muted:#5f6f84;
+  --light-shadow:0 22px 54px #132d4617;
+  background:var(--light-bg)!important;
+  color:var(--light-text)!important;
+  color-scheme:light;
+}
+body[data-theme="light"] .app-shell{background:var(--light-bg)!important;color:var(--light-text)!important}
+body[data-theme="light"] .app-main,
+body[data-theme="light"] .topbar,
+body[data-theme="light"] .sidebar,
+body[data-theme="light"] .sidebar-brand,
+body[data-theme="light"] .main-nav{background:#ffffff!important;color:var(--light-text)!important;border-color:var(--light-border)!important}
+body[data-theme="light"] .topbar{box-shadow:0 12px 28px #132d4608!important}
+body[data-theme="light"] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page){
+  background:radial-gradient(circle at 80% 0%,#01c38d1f 0%,transparent 30%),linear-gradient(180deg,#f8fbff 0%,#edf4fa 100%)!important;
+  color:var(--light-text)!important;
+}
+body[data-theme="light"] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page)::before{display:none!important}
+body[data-theme="light"] :is(.stat-card,.panel,.profile-card,.company-card,.expenses-table-card,.income-table-card,.reports-card,.plan-card,.plans-editor-card,.admin-table-card,.receipts-card,.integrations-toolbar,.integrations-card,.settings-panel,.settings-quick-card,.payroll-panel,.cf-panel,.support-inbox-panel,.support-detail-panel,.support-summary article,.support-setup-card){
+  border-color:var(--light-border)!important;
+  background:linear-gradient(145deg,#ffffff 0%,#eef5fb 100%)!important;
+  color:var(--light-text)!important;
+  box-shadow:var(--light-shadow)!important;
+}
+body[data-theme="light"] :is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head,.support-inbox-panel>header,.support-detail-panel>header){
+  border-color:var(--light-border)!important;
+  background:#f2f7fb!important;
+}
+body[data-theme="light"] :is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header,.support-hero) h1,
+body[data-theme="light"] :is(h1,h2,h3,.stat-card strong,.panel h2,.panel strong,.profile-card-heading h2,.profile-copy>span,.profile-copy li,.verified-card h2,.info-row strong,.settings-row strong,.security-list li,.activity-row strong,.summary-tile strong,.company-card h2,.company-info-list strong,.expenses-table-card strong,.income-table-card strong,.reports-card h2,.plan-card h3,.admin-table td strong,.receipts-table td,.integrations-card h3,.settings-panel-head h2,.settings-quick-card strong,.settings-security-row strong,.settings-list-link span,.settings-backup strong,.settings-destination strong,.payroll-panel h2,.cf-panel h2,.support-inbox-panel h2,.support-detail-panel h2,.support-message strong,.support-empty strong,.support-summary strong){
+  color:var(--light-text-strong)!important;
+}
+body[data-theme="light"] :is(.welcome,.expenses-header,.income-header,.companies-header,.plans-header,.admin-header,.reports-header,.cf-header,.receipts-hero,.integrations-hero,.settings-header,.payroll-header,.support-hero) span,
+body[data-theme="light"] :is(p,small,.stat-card small,.panel p,.panel small,.profile-copy p,.info-row small,.settings-row small,.activity-row small,.summary-tile span,.company-info-list span,.expenses-table-card small,.income-table-card small,.reports-card p,.plan-card p,.admin-table td small,.receipts-table th,.integrations-card small,.settings-panel-head p,.settings-quick-card small,.settings-security-row small,.settings-backup p,.payroll-panel small,.cf-panel small,.support-message small,.support-message p,.support-empty small,.support-summary small){
+  color:var(--light-muted)!important;
+}
+body[data-theme="light"] :is(.settings-eyebrow,.payroll-eyebrow,.receipts-title p,.integrations-hero-copy p,.support-hero p){color:#00a979!important}
+body[data-theme="light"] :is(.settings-search,.receipts-search,.integrations-search,.payroll-search,.support-search,.expenses-export-button,.settings-btn-outline,.payroll-btn-secondary,.settings-theme-options button,.integrations-tabs button,.integrations-filters button,.payroll-pages button,.settings-form input,.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form input,.payroll-form select,.expenses-form input,.expenses-form select){
+  border-color:var(--light-border)!important;
+  background:#ffffff!important;
+  color:var(--light-text)!important;
+}
+body[data-theme="light"] :is(.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input,.expenses-form input)::placeholder{color:#7f8ea1!important}
+body[data-theme="light"] :is(.settings-security-row,.settings-list-link,.settings-list-select,.settings-destination,.expenses-static-field){
+  border-color:var(--light-border)!important;
+  background:#f8fbff!important;
+  color:var(--light-text)!important;
+}
+body[data-theme="light"] :is(.settings-theme-options button.is-active,.integrations-tabs button.is-active,.integrations-filters button.is-active,.payroll-pages button.is-active){
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .settings-page .settings-quick-card,
+body[data-theme="light"] .settings-page .settings-quick-card strong{color:var(--light-text-strong)!important}
+body[data-theme="light"] .settings-page .settings-quick-card small{color:var(--light-muted)!important}
+body[data-theme="light"] .settings-page .settings-quick-card em{color:#007f63!important}
+body[data-theme="light"] .settings-page .settings-quick-card>span,
+body[data-theme="light"] :is(.icon-tile,.panel-icon,.verified-shield,.receipts-summary article>span,.integrations-stats article>span,.settings-panel-head>span,.support-summary article>span,.support-setup-card>span){
+  background:#01c38d18!important;
+  color:#00966f!important;
+}
+body[data-theme="light"] :is(.settings-table,.receipts-table,.payroll-table,.admin-table,.expenses-table,.income-table){background:transparent!important;color:var(--light-text)!important}
+body[data-theme="light"] :is(.settings-table th,.receipts-table th,.payroll-table th,.admin-table th,.expenses-table th,.income-table th){color:#687a90!important;border-color:var(--light-border)!important}
+body[data-theme="light"] :is(.settings-table td,.receipts-table td,.payroll-table td,.admin-table td,.expenses-table td,.income-table td){color:var(--light-text)!important;border-color:#e1e9f2!important}
+body[data-theme="light"] :is(.settings-menu,.payroll-menu,.expenses-export-menu,.notifications-panel){
+  border-color:var(--light-border)!important;
+  background:#fffffffa!important;
+  color:var(--light-text)!important;
+  box-shadow:0 22px 48px #132d4624!important;
+}
+body[data-theme="light"] :is(.expenses-modal,.profile-editor,.plans-editor-card,.receipts-detail-modal,.integrations-modal,.cf-modal,.auth-modal){
+  border-color:var(--light-border)!important;
+  background:linear-gradient(145deg,#ffffff,#eef5fb)!important;
+  color:var(--light-text)!important;
+}
+
+/* Capa final de contraste por tema: texto, cards, tablas, menús y modales */
+body[data-theme="dark"]{
+  --theme-page-bg:radial-gradient(circle at 84% 0%,#01c38d24 0%,transparent 25%),linear-gradient(180deg,#191e29 0%,#132d46 100%);
+  --theme-shell-bg:#191e29;
+  --theme-card-bg:linear-gradient(145deg,#132d46e8,#191e29f2);
+  --theme-card-soft:linear-gradient(145deg,#ffffff0e,#ffffff08);
+  --theme-card-header:#ffffff07;
+  --theme-elevated-bg:linear-gradient(145deg,#191e29fa,#132d46f7);
+  --theme-input-bg:#ffffff09;
+  --theme-input-disabled:#ffffff05;
+  --theme-menu-bg:#172236fb;
+  --theme-table-hover:#ffffff08;
+  --theme-border:#ffffff14;
+  --theme-border-strong:#ffffff20;
+  --theme-heading:#ffffff;
+  --theme-text:#eef5fb;
+  --theme-muted:#a7b3c6;
+  --theme-subtle:#8fa2b9;
+  --theme-accent:#01c38d;
+  --theme-accent-readable:#42f2bd;
+  --theme-shadow:0 26px 58px #00000033;
+  --theme-backdrop:#050b11c7;
+}
+body[data-theme="light"]{
+  --theme-page-bg:radial-gradient(circle at 82% 0%,#01c38d1b 0%,transparent 30%),linear-gradient(180deg,#f8fbff 0%,#edf4fa 100%);
+  --theme-shell-bg:#f4f7fb;
+  --theme-card-bg:linear-gradient(145deg,#ffffff 0%,#eef5fb 100%);
+  --theme-card-soft:linear-gradient(145deg,#ffffff 0%,#f2f7fb 100%);
+  --theme-card-header:#f2f7fb;
+  --theme-elevated-bg:linear-gradient(145deg,#ffffff 0%,#eef5fb 100%);
+  --theme-input-bg:#ffffff;
+  --theme-input-disabled:#eef4fa;
+  --theme-menu-bg:#fffffffb;
+  --theme-table-hover:#e9f7f4;
+  --theme-border:#d8e3ef;
+  --theme-border-strong:#c6d5e5;
+  --theme-heading:#0b1722;
+  --theme-text:#132d46;
+  --theme-muted:#5f6f84;
+  --theme-subtle:#7f8ea1;
+  --theme-accent:#008d67;
+  --theme-accent-readable:#007f63;
+  --theme-shadow:0 22px 54px #132d4617;
+  --theme-backdrop:#07111d8c;
+}
+body[data-theme]{
+  background:var(--theme-shell-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.app-shell,.app-main){
+  background:var(--theme-shell-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page,.legal-page){
+  background:var(--theme-page-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page,.legal-page)::before{
+  display:none!important;
+}
+body[data-theme] :is(.topbar,.sidebar,.sidebar-brand,.main-nav){
+  background:var(--theme-shell-bg)!important;
+  border-color:var(--theme-border)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme="light"] :is(.topbar,.sidebar,.sidebar-brand,.main-nav){
+  background:#ffffff!important;
+}
+body[data-theme] :is(.search,.search input,.nav-link,.main-nav p){
+  color:var(--theme-muted)!important;
+}
+body[data-theme] .search input::placeholder{color:var(--theme-subtle)!important}
+body[data-theme] .nav-link:hover{
+  background:color-mix(in srgb,var(--theme-accent) 12%,transparent)!important;
+  color:var(--theme-heading)!important;
+}
+body[data-theme] .nav-link.active{
+  border-color:color-mix(in srgb,var(--theme-accent) 42%,transparent)!important;
+  background:color-mix(in srgb,var(--theme-accent) 18%,transparent)!important;
+  color:var(--theme-accent-readable)!important;
+}
+body[data-theme] :is(.stat-card,.panel,.profile-hero,.verified-card,.profile-card,.summary-tile,.quick-card,.company-card,.obligations-card,.expenses-table-card,.income-table-card,.reports-card,.plan-card,.plans-editor-card,.admin-table-card,.admin-stat-grid article,.reports-stats article,.receipts-card,.receipts-summary article,.integrations-toolbar,.integrations-card,.integrations-stats article,.settings-panel,.settings-quick-card,.payroll-panel,.payroll-history-card,.payroll-kpis article,.cf-panel,.cf-stat,.support-inbox-panel,.support-detail-panel,.support-summary article,.support-setup-card,.legal-index,.legal-document,.legal-note){
+  border-color:var(--theme-border)!important;
+  background:var(--theme-card-bg)!important;
+  color:var(--theme-text)!important;
+  box-shadow:var(--theme-shadow)!important;
+}
+body[data-theme] :is(.stat-card,.admin-stat-grid article,.reports-stats article,.receipts-summary article,.integrations-stats article,.payroll-kpis article,.cf-stat){
+  background:var(--theme-card-soft)!important;
+}
+body[data-theme] :is(.panel-heading,.profile-card-heading,.company-card-heading,.reports-card-heading,.receipts-card-top,.settings-panel-head,.payroll-panel-head,.cf-panel-head,.support-inbox-panel>header,.support-detail-panel>header,.plans-editor-heading,.profile-editor-heading,.integrations-modal-head,.expenses-modal>header,.receipts-detail-modal>header,.legal-intro,.legal-footer){
+  border-color:var(--theme-border)!important;
+  background:var(--theme-card-header)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page,.legal-page,.auth-modal,.profile-editor,.plans-editor-card,.expenses-modal,.receipts-detail-modal,.integrations-modal,.cf-modal) :is(h1,h2,h3,h4,h5,h6,strong,b,label,th){
+  color:var(--theme-heading)!important;
+}
+body[data-theme] :is(.dashboard-content,.profile-content,.expenses-content,.income-content,.companies-content,.plans-content,.admin-content,.reports-content,.cf-page,.receipts-page,.integrations-page,.settings-page,.payroll-page,.support-page,.legal-page,.auth-modal,.profile-editor,.plans-editor-card,.expenses-modal,.receipts-detail-modal,.integrations-modal,.cf-modal) :is(p,small,li,td,dd){
+  color:var(--theme-muted)!important;
+}
+body[data-theme] :is(.stat-card h2,.panel h2,.profile-copy h1,.company-info-list strong,.expenses-table td,.income-table td,.reports-table td,.admin-table td,.receipts-table td,.payroll-table td,.cf-table td,.settings-table td,.support-message strong,.support-detail-panel article p,.legal-section h2,.legal-subsection h3){
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.welcome>div>p,.expenses-header>div>p,.income-header>div>p,.companies-header>div>p,.plans-header>div>p,.admin-header>div>p,.reports-header>p,.cf-header>div>p,.receipts-title p,.integrations-hero-copy p,.settings-eyebrow,.payroll-eyebrow,.support-hero p,.auth-modal p,.plans-editor-heading p,.profile-editor-heading span,.expenses-modal>header p,.integrations-modal-head span,.cf-modal header span){
+  color:var(--theme-accent-readable)!important;
+}
+body[data-theme] :is(.welcome>div>span,.expenses-header>div>span,.income-header>div>span,.companies-header>div>span,.plans-header>div>span,.admin-header>div>span,.reports-header>span,.cf-header>div>span,.receipts-title span,.integrations-hero-copy span,.settings-header span,.payroll-header span,.support-hero span,.auth-modal span,.plans-editor-heading span,.profile-editor-heading p,.expenses-modal>header span,.integrations-modal-head p,.receipts-detail-modal>header span,.cf-modal header p){
+  color:var(--theme-muted)!important;
+}
+body[data-theme] :is(.table-search,.settings-search,.receipts-search,.integrations-search,.payroll-search,.support-search,.expenses-export-button,.settings-btn-outline,.payroll-btn-secondary,.settings-theme-options button,.integrations-tabs button,.integrations-filters button,.payroll-pages button,.table-pagination button,.settings-icon-btn,.expense-menu-button,.income-menu-button){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.table-search input,.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input,.settings-form input,.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form input,.payroll-form select,.expenses-form input,.expenses-form select,.profile-editor-grid input,.profile-editor-grid select,.plans-editor-grid input,.plans-editor-grid select,.plans-editor-grid textarea,.cf-modal input,.support-reply-form textarea){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.table-search input,.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input,.expenses-form input,.profile-editor-grid input,.plans-editor-grid textarea,.support-reply-form textarea)::placeholder{
+  color:var(--theme-subtle)!important;
+}
+body[data-theme] :is(input:disabled,select:disabled,textarea:disabled){
+  background:var(--theme-input-disabled)!important;
+  color:var(--theme-subtle)!important;
+  opacity:1!important;
+}
+body[data-theme] select option{
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme="light"] select option{
+  background:#ffffff!important;
+  color:#132d46!important;
+}
+body[data-theme] :is(.settings-table,.receipts-table,.payroll-table,.admin-table,.expenses-table,.income-table,.reports-table,.cf-table){
+  background:transparent!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.settings-table th,.receipts-table th,.payroll-table th,.admin-table th,.expenses-table th,.income-table th,.reports-table th,.cf-table th,.table-head span){
+  color:var(--theme-muted)!important;
+  border-color:var(--theme-border)!important;
+}
+body[data-theme] :is(.settings-table td,.receipts-table td,.payroll-table td,.admin-table td,.expenses-table td,.income-table td,.reports-table td,.cf-table td,.movement-row){
+  color:var(--theme-text)!important;
+  border-color:var(--theme-border)!important;
+}
+body[data-theme] :is(.settings-table tbody tr:hover,.receipts-table tbody tr:hover,.payroll-table tbody tr:hover,.admin-table tbody tr:hover,.expenses-table tbody tr:hover,.income-table tbody tr:hover,.reports-table tbody tr:hover,.cf-table tbody tr:hover,.movement-row:hover){
+  background:var(--theme-table-hover)!important;
+}
+body[data-theme] :is(.settings-menu,.payroll-menu,.payroll-menu-floating,.expenses-export-menu,.notifications-panel){
+  border-color:var(--theme-border)!important;
+  background:var(--theme-menu-bg)!important;
+  color:var(--theme-text)!important;
+  box-shadow:var(--theme-shadow)!important;
+}
+body[data-theme] :is(.settings-menu button,.payroll-menu button,.payroll-menu-floating button,.expenses-export-menu button,.notification-item){
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.notification-item-copy strong,.notifications-panel-head h2,.notifications-empty strong){
+  color:var(--theme-heading)!important;
+}
+body[data-theme] :is(.notification-item-copy small,.notification-item time,.notifications-empty small){
+  color:var(--theme-muted)!important;
+}
+body[data-theme] :is(.auth-modal-backdrop,.profile-editor-backdrop,.plans-editor,.cf-modal-backdrop,.integrations-modal-backdrop,.expenses-modal-backdrop,.receipts-detail-backdrop){
+  background:var(--theme-backdrop)!important;
+}
+body[data-theme] :is(.auth-modal,.profile-editor,.plans-editor-card,.expenses-modal,.receipts-detail-modal,.integrations-modal,.cf-modal){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-elevated-bg)!important;
+  color:var(--theme-text)!important;
+  box-shadow:0 34px 90px color-mix(in srgb,var(--theme-shell-bg) 58%,transparent)!important;
+}
+body[data-theme] :is(.auth-modal-form label,.profile-editor-grid label,.plans-editor-grid label,.expenses-form label,.cf-modal label){
+  color:var(--theme-heading)!important;
+}
+body[data-theme] :is(.auth-modal-form input,.profile-editor-grid input,.profile-editor-grid select,.plans-editor-grid input,.plans-editor-grid select,.plans-editor-grid textarea,.expenses-form input,.expenses-form select,.cf-modal input){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.auth-modal-actions>button:first-child,.profile-editor-actions>button,.plans-editor-actions>button:first-child,.expenses-form footer button:first-child,.expenses-modal>header button,.profile-editor-heading>button,.plans-editor-heading button,.receipts-detail-modal>header button,.integrations-modal-head>button,.cf-modal header>button){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.icon-tile,.panel-icon,.verified-shield,.stat-card>span,.empty-chart>span,.empty-small>span,.receipts-summary article>span,.integrations-stats article>span,.settings-quick-card>span,.settings-panel-head>span,.support-summary article>span,.support-setup-card>span,.cf-stat-top span,.payroll-kpis article>span,.notification-item-icon){
+  background:color-mix(in srgb,var(--theme-accent) 16%,transparent)!important;
+  color:var(--theme-accent-readable)!important;
+  box-shadow:0 0 24px color-mix(in srgb,var(--theme-accent) 18%,transparent)!important;
+}
+body[data-theme] :is(.settings-theme-options button.is-active,.integrations-tabs button.is-active,.integrations-filters button.is-active,.payroll-pages button.is-active,.table-pagination button.is-active){
+  border-color:color-mix(in srgb,var(--theme-accent) 52%,transparent)!important;
+  background:color-mix(in srgb,var(--theme-accent) 18%,transparent)!important;
+  color:var(--theme-accent-readable)!important;
+}
+
+/* Aislamiento de autenticación: estas pantallas usan panel blanco aun cuando el sistema esté en modo oscuro */
+body[data-theme] .login-page{
+  background:#ffffff!important;
+  color:#132d46!important;
+}
+body[data-theme] .login-panel,
+body[data-theme] .login-card,
+body[data-theme] .register-card{
+  color:#132d46!important;
+}
+body[data-theme] .login-heading h1{
+  color:#0b1722!important;
+}
+body[data-theme] .login-heading p,
+body[data-theme] .register-copy,
+body[data-theme] .legal,
+body[data-theme] .form-options label,
+body[data-theme] .terms-check{
+  color:#5f6f84!important;
+}
+body[data-theme] .login-heading>span,
+body[data-theme] .login-form a,
+body[data-theme] .login-form button.auth-link-button,
+body[data-theme] .register-copy a,
+body[data-theme] .terms-check a,
+body[data-theme] .legal a{
+  color:#00a979!important;
+}
+body[data-theme] .login-form>label,
+body[data-theme] .field-row>label{
+  color:#0b1722!important;
+}
+body[data-theme] .login-form input:not([type="checkbox"]){
+  border-color:#d8e3ef!important;
+  background:#ffffff!important;
+  color:#132d46!important;
+  caret-color:#01c38d!important;
+}
+body[data-theme] .login-form input:not([type="checkbox"])::placeholder{
+  color:#8a96a5!important;
+  opacity:1!important;
+}
+body[data-theme] .login-form input:not([type="checkbox"]):focus{
+  border-color:#01c38d!important;
+  background:#ffffff!important;
+  box-shadow:0 0 0 3px #01c38d26!important;
+}
+body[data-theme] .login-form input[type="checkbox"]{
+  border-color:#6f7b8c!important;
+  background:#ffffff!important;
+  accent-color:#01c38d!important;
+}
+body[data-theme] .password-field button{
+  border-color:#01c38d66!important;
+  background:linear-gradient(135deg,#f3fffb 0%,#dff9f1 45%,#132d4614 100%)!important;
+  color:#132d46!important;
+}
+body[data-theme] .password-field button:hover{
+  border-color:transparent!important;
+  background:var(--button-gradient)!important;
+  color:#ffffff!important;
+}
+
+/* Refuerzo para campos que viven fuera de cards o formularios principales */
+body[data-theme] :is(.income-tools label,.table-search,.settings-search,.receipts-search,.integrations-search,.payroll-search,.support-search){
+  border-color:var(--theme-border-strong)!important;
+  background:var(--theme-input-bg)!important;
+  color:var(--theme-text)!important;
+}
+body[data-theme] :is(.income-tools input,.table-search input,.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input){
+  background:transparent!important;
+  color:var(--theme-text)!important;
+  caret-color:var(--theme-accent-readable)!important;
+}
+body[data-theme] :is(.income-tools input,.table-search input,.settings-search input,.receipts-search input,.integrations-search input,.payroll-search input,.support-search input)::placeholder{
+  color:var(--theme-subtle)!important;
+  opacity:1!important;
+}
+
+/* Refuerzo base: evita textos claros sobre formularios con fondo blanco antes de que el tema termine de hidratar. */
+.login-page,
+.login-page .login-panel,
+.login-page .login-card,
+.login-page .register-card{
+  color:#132d46!important;
+}
+.login-page .login-heading h1{
+  color:#0b1722!important;
+}
+.login-page :is(.login-heading p,.register-copy,.legal,.form-options label,.terms-check){
+  color:#5f6f84!important;
+}
+.login-page :is(.login-heading>span,.login-form a,.login-form button.auth-link-button,.register-copy a,.terms-check a,.legal a){
+  color:#00a979!important;
+}
+.login-page :is(.login-form>label,.field-row>label){
+  color:#0b1722!important;
+}
+.login-page .login-form input:not([type="checkbox"]){
+  border-color:#d8e3ef!important;
+  background:#ffffff!important;
+  color:#132d46!important;
+  caret-color:#01c38d!important;
+}
+.login-page .login-form input:not([type="checkbox"])::placeholder{
+  color:#8a96a5!important;
+  opacity:1!important;
+}
+.login-page .login-form input[type="checkbox"]{
+  border-color:#6f7b8c!important;
+  background:#ffffff!important;
+  accent-color:#01c38d!important;
+}
+
+/* Refuerzo global de contraste para campos de texto, selects y textareas en cualquier pantalla. */
+body[data-theme] :where(input:not([type="checkbox"]):not([type="radio"]),textarea,select){
+  color:var(--theme-text)!important;
+  caret-color:var(--theme-accent-readable)!important;
+}
+body[data-theme] :where(input:not([type="checkbox"]):not([type="radio"]),textarea)::placeholder{
+  color:var(--theme-subtle)!important;
+  opacity:1!important;
+}
+body[data-theme="dark"] :where(select option,select optgroup){
+  background:#132d46!important;
+  color:#eef5fb!important;
+}
+body[data-theme="light"] :where(select option,select optgroup){
+  background:#ffffff!important;
+  color:#132d46!important;
+}
+
+/* Correcciones finales de contraste en modo claro para páginas operativas */
+body[data-theme="light"]{
+  --theme-row-bg:#f8fbff;
+  --theme-row-alt:#eef7f5;
+  --theme-action-bg:#ffffff;
+  --theme-action-hover:#dff8f0;
+  --theme-soft-green:#dff8f0;
+  --theme-soft-amber:#fff3dd;
+}
+body[data-theme="light"] :is(.profile-card,.summary-card,.quick-card,.security-card,.activity-card,.cf-panel,.receipts-card,.expenses-table-card,.income-table-card,.plan-card){
+  background:linear-gradient(145deg,#ffffff 0%,#edf5fb 100%)!important;
+}
+body[data-theme="light"] :is(.profile-card-heading,.cf-panel-head,.receipts-card-top){
+  background:#f2f7fb!important;
+  border-color:#d8e3ef!important;
+}
+body[data-theme="light"] :is(.profile-card-heading h2,.cf-panel-head h2,.receipts-card-top h2,.security-list li,.activity-row strong,.cf-event-list strong,.cf-doc-list strong,.cf-tax-list strong,.plan-section h3,.plan-card h2){
+  color:#0b1722!important;
+}
+body[data-theme="light"] :is(.info-row small,.settings-row small,.activity-row small,.activity-row time,.cf-panel-head span,.cf-calendar-nav,.cf-calendar-weekdays,.cf-event-list small,.cf-doc-list small,.cf-tax-list small,.plan-card>p,.plan-price small,.plan-annual small,.plan-card footer,.receipts-table td small,.receipt-company,.payroll-kpi-caption){
+  color:#5f6f84!important;
+}
+body[data-theme="light"] :is(.info-row strong,.settings-row strong,.summary-tile strong,.expenses-stat-grid strong,.income-stat-grid strong,.receipts-summary strong,.payroll-kpis strong,.cf-stat-top strong,.plan-price strong,.plan-annual span,.receipt-folio,.receipts-table td strong){
+  color:#132d46!important;
+}
+body[data-theme="light"] :is(.profile-action,.quick-grid button,.summary-tile,.plan-price,.plan-db-limits span,.plan-db-limits b,.cf-tabs button,.cf-action,.receipt-action,.income-menu-button,.expense-menu-button){
+  border-color:#c6d5e5!important;
+  background:var(--theme-action-bg)!important;
+  color:#132d46!important;
+  box-shadow:0 10px 22px #132d4608!important;
+}
+body[data-theme="light"] :is(.profile-action:hover,.quick-grid button:hover,.summary-tile:hover,.cf-tabs button:hover,.cf-action:hover,.receipt-action:hover,.income-menu-button:hover,.expense-menu-button:hover){
+  border-color:#01c38d66!important;
+  background:var(--theme-action-hover)!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] :is(.profile-action span,.quick-grid span,.profile-card-heading h2 span,.summary-tile b,.cf-event-date,.cf-link-btn,.plan-section li .g-icon,.expense-category .g-icon,.income-category .g-icon){
+  color:#008d67!important;
+  text-shadow:none!important;
+}
+body[data-theme="light"] .profile-action:disabled,
+body[data-theme="light"] .profile-action[aria-disabled="true"]{
+  background:#edf3f8!important;
+  color:#7f8ea1!important;
+}
+
+body[data-theme="light"] .security-ring{
+  background:radial-gradient(circle,#132d46 56%,transparent 57%),conic-gradient(#01c38d 0 100%,#d8e3ef 0)!important;
+}
+body[data-theme="light"] .security-ring strong,
+body[data-theme="light"] .security-ring span{
+  color:#ffffff!important;
+}
+body[data-theme="light"] .security-ring small{
+  color:#42f2bd!important;
+}
+
+body[data-theme="light"] .cf-calendar-grid button{
+  border-color:#d8e3ef!important;
+  background:#f8fbff!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] .cf-calendar-grid button:hover{
+  border-color:#01c38d66!important;
+  background:#e6f8f2!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .cf-calendar-grid button.has-event{
+  border-color:#01c38d66!important;
+  box-shadow:inset 0 0 0 1px #01c38d55!important;
+}
+body[data-theme="light"] .cf-calendar-grid button.has-tax{
+  border-color:#ffbd6b!important;
+  box-shadow:inset 0 0 0 1px #ffbd6b!important;
+}
+body[data-theme="light"] .cf-calendar-grid button.is-selected{
+  background:#c9f4e8!important;
+  border-color:#01c38d99!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .cf-badge-pending{
+  border-color:#ffbd6b!important;
+  background:#fff3dd!important;
+  color:#b26400!important;
+}
+body[data-theme="light"] .cf-badge-done,
+body[data-theme="light"] .cf-status.is-paid{
+  border-color:#01c38d55!important;
+  background:#dff8f0!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .cf-status.is-registered{
+  background:#edf3f8!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] :is(.cf-doc-list em.is-positive,.cf-tax-list em,.positive,.income-amount){
+  color:#008d67!important;
+}
+body[data-theme="light"] :is(.cf-doc-list em.is-negative,.negative,.expense-amount){
+  color:#b26400!important;
+}
+body[data-theme="light"] .cf-doc-pagination{
+  border-color:#d8e3ef!important;
+  background:#f2f7fb!important;
+}
+body[data-theme="light"] .cf-action-green,
+body[data-theme="light"] .cf-action-mint{
+  border-color:#8ce5ca!important;
+  background:#e6f8f2!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .cf-action-deep{
+  border-color:#c6d5e5!important;
+  background:#edf3f8!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] .cf-action-amber{
+  border-color:#ffbd6b!important;
+  background:#fff3dd!important;
+  color:#8a4b00!important;
+}
+body[data-theme="light"] .cf-tip{
+  border-color:#8ce5ca!important;
+  background:#e6f8f2!important;
+}
+body[data-theme="light"] .cf-tip p,
+body[data-theme="light"] .cf-tip strong{
+  color:#132d46!important;
+}
+
+body[data-theme="light"] :is(.expenses-table tbody tr,.income-table tbody tr,.receipts-table tbody tr,.cf-table tbody tr){
+  background:var(--theme-row-bg)!important;
+}
+body[data-theme="light"] :is(.expenses-table tbody tr:nth-child(even),.income-table tbody tr:nth-child(even),.receipts-table tbody tr:nth-child(even),.cf-table tbody tr:nth-child(even)){
+  background:#f2f7fb!important;
+}
+body[data-theme="light"] :is(.expenses-table tbody tr:hover,.income-table tbody tr:hover,.receipts-table tbody tr:hover,.cf-table tbody tr:hover){
+  background:var(--theme-row-alt)!important;
+}
+body[data-theme="light"] :is(.expenses-table td,.income-table td,.receipts-table td,.cf-table td,.movement-row){
+  color:#132d46!important;
+}
+body[data-theme="light"] :is(.expenses-table th,.income-table th,.receipts-table th,.cf-table th){
+  color:#5f6f84!important;
+  background:#f2f7fb!important;
+}
+body[data-theme="light"] :is(.expense-category,.income-category,.cf-table td,.receipts-table td){
+  color:#132d46!important;
+}
+body[data-theme="light"] :is(.expense-category,.income-category){
+  opacity:1!important;
+}
+body[data-theme="light"] .income-table .income-category,
+body[data-theme="light"] .expenses-table .expense-category{
+  color:#132d46!important;
+}
+body[data-theme="light"] :is(.income-table .income-category span,.expenses-table .expense-category span){
+  color:#008d67!important;
+}
+
+body[data-theme="light"] :is(.receipt-action,.receipt-action .g-icon,.receipt-actions .g-icon){
+  color:#132d46!important;
+  opacity:1!important;
+}
+body[data-theme="light"] .receipt-action:disabled{
+  border-color:#d8e3ef!important;
+  background:#eef4fa!important;
+  color:#7f8ea1!important;
+  opacity:.85!important;
+}
+body[data-theme="light"] .receipt-status,
+body[data-theme="light"] .movement-status,
+body[data-theme="light"] .status-dot{
+  color:#132d46!important;
+  text-shadow:none!important;
+}
+
+body[data-theme="light"] :is(.expenses-stat-grid article,.income-stat-grid article,.receipts-summary article,.payroll-kpis article,.cf-stat){
+  border-color:#d8e3ef!important;
+  background:linear-gradient(145deg,#ffffff 0%,#eef5fb 100%)!important;
+  color:#132d46!important;
+  box-shadow:0 18px 38px #132d4612!important;
+}
+body[data-theme="light"] :is(.expenses-stat-grid small,.income-stat-grid small,.receipts-summary small,.payroll-kpis small,.cf-stat-top small,.cf-stat-top em){
+  color:#5f6f84!important;
+}
+
+body[data-theme="light"] .plan-section li{
+  color:#52657d!important;
+}
+body[data-theme="light"] .plan-section.muted li{
+  color:#6f7f92!important;
+}
+body[data-theme="light"] .plan-subscribe-button.current{
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#008d67!important;
+}
+body[data-theme="light"] .plan-subscribe-button:disabled{
+  opacity:1!important;
+}
+body[data-theme="light"] .plan-card footer{
+  color:#5f6f84!important;
+}
+
+/* Selects nativos: contraste estable en modo oscuro y claro */
+body[data-theme="dark"] select,
+body[data-theme="dark"] :is(.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form select,.profile-editor-grid select,.plans-editor-grid select,.expenses-form select,.income-form select,.panel-heading select){
+  color-scheme:dark!important;
+  border-color:#ffffff20!important;
+  background-color:#1a3148!important;
+  color:#f5f7fb!important;
+}
+body[data-theme="dark"] select option,
+body[data-theme="dark"] select optgroup{
+  color-scheme:dark!important;
+  background-color:#132d46!important;
+  color:#f5f7fb!important;
+}
+body[data-theme="dark"] select option:checked{
+  background-color:#01c38d!important;
+  color:#071a23!important;
+}
+body[data-theme="dark"] select option:disabled{
+  background-color:#132d46!important;
+  color:#8fa2b9!important;
+}
+body[data-theme="light"] select,
+body[data-theme="light"] :is(.settings-form select,.settings-prefs select,.settings-backup select,.settings-list-select select,.payroll-form select,.profile-editor-grid select,.plans-editor-grid select,.expenses-form select,.income-form select,.panel-heading select){
+  color-scheme:light!important;
+  border-color:#c5d4e4!important;
+  background-color:#ffffff!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] select option,
+body[data-theme="light"] select optgroup{
+  color-scheme:light!important;
+  background-color:#ffffff!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] select option:checked{
+  background-color:#c9f4e8!important;
+  color:#0b1722!important;
+}
+body[data-theme="light"] select option:disabled{
+  background-color:#ffffff!important;
+  color:#7f8ea1!important;
+}
+
+/* Login y registro quedan aislados del tema global: siempre usan su UI clara propia. */
+:root[data-theme="light"] .login-page,
+:root[data-theme="dark"] .login-page,
+body[data-theme] .login-page{
+  color-scheme:light!important;
+  --theme-text:#132d46;
+  --theme-heading:#0b1722;
+  --theme-muted:#5f6f84;
+  --theme-subtle:#8a96a5;
+  --theme-input-bg:#ffffff;
+  --theme-border-strong:#d8e3ef;
+  background:#ffffff!important;
+  color:#132d46!important;
+}
+:root[data-theme="light"] .login-page *,
+:root[data-theme="dark"] .login-page *,
+body[data-theme] .login-page *{
+  color-scheme:light!important;
+}
+body[data-theme] .login-page :where(input:not([type="checkbox"]):not([type="radio"]),textarea,select),
+.login-page :where(input:not([type="checkbox"]):not([type="radio"]),textarea,select){
+  border-color:#d8e3ef!important;
+  background:#ffffff!important;
+  color:#132d46!important;
+  caret-color:#01c38d!important;
+}
+body[data-theme] .login-page :where(input:not([type="checkbox"]):not([type="radio"]),textarea)::placeholder,
+.login-page :where(input:not([type="checkbox"]):not([type="radio"]),textarea)::placeholder{
+  color:#8a96a5!important;
+  opacity:1!important;
+}
+body[data-theme] .login-page :where(select option,select optgroup),
+.login-page :where(select option,select optgroup){
+  background:#ffffff!important;
+  color:#132d46!important;
+}
+
+/* Verificación de correo en perfil */
+.verified-card.pending{
+  border-color:#ffbd6b55;
+  background:linear-gradient(135deg,#132d46d9,#2a231be8);
+  box-shadow:inset 0 0 34px #ffbd6b12,0 18px 32px #00000024;
+}
+.verified-card.pending .verified-shield{
+  border-color:#ffbd6b80;
+  background:#ffbd6b16;
+  color:#ffcf70;
+  box-shadow:0 0 22px #ffbd6b40,inset 0 0 20px #ffbd6b18;
+}
+.verified-card.pending h2 span{
+  color:#ffbd6b;
+}
+.email-verification-actions{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:9px;
+  margin-top:12px;
+}
+.email-verification-actions button{
+  min-height:34px;
+  padding:0 12px;
+  border:1px solid #01c38d66;
+  border-radius:8px;
+  background:#01c38d18;
+  color:#42f2bd;
+  font-size:10px;
+  font-weight:900;
+  transition:background .2s ease,border-color .2s ease,color .2s ease,transform .2s ease;
+}
+.email-verification-actions button:hover:not(:disabled){
+  border-color:transparent;
+  background:var(--button-gradient);
+  color:#ffffff;
+  transform:translateY(-1px);
+}
+.email-verification-actions button:disabled{
+  cursor:wait;
+  opacity:.72;
+}
+.email-verification-actions small{
+  flex-basis:100%;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.45;
+}
+.email-verification-actions small.is-success{
+  color:#42f2bd;
+}
+.email-verification-actions small.is-error{
+  color:#ffb4b4;
+}
+.security-ring.pending{
+  background:radial-gradient(circle,#132d46 56%,transparent 57%),conic-gradient(#ffbd6b 0 75%,#ffffff1c 75% 100%)!important;
+  box-shadow:0 0 24px #ffbd6b44;
+}
+.security-ring.pending small{
+  color:#ffcf70!important;
+}
+.security-list li.is-pending span{
+  background:#ffbd6b20;
+  color:#ffcf70;
+}
+.phone-verification-action{
+  border:1px solid #01c38d2d;
+}
+.phone-verification-action.is-verified{
+  border-color:#01c38d45;
+  background:#01c38d14;
+  color:#dffcf3;
+}
+.phone-verification-modal{
+  width:min(620px,100%);
+}
+.phone-verification-modal .profile-editor-grid{
+  padding-bottom:12px;
+}
+.phone-verification-modal .profile-editor-message.is-success{
+  border-color:#01c38d55;
+  background:#01c38d17;
+  color:#42f2bd;
+}
+.phone-recaptcha-container{
+  min-height:1px;
+  margin:0 24px;
+}
+
+body[data-theme="light"] .verified-card{
+  border-color:#8ce5ca!important;
+  background:linear-gradient(135deg,#ffffff 0%,#edf8f5 100%)!important;
+  box-shadow:0 18px 32px #132d4610!important;
+}
+body[data-theme="light"] .verified-shield{
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#008d67!important;
+  box-shadow:0 0 22px #01c38d26,inset 0 0 20px #01c38d12!important;
+}
+body[data-theme="light"] .verified-card h2{
+  color:#132d46!important;
+}
+body[data-theme="light"] .verified-card p{
+  color:#5f6f84!important;
+}
+body[data-theme="light"] .verified-card.pending{
+  border-color:#ffbd6b99!important;
+  background:linear-gradient(135deg,#ffffff 0%,#fff7ea 100%)!important;
+}
+body[data-theme="light"] .verified-card.pending .verified-shield{
+  border-color:#ffbd6b99!important;
+  background:#fff0d8!important;
+  color:#b26400!important;
+}
+body[data-theme="light"] .email-verification-actions button{
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#007f63!important;
+}
+body[data-theme="light"] .email-verification-actions button:hover:not(:disabled){
+  border-color:transparent!important;
+  background:var(--button-gradient)!important;
+  color:#ffffff!important;
+}
+body[data-theme="light"] .email-verification-actions small.is-success{
+  color:#007f63!important;
+}
+body[data-theme="light"] .email-verification-actions small.is-error{
+  color:#a22121!important;
+}
+body[data-theme="light"] .security-ring.pending{
+  background:radial-gradient(circle,#132d46 56%,transparent 57%),conic-gradient(#ffbd6b 0 75%,#d8e3ef 75% 100%)!important;
+  box-shadow:0 0 24px #ffbd6b30!important;
+}
+body[data-theme="light"] .security-list li.is-pending span{
+  background:#fff0d8!important;
+  color:#b26400!important;
+}
+body[data-theme="light"] .phone-verification-action{
+  border-color:#8ce5ca!important;
+  background:#e8f7f3!important;
+  color:#132d46!important;
+}
+body[data-theme="light"] .phone-verification-action.is-verified{
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+}
+body[data-theme="light"] .phone-verification-modal .profile-editor-message.is-success{
+  border-color:#01c38d66!important;
+  background:#dff8f0!important;
+  color:#007f63!important;
+}

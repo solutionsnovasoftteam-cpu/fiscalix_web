@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { SupportReplyForm } from "@/app/support/SupportReplyForm";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator } from "@/lib/i18n";
 import {
   getGmailSetupStatus,
   getSupportMessage,
@@ -13,6 +14,7 @@ import {
   type SupportInboxResult,
 } from "@/lib/gmailSupport";
 import { canViewAdminDashboard } from "@/lib/roles";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 type PageSearchParams = {
   messageId?: string;
@@ -20,21 +22,20 @@ type PageSearchParams = {
   q?: string;
 };
 
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
 function cleanParam(value: string | string[] | undefined) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function formatDate(value: string) {
+function formatDate(value: string, language: FiscalixLanguage = "es") {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Fecha no disponible" : dateFormatter.format(date);
+  if (Number.isNaN(date.getTime())) return createTranslator(language)("support.dateUnavailable");
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "es-MX", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 function buildHref(current: PageSearchParams, next: Partial<PageSearchParams>) {
@@ -83,20 +84,23 @@ async function loadSelectedMessage(messageId: string) {
 }
 
 function SupportSetupCard({
+  language = "es",
   missing,
   supportEmail,
 }: {
+  language?: FiscalixLanguage;
   missing: string[];
   supportEmail: string;
 }) {
+  const t = createTranslator(language);
   return (
     <section className="support-setup-card">
       <span><Icon name="lock" /></span>
       <div>
-        <p>CONEXIÓN PENDIENTE</p>
-        <h2>Gmail aún no está configurado</h2>
+        <p>{t("support.pendingConnection")}</p>
+        <h2>{t("support.gmailNotConfigured")}</h2>
         <small>
-          La bandeja está preparada para consultar {supportEmail}, pero faltan secretos de OAuth en el servidor.
+          {t("support.setupHelp", { email: supportEmail })}
         </small>
       </div>
       <ul>
@@ -108,17 +112,20 @@ function SupportSetupCard({
 
 function MessageList({
   inbox,
+  language = "es",
   params,
 }: {
   inbox: SupportInboxResult;
+  language?: FiscalixLanguage;
   params: PageSearchParams;
 }) {
+  const t = createTranslator(language);
   if (!inbox.messages.length) {
     return (
       <div className="support-empty">
         <span><Icon name="mark_email_unread" /></span>
-        <strong>No hay correos para mostrar</strong>
-        <small>Prueba otra búsqueda o revisa directamente la bandeja de Gmail.</small>
+        <strong>{t("support.empty")}</strong>
+        <small>{t("support.emptyHelp")}</small>
       </div>
     );
   }
@@ -135,23 +142,30 @@ function MessageList({
           <div>
             <strong>{message.subject}</strong>
             <small>{message.from}</small>
-            <p>{message.snippet || "Sin vista previa disponible."}</p>
+            <p>{message.snippet || t("support.noPreview")}</p>
           </div>
-          <time>{formatDate(message.date)}</time>
+          <time>{formatDate(message.date, language)}</time>
         </Link>
       ))}
     </div>
   );
 }
 
-function MessageDetail({ message }: { message: SupportEmailDetail | null }) {
+function MessageDetail({
+  language = "es",
+  message,
+}: {
+  language?: FiscalixLanguage;
+  message: SupportEmailDetail | null;
+}) {
+  const t = createTranslator(language);
   if (!message) {
     return (
       <aside className="support-detail-panel">
         <div className="support-empty compact">
           <span><Icon name="mail" /></span>
-          <strong>Selecciona una aclaración</strong>
-          <small>El detalle del correo aparecerá en este panel.</small>
+          <strong>{t("support.select")}</strong>
+          <small>{t("support.selectHelp")}</small>
         </div>
       </aside>
     );
@@ -160,17 +174,17 @@ function MessageDetail({ message }: { message: SupportEmailDetail | null }) {
   return (
     <aside className="support-detail-panel">
       <header>
-        <p>DETALLE DEL CORREO</p>
+        <p>{t("support.detail")}</p>
         <h2>{message.subject}</h2>
         <small>{message.from}</small>
-        <time>{formatDate(message.date)}</time>
+        <time>{formatDate(message.date, language)}</time>
       </header>
       <article>
         {message.body.split(/\n{2,}/).map((paragraph, index) => (
           <p key={`${message.id}-${index}`}>{paragraph}</p>
         ))}
       </article>
-      <SupportReplyForm messageId={message.id} recipient={message.replyTo || message.from} />
+      <SupportReplyForm language={language} messageId={message.id} recipient={message.replyTo || message.from} />
     </aside>
   );
 }
@@ -183,6 +197,8 @@ export default async function SupportPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!canViewAdminDashboard(user)) redirect("/dashboard");
+  const language = user.preferences?.language ?? "es";
+  const t = createTranslator(language);
 
   const resolvedParams = await searchParams;
   const params = {
@@ -199,75 +215,75 @@ export default async function SupportPage({
       <main className="support-page">
         <header className="support-hero">
           <div>
-            <p>CENTRO DE ACLARACIONES</p>
-            <h1>Bandeja de soporte</h1>
+            <p>{t("support.eyebrow")}</p>
+            <h1>{t("support.title")}</h1>
             <span>
-              Consulta los correos recibidos en {setupStatus.supportEmail} desde Fiscalix.
+              {t("support.description", { email: setupStatus.supportEmail })}
             </span>
           </div>
           <form action="/support" className="support-search">
             <Icon name="search" />
             <input
-              aria-label="Buscar correos de aclaraciones"
+              aria-label={t("support.searchLabel")}
               defaultValue={params.q}
               name="q"
-              placeholder="Buscar por remitente, asunto o texto..."
+              placeholder={t("support.searchPlaceholder")}
               type="search"
             />
-            <button type="submit">Buscar</button>
+            <button type="submit">{t("button.search")}</button>
           </form>
         </header>
 
-        <section className="support-summary" aria-label="Resumen de aclaraciones">
+        <section className="support-summary" aria-label={t("support.eyebrow")}>
           <article>
             <span><Icon name="alternate_email" /></span>
             <div>
-              <small>Correo conectado</small>
+              <small>{t("support.connectedEmail")}</small>
               <strong>{setupStatus.supportEmail}</strong>
             </div>
           </article>
           <article>
             <span><Icon name="inbox" /></span>
             <div>
-              <small>Resultados estimados</small>
+              <small>{t("support.estimatedResults")}</small>
               <strong>{inbox?.resultSizeEstimate ?? 0}</strong>
             </div>
           </article>
           <article>
             <span><Icon name={setupStatus.configured ? "check_circle" : "warning"} /></span>
             <div>
-              <small>Estado de conexión</small>
-              <strong>{setupStatus.configured ? "Configurada" : "Pendiente"}</strong>
+              <small>{t("support.connectionStatus")}</small>
+              <strong>{setupStatus.configured ? t("support.configured") : t("support.setupPending")}</strong>
             </div>
           </article>
         </section>
 
-        {setupError ? <SupportSetupCard missing={setupError.missing} supportEmail={setupError.supportEmail} /> : null}
-        {systemError ? <p className="support-error">{systemError}</p> : null}
+        {setupError ? <SupportSetupCard language={language} missing={setupError.missing} supportEmail={setupError.supportEmail} /> : null}
+        {systemError ? <p className="support-error">{t("support.loadError")}</p> : null}
 
         <section className="support-grid">
           <article className="support-inbox-panel">
             <header>
               <div>
-                <p>BANDEJA DE ENTRADA</p>
-                <h2>Aclaraciones recibidas</h2>
+                <p>{t("support.inbox")}</p>
+                <h2>{t("support.received")}</h2>
               </div>
-              {params.q ? <Link href="/support">Limpiar búsqueda</Link> : null}
+              {params.q ? <Link href="/support">{t("support.clearSearch")}</Link> : null}
             </header>
 
-            {inbox ? <MessageList inbox={inbox} params={params} /> : null}
+            {inbox ? <MessageList inbox={inbox} language={language} params={params} /> : null}
 
             {inbox?.nextPageToken ? (
               <footer>
                 <Link href={buildHref(params, { messageId: "", pageToken: inbox.nextPageToken })}>
-                  Siguiente página
+                  {t("support.nextPage")}
                   <Icon name="arrow_forward" />
                 </Link>
               </footer>
             ) : null}
           </article>
 
-          <MessageDetail message={selectedMessage} />
+          <MessageDetail language={language} message={selectedMessage} />
         </section>
       </main>
     </AppShell>

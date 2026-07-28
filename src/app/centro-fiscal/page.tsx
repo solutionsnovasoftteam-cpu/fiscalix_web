@@ -4,6 +4,7 @@ import { CentroFiscalHub, type CentroFiscalInitialData } from "@/app/centro-fisc
 import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { defaultUserPreferences } from "@/lib/userPreferences.shared";
 
 type Relation<T> = T | T[] | null;
 
@@ -63,6 +64,7 @@ function taxEstimate(name: string, base: number) {
 export default async function CentroFiscalPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
 
   const now = new Date();
   const { companyIds } = await getAccessibleCompanyIds(user);
@@ -187,6 +189,7 @@ export default async function CentroFiscalPage() {
     <AppShell activeHref="/centro-fiscal" user={user}>
       <CentroFiscalHub
         initialData={{ docs, events, movements, taxes }}
+        preferences={preferences}
         serverNow={now.toISOString()}
       />
     </AppShell>

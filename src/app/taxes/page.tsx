@@ -5,9 +5,11 @@ import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { getAccessibleCompanies } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
+import { defaultUserPreferences, formatPreferenceMoney } from "@/lib/userPreferences.shared";
 
 type TaxObligation = {
   activa: boolean | null;
@@ -37,13 +39,6 @@ const ISR_MONTHLY_TARIFF_2026 = [
   { fixedFee: 37009.69, lowerLimit: 141880.67, rate: 0.34, upperLimit: 425641.99 },
   { fixedFee: 133488.54, lowerLimit: 425642, rate: 0.35, upperLimit: null },
 ];
-
-const money = new Intl.NumberFormat("es-MX", {
-  currency: "MXN",
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "currency",
-});
 
 function label(value: string | null | undefined, fallback: string) {
   return value?.trim() || fallback;
@@ -76,16 +71,16 @@ function isrFromIncome(base: number) {
   return Math.max(0, bracket.fixedFee + ((base - bracket.lowerLimit) * bracket.rate));
 }
 
-function taxBaseLabel(obligation: TaxObligation, base: number) {
-  if (obligation.activa === false) return "No aplica";
-  return isIvaObligation(obligation.nombre) || isIsrObligation(obligation.nombre) ? money.format(base) : "—";
+function taxBaseLabel(obligation: TaxObligation, base: number, money: (value: number) => string, notApplicable = "No aplica") {
+  if (obligation.activa === false) return notApplicable;
+  return isIvaObligation(obligation.nombre) || isIsrObligation(obligation.nombre) ? money(base) : "—";
 }
 
-function taxEstimateLabel(obligation: TaxObligation, base: number) {
-  if (obligation.activa === false) return "No aplica";
-  if (isIvaObligation(obligation.nombre)) return money.format(ivaFromIncome(base));
-  if (isIsrObligation(obligation.nombre)) return money.format(isrFromIncome(base));
-  return "Pendiente de configurar";
+function taxEstimateLabel(obligation: TaxObligation, base: number, money: (value: number) => string, notApplicable = "No aplica", pendingConfig = "Pendiente de configurar") {
+  if (obligation.activa === false) return notApplicable;
+  if (isIvaObligation(obligation.nombre)) return money(ivaFromIncome(base));
+  if (isIsrObligation(obligation.nombre)) return money(isrFromIncome(base));
+  return pendingConfig;
 }
 
 export default async function TaxesPage({
@@ -95,6 +90,9 @@ export default async function TaxesPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
+  const money = (value: number) => formatPreferenceMoney(value, preferences);
   const resolvedSearchParams = await searchParams;
   const ivaQuery = searchParamText(resolvedSearchParams, "ivaQ");
   const taxQuery = searchParamText(resolvedSearchParams, "taxQ");
@@ -102,7 +100,7 @@ export default async function TaxesPage({
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
-  const companyNameById = new Map(companies.map((company) => [company.id, label(company.nombre_comercial, "Sin empresa")]));
+  const companyNameById = new Map(companies.map((company) => [company.id, label(company.nombre_comercial, t("common.noCompany"))]));
   const [obligationsResult, incomesResult] = companyIds.length
     ? await Promise.all([
       supabase
@@ -149,21 +147,21 @@ export default async function TaxesPage({
   const filteredIvaRows = ivaRows.filter((row) => matchesSearch([
     row.companyName,
     row.base,
-    money.format(row.base),
+    money(row.base),
     "16%",
     row.iva,
-    money.format(row.iva),
+    money(row.iva),
   ], ivaQuery));
   const filteredObligations = obligations.filter((obligation) => {
     const base = taxableBaseByCompany.get(obligation.empresa_id ?? "") ?? 0;
     return matchesSearch([
-      label(obligation.nombre, "Impuesto por determinar"),
+      label(obligation.nombre, t("taxes.taxToDetermine")),
       obligation.descripcion,
-      companyNameById.get(obligation.empresa_id ?? "") ?? "Sin empresa",
-      label(obligation.periodicidad, "Pendiente"),
-      taxBaseLabel(obligation, base),
-      taxEstimateLabel(obligation, base),
-      obligation.activa === false ? "Inactiva" : "Activa",
+      companyNameById.get(obligation.empresa_id ?? "") ?? t("common.noCompany"),
+      label(obligation.periodicidad, t("common.pending")),
+      taxBaseLabel(obligation, base, money, t("taxes.notApplicable")),
+      taxEstimateLabel(obligation, base, money, t("taxes.notApplicable"), t("taxes.pendingConfig")),
+      obligation.activa === false ? t("common.inactive") : t("common.active"),
     ], taxQuery);
   });
   const ivaPage = paginateItems(filteredIvaRows, pageFromParam(resolvedSearchParams.ivaPage));
@@ -174,41 +172,42 @@ export default async function TaxesPage({
     <AppShell activeHref="/taxes" user={user}>
       <main className="reports-content">
         <header className="reports-header">
-          <p>CONTROL FISCAL</p>
-          <h1>Impuestos</h1>
-          <span>IVA al 16% e ISR mensual estimado con tarifa progresiva 2026 sobre tus ingresos registrados.</span>
+          <p>{t("taxes.eyebrow")}</p>
+          <h1>{t("taxes.title")}</h1>
+          <span>{t("taxes.description")}</span>
         </header>
 
         {hasError && (
           <section className="dashboard-alert" role="alert">
-            <strong>No fue posible cargar la proyección de impuestos.</strong>
-            <span>Revisa la conexión con Supabase o los permisos de las tablas fiscales y financieras.</span>
+            <strong>{t("taxes.loadError")}</strong>
+            <span>{t("taxes.loadErrorHelp")}</span>
           </section>
         )}
 
         <section className="reports-stats">
-          <article><span><Icon name="fact_check" /></span><small>Obligaciones activas</small><strong>{activeObligations.length}</strong></article>
-          <article><span><Icon name="attach_money" /></span><small>Base de ingresos registrada</small><strong>{money.format(registeredBase)}</strong></article>
-          <article><span><Icon name="percent" /></span><small>IVA estimado 16%</small><strong>{money.format(registeredIva)}</strong></article>
-          <article><span><Icon name="calculate" /></span><small>ISR estimado 2026</small><strong>{money.format(registeredIsr)}</strong></article>
+          <article><span><Icon name="fact_check" /></span><small>{t("taxes.activeObligations")}</small><strong>{activeObligations.length}</strong></article>
+          <article><span><Icon name="attach_money" /></span><small>{t("taxes.registeredIncomeBase")}</small><strong>{money(registeredBase)}</strong></article>
+          <article><span><Icon name="percent" /></span><small>{t("taxes.estimatedIva")}</small><strong>{money(registeredIva)}</strong></article>
+          <article><span><Icon name="calculate" /></span><small>{t("taxes.estimatedIsr")}</small><strong>{money(registeredIsr)}</strong></article>
         </section>
 
         <section className="reports-card">
           <div className="reports-card-heading">
             <div>
-              <h2>IVA estimado por empresa</h2>
-              <p>Se calcula como 16% de los ingresos registrados por empresa. Es una estimación informativa basada en tus datos de Fiscalix.</p>
+              <h2>{t("taxes.ivaByCompany")}</h2>
+              <p>{t("taxes.ivaByCompanyHelp")}</p>
             </div>
             <div className="table-card-actions">
               <TableSearch
-                label="Buscar IVA estimado"
+                label={t("taxes.searchIvaLabel")}
+                language={preferences.language}
                 name="ivaQ"
                 pathname="/taxes"
-                placeholder="Buscar empresa, base o IVA..."
+                placeholder={t("taxes.searchIvaPlaceholder")}
                 resetPageKeys={["ivaPage"]}
                 searchParams={resolvedSearchParams}
               />
-              <span>{filteredIvaRows.length} resultado{filteredIvaRows.length === 1 ? "" : "s"}</span>
+              <span>{resultCount(filteredIvaRows.length, preferences.language)}</span>
             </div>
           </div>
 
@@ -216,14 +215,14 @@ export default async function TaxesPage({
             <>
               <div className="reports-table-scroll">
                 <table className="reports-table">
-                  <thead><tr><th>Empresa</th><th>Base de ingresos</th><th>Tasa IVA</th><th>IVA estimado</th></tr></thead>
+                  <thead><tr><th>{t("table.company")}</th><th>{t("taxes.incomeBase")}</th><th>{t("taxes.ivaRate")}</th><th>{t("taxes.estimatedIva")}</th></tr></thead>
                   <tbody>
                     {ivaPage.items.map((row) => (
                       <tr key={row.companyId}>
                         <td><strong>{row.companyName}</strong></td>
-                        <td>{money.format(row.base)}</td>
+                        <td>{money(row.base)}</td>
                         <td>16%</td>
-                        <td>{money.format(row.iva)}</td>
+                        <td>{money(row.iva)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -233,6 +232,7 @@ export default async function TaxesPage({
                 currentPage={ivaPage.currentPage}
                 end={ivaPage.end}
                 hrefForPage={(page) => pageHref("/taxes", resolvedSearchParams, "ivaPage", page)}
+                language={preferences.language}
                 start={ivaPage.start}
                 totalItems={filteredIvaRows.length}
               />
@@ -240,8 +240,8 @@ export default async function TaxesPage({
           ) : (
             <div className="reports-empty">
               <span><Icon name="percent" /></span>
-              <strong>{ivaQuery ? "No encontramos registros de IVA" : "No hay ingresos para calcular IVA"}</strong>
-              <small>{ivaQuery ? "Prueba con otro término de búsqueda." : "Cuando registres ingresos asociados a una empresa, aparecerá aquí el IVA estimado al 16%."}</small>
+              <strong>{ivaQuery ? t("taxes.noIvaSearch") : t("taxes.noIva")}</strong>
+              <small>{ivaQuery ? t("common.tryAnotherSearch") : t("taxes.noIvaHelp")}</small>
             </div>
           )}
         </section>
@@ -249,19 +249,20 @@ export default async function TaxesPage({
         <section className="reports-card">
           <div className="reports-card-heading">
             <div>
-              <h2>Impuestos por generar</h2>
-              <p>IVA usa 16%; ISR usa cuota fija y porcentaje sobre excedente según la tarifa mensual 2026.</p>
+              <h2>{t("taxes.toGenerate")}</h2>
+              <p>{t("taxes.toGenerateHelp")}</p>
             </div>
             <div className="table-card-actions">
               <TableSearch
-                label="Buscar impuestos por generar"
+                label={t("taxes.searchTaxesLabel")}
+                language={preferences.language}
                 name="taxQ"
                 pathname="/taxes"
-                placeholder="Buscar impuesto, empresa, estado o importe..."
+                placeholder={t("taxes.searchTaxesPlaceholder")}
                 resetPageKeys={["taxPage"]}
                 searchParams={resolvedSearchParams}
               />
-              <span>{filteredObligations.length} resultado{filteredObligations.length === 1 ? "" : "s"}</span>
+              <span>{resultCount(filteredObligations.length, preferences.language)}</span>
             </div>
           </div>
 
@@ -269,7 +270,7 @@ export default async function TaxesPage({
             <>
               <div className="reports-table-scroll">
                 <table className="reports-table">
-                  <thead><tr><th>Impuesto potencial</th><th>Empresa</th><th>Periodicidad</th><th>Base registrada</th><th>Importe estimado</th><th>Estado</th></tr></thead>
+                  <thead><tr><th>{t("taxes.potentialTax")}</th><th>{t("table.company")}</th><th>{t("taxes.periodicity")}</th><th>{t("taxes.registeredBase")}</th><th>{t("taxes.estimatedAmount")}</th><th>{t("table.status")}</th></tr></thead>
                   <tbody>
                     {obligationsPage.items.map((obligation) => {
                       const base = taxableBaseByCompany.get(obligation.empresa_id ?? "") ?? 0;
@@ -277,14 +278,14 @@ export default async function TaxesPage({
                       return (
                         <tr key={obligation.id}>
                           <td>
-                            <strong>{label(obligation.nombre, "Impuesto por determinar")}</strong>
+                            <strong>{label(obligation.nombre, t("taxes.taxToDetermine"))}</strong>
                             {obligation.descripcion && <small>{obligation.descripcion}</small>}
                           </td>
-                          <td>{companyNameById.get(obligation.empresa_id ?? "") ?? "Sin empresa"}</td>
-                          <td>{label(obligation.periodicidad, "Pendiente")}</td>
-                          <td>{taxBaseLabel(obligation, base)}</td>
-                          <td>{taxEstimateLabel(obligation, base)}</td>
-                          <td><span className={obligation.activa === false ? "admin-status suspended" : "admin-status"}>{obligation.activa === false ? "Inactiva" : "Activa"}</span></td>
+                          <td>{companyNameById.get(obligation.empresa_id ?? "") ?? t("common.noCompany")}</td>
+                          <td>{label(obligation.periodicidad, t("common.pending"))}</td>
+                          <td>{taxBaseLabel(obligation, base, money, t("taxes.notApplicable"))}</td>
+                          <td>{taxEstimateLabel(obligation, base, money, t("taxes.notApplicable"), t("taxes.pendingConfig"))}</td>
+                          <td><span className={obligation.activa === false ? "admin-status suspended" : "admin-status"}>{obligation.activa === false ? t("common.inactive") : t("common.active")}</span></td>
                         </tr>
                       );
                     })}
@@ -295,6 +296,7 @@ export default async function TaxesPage({
                 currentPage={obligationsPage.currentPage}
                 end={obligationsPage.end}
                 hrefForPage={(page) => pageHref("/taxes", resolvedSearchParams, "taxPage", page)}
+                language={preferences.language}
                 start={obligationsPage.start}
                 totalItems={filteredObligations.length}
               />
@@ -302,8 +304,8 @@ export default async function TaxesPage({
           ) : (
             <div className="reports-empty">
               <span><Icon name="receipt_long" /></span>
-              <strong>{taxQuery ? "No encontramos impuestos" : "No hay impuestos potenciales por mostrar"}</strong>
-              <small>{taxQuery ? "Prueba con otro término de búsqueda." : "Agrega una empresa y sus obligaciones fiscales para generar esta proyección."}</small>
+              <strong>{taxQuery ? t("taxes.noSearch") : t("taxes.empty")}</strong>
+              <small>{taxQuery ? t("common.tryAnotherSearch") : t("taxes.emptyHelp")}</small>
             </div>
           )}
         </section>

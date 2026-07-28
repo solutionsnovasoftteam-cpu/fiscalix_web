@@ -4,23 +4,27 @@ import { FormEvent, useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 import { useModal } from "@/lib/useModal";
 
 type ProfileEditorProps = {
   apellido: string;
   correo: string;
+  language?: FiscalixLanguage;
   nombre: string;
   telefono: string;
 };
 
-export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEditorProps) {
+export function ProfileEditor({ apellido, correo, language = "es", nombre, telefono }: ProfileEditorProps) {
   const router = useRouter();
+  const t = createTranslator(language);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [emailValue, setEmailValue] = useState(correo);
   const [message, setMessage] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => setOpen(false), [setOpen]);
   useModal({ busy, dialogRef, onClose: close, open });
 
   const emailChanged = emailValue.trim().toLowerCase() !== correo.toLowerCase();
@@ -44,11 +48,11 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
         method: "PATCH",
       });
       const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? "No fue posible guardar los cambios.");
+      if (!response.ok) throw new Error(result.message ?? t("preferences.saveError"));
       setOpen(false);
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No fue posible guardar los cambios.");
+      setMessage(error instanceof Error ? error.message : t("preferences.saveError"));
     } finally {
       setBusy(false);
     }
@@ -58,16 +62,16 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
     <div className="profile-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setOpen(false); }}>
       <section aria-labelledby="profile-editor-title" aria-modal="true" className="profile-editor" ref={dialogRef} role="dialog" tabIndex={-1}>
         <div className="profile-editor-heading">
-          <div><span>PERFIL PERSONAL</span><h2 id="profile-editor-title">Editar información</h2><p>Actualiza tus datos visibles y tu correo de acceso.</p></div>
-          <button aria-label="Cerrar" disabled={busy} onClick={() => setOpen(false)} type="button"><Icon name="close" /></button>
+          <div><span>{t("profile.editorEyebrow")}</span><h2 id="profile-editor-title">{t("profile.editorTitle")}</h2><p>{t("profile.editorHelp")}</p></div>
+          <button aria-label={t("button.close")} disabled={busy} onClick={() => setOpen(false)} type="button"><Icon name="close" /></button>
         </div>
         <form onSubmit={submit}>
           <div className="profile-editor-grid">
-            <label>Nombre<input defaultValue={nombre} maxLength={80} name="nombre" required /></label>
-            <label>Apellido<input defaultValue={apellido} maxLength={80} name="apellido" required /></label>
-            <label className="wide">Teléfono<input defaultValue={telefono} inputMode="tel" maxLength={25} name="telefono" placeholder="Ej. 55 1234 5678" /></label>
+            <label>{t("profile.firstName")}<input defaultValue={nombre} maxLength={80} name="nombre" required /></label>
+            <label>{t("profile.lastName")}<input defaultValue={apellido} maxLength={80} name="apellido" required /></label>
+            <label className="wide">{t("profile.phone")}<input defaultValue={telefono} inputMode="tel" maxLength={25} name="telefono" placeholder={t("profile.phoneExample")} /></label>
             <label className="wide">
-              Correo electrónico
+              {t("profile.email")}
               <input
                 autoComplete="email"
                 maxLength={160}
@@ -77,23 +81,23 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
                 type="email"
                 value={emailValue}
               />
-              <small>Si cambias el correo, tendrás que confirmar tu contraseña actual.</small>
+              <small>{t("profile.emailChangeHelp")}</small>
             </label>
             <label className="wide">
-              Contraseña actual
+              {t("profile.currentPassword")}
               <input
                 autoComplete="current-password"
                 disabled={!emailChanged || busy}
                 name="currentPassword"
-                placeholder={emailChanged ? "Confirma tu contraseña actual" : "Solo necesaria si cambias el correo"}
+                placeholder={emailChanged ? t("profile.passwordChangePlaceholder") : t("profile.passwordOnlyIfEmail")}
                 required={emailChanged}
                 type="password"
               />
-              <small>La usamos únicamente para validar que tú solicitaste el cambio.</small>
+              <small>{t("profile.passwordValidationHelp")}</small>
             </label>
           </div>
           {message && <p className="profile-editor-message" role="alert">{message}</p>}
-          <div className="profile-editor-actions"><button disabled={busy} onClick={() => setOpen(false)} type="button">Cancelar</button><button className="primary-button" disabled={busy} type="submit">{busy ? "Guardando..." : "Guardar cambios"}</button></div>
+          <div className="profile-editor-actions"><button disabled={busy} onClick={() => setOpen(false)} type="button">{t("button.cancel")}</button><button className="primary-button" disabled={busy} type="submit">{busy ? t("common.saving") : t("button.saveChanges")}</button></div>
         </form>
       </section>
     </div>
@@ -102,7 +106,7 @@ export function ProfileEditor({ apellido, correo, nombre, telefono }: ProfileEdi
 
   return (
     <>
-      <button onClick={() => { setEmailValue(correo); setMessage(""); setOpen(true); }} type="button">Editar información</button>
+      <button onClick={() => { setEmailValue(correo); setMessage(""); setOpen(true); }} type="button">{t("button.editInfo")}</button>
       {portalTarget && modal ? createPortal(modal, portalTarget) : null}
     </>
   );

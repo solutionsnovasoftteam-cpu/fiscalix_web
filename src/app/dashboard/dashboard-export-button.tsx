@@ -5,6 +5,13 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
 import { notifyPdfDownload } from "@/lib/clientNotifications";
+import { createTranslator } from "@/lib/i18n";
+import {
+  formatPreferenceDate,
+  formatPreferenceDateTime,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 import fiscalixLogo from "../../../logo-fiscalix.png";
 
 export type DashboardExportData = {
@@ -37,19 +44,6 @@ export type DashboardExportData = {
   }>;
 };
 
-const money = new Intl.NumberFormat("es-MX", {
-  currency: "MXN",
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "currency",
-});
-
-const dateLabel = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "long",
-  year: "numeric",
-});
-
 const C = {
   amber: [255, 139, 105] as [number, number, number],
   deep: [19, 45, 70] as [number, number, number],
@@ -69,9 +63,8 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateLabel.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, value);
 }
 
 function loadLogoDataUrl(src: string) {
@@ -95,7 +88,8 @@ function loadLogoDataUrl(src: string) {
   });
 }
 
-function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number) {
+function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number, preferences: UserPreferences) {
+  const t = createTranslator(preferences.language);
   const footerTop = pageHeight - 18;
   doc.setFillColor(...C.navy);
   doc.rect(0, footerTop, pageWidth, 18, "F");
@@ -104,13 +98,13 @@ function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(159, 176, 192);
-  doc.text("Documento generado por Fiscalix · Resumen ejecutivo del dashboard", pageWidth / 2, footerTop + 9, { align: "center" });
+  doc.text(t("dashboard.pdfFooter"), pageWidth / 2, footerTop + 9, { align: "center" });
 }
 
-function drawBase(doc: jsPDF, pageWidth: number, pageHeight: number) {
+function drawBase(doc: jsPDF, pageWidth: number, pageHeight: number, preferences: UserPreferences) {
   doc.setFillColor(...C.page);
   doc.rect(0, 0, pageWidth, pageHeight, "F");
-  drawFooter(doc, pageWidth, pageHeight);
+  drawFooter(doc, pageWidth, pageHeight, preferences);
 }
 
 function drawSectionTitle(doc: jsPDF, title: string, y: number) {
@@ -123,10 +117,10 @@ function drawSectionTitle(doc: jsPDF, title: string, y: number) {
   doc.line(15, y + 2, 52, y + 2);
 }
 
-function ensureSpace(doc: jsPDF, y: number, needed: number, pageWidth: number, pageHeight: number) {
+function ensureSpace(doc: jsPDF, y: number, needed: number, pageWidth: number, pageHeight: number, preferences: UserPreferences) {
   if (y + needed < pageHeight - 24) return y;
   doc.addPage();
-  drawBase(doc, pageWidth, pageHeight);
+  drawBase(doc, pageWidth, pageHeight, preferences);
   return 22;
 }
 
@@ -161,7 +155,14 @@ function drawMetricCards(doc: jsPDF, data: DashboardExportData, pageWidth: numbe
   return startY + cardHeight * 2 + gap + 5;
 }
 
-function drawMonthlyChart(doc: jsPDF, data: DashboardExportData, pageWidth: number, startY: number) {
+function drawMonthlyChart(
+  doc: jsPDF,
+  data: DashboardExportData,
+  pageWidth: number,
+  startY: number,
+  preferences: UserPreferences,
+) {
+  const t = createTranslator(preferences.language);
   const rows = data.monthlySummary;
   const margin = 15;
   const chartX = margin + 22;
@@ -215,15 +216,15 @@ function drawMonthlyChart(doc: jsPDF, data: DashboardExportData, pageWidth: numb
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
   doc.setTextColor(...C.muted);
-  doc.text(money.format(maxValue), margin + 4, chartY + 2);
-  doc.text("$0.00", margin + 4, chartY + chartHeight + 2);
+  doc.text(formatPreferenceMoney(maxValue, preferences), margin + 4, chartY + 2);
+  doc.text(formatPreferenceMoney(0, preferences), margin + 4, chartY + chartHeight + 2);
   doc.setFillColor(...C.green);
   doc.rect(pageWidth - margin - 58, startY + 8, 6, 2, "F");
   doc.setTextColor(...C.navy);
-  doc.text("Ingresos", pageWidth - margin - 49, startY + 10);
+  doc.text(t("dashboard.income"), pageWidth - margin - 49, startY + 10);
   doc.setFillColor(...C.amber);
   doc.rect(pageWidth - margin - 28, startY + 8, 6, 2, "F");
-  doc.text("Gastos", pageWidth - margin - 19, startY + 10);
+  doc.text(t("dashboard.expenses"), pageWidth - margin - 19, startY + 10);
 
   return startY + 82;
 }
@@ -236,8 +237,9 @@ function drawSimpleList(
   startY: number,
   pageWidth: number,
   pageHeight: number,
+  preferences: UserPreferences,
 ) {
-  let y = ensureSpace(doc, startY, 24, pageWidth, pageHeight);
+  let y = ensureSpace(doc, startY, 24, pageWidth, pageHeight, preferences);
   drawSectionTitle(doc, title, y);
   y += 9;
 
@@ -250,7 +252,7 @@ function drawSimpleList(
   }
 
   for (const item of items) {
-    y = ensureSpace(doc, y, 18, pageWidth, pageHeight);
+    y = ensureSpace(doc, y, 18, pageWidth, pageHeight, preferences);
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(15, y, pageWidth - 30, 15, 2, 2, "F");
     doc.setFont("helvetica", "bold");
@@ -272,14 +274,15 @@ function drawSimpleList(
   return y + 3;
 }
 
-async function downloadDashboardPdf(data: DashboardExportData) {
+async function downloadDashboardPdf(data: DashboardExportData, preferences: UserPreferences) {
+  const t = createTranslator(preferences.language);
   const doc = new jsPDF({ format: "a4", unit: "mm" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 15;
   const generatedAt = new Date();
 
-  drawBase(doc, pageWidth, pageHeight);
+  drawBase(doc, pageWidth, pageHeight, preferences);
 
   doc.setFillColor(...C.navy);
   doc.rect(0, 0, pageWidth, 42, "F");
@@ -303,25 +306,25 @@ async function downloadDashboardPdf(data: DashboardExportData) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...C.green);
-  doc.text("RESUMEN GENERAL", pageWidth - margin, 16, { align: "right" });
+  doc.text(t("dashboard.eyebrow").toUpperCase(), pageWidth - margin, 16, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(159, 176, 192);
-  doc.text(`Usuario · ${data.generatedFor}`, pageWidth - margin, 23, { align: "right" });
-  doc.text(`Generado · ${dateLabel.format(generatedAt)}`, pageWidth - margin, 30, { align: "right" });
+  doc.text(`${t("dashboard.generatedFor")} · ${data.generatedFor}`, pageWidth - margin, 23, { align: "right" });
+  doc.text(`${t("dashboard.generatedAt")} · ${formatPreferenceDateTime(generatedAt.toISOString(), preferences)}`, pageWidth - margin, 30, { align: "right" });
 
   let y = 54;
-  drawSectionTitle(doc, "Indicadores principales", y);
+  drawSectionTitle(doc, t("dashboard.mainIndicators"), y);
   y = drawMetricCards(doc, data, pageWidth, y + 8);
 
-  y = ensureSpace(doc, y, 88, pageWidth, pageHeight);
-  drawSectionTitle(doc, "Resumen financiero de los últimos 6 meses", y);
-  y = drawMonthlyChart(doc, data, pageWidth, y + 7);
+  y = ensureSpace(doc, y, 88, pageWidth, pageHeight, preferences);
+  drawSectionTitle(doc, t("dashboard.chartPdfTitle"), y);
+  y = drawMonthlyChart(doc, data, pageWidth, y + 7, preferences);
 
   y = drawSimpleList(
     doc,
-    "Próximas obligaciones",
-    "No hay obligaciones próximas registradas.",
+    t("dashboard.upcomingObligations"),
+    t("dashboard.noUpcomingPdf"),
     data.obligations.map((item) => ({
       left: item.title,
       right: item.meta,
@@ -330,26 +333,35 @@ async function downloadDashboardPdf(data: DashboardExportData) {
     y,
     pageWidth,
     pageHeight,
+    preferences,
   );
 
   drawSimpleList(
     doc,
-    "Movimientos recientes",
-    "No hay movimientos recientes registrados.",
+    t("dashboard.recentMovements"),
+    t("dashboard.noMovementsPdf"),
     data.movements.map((movement) => ({
-      left: `${movement.type}: ${movement.concept}`,
-      right: `${movement.tone === "positive" ? "+" : "-"}${money.format(movement.amount)}`,
-      sub: `${movement.company} · ${formatDate(movement.date)}`,
+      left: `${movement.type === "Ingreso" ? t("dashboard.income") : t("dashboard.expenses")}: ${movement.concept}`,
+      right: `${movement.tone === "positive" ? "+" : "-"}${formatPreferenceMoney(movement.amount, preferences)}`,
+      sub: `${movement.company} · ${formatDate(movement.date, preferences)}`,
     })),
     y,
     pageWidth,
     pageHeight,
+    preferences,
   );
 
   doc.save(`dashboard-fiscalix-${localDateKey()}.pdf`);
 }
 
-export function DashboardExportButton({ data }: { data: DashboardExportData }) {
+export function DashboardExportButton({
+  data,
+  preferences,
+}: {
+  data: DashboardExportData;
+  preferences: UserPreferences;
+}) {
+  const t = createTranslator(preferences.language);
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -363,11 +375,11 @@ export function DashboardExportButton({ data }: { data: DashboardExportData }) {
     setMessage("");
 
     try {
-      await downloadDashboardPdf(data);
+      await downloadDashboardPdf(data, preferences);
       await notifyPdfDownload("dashboard");
-      notify("PDF del dashboard generado.");
+      notify(t("dashboard.pdfGeneratedToast"));
     } catch {
-      notify("No fue posible generar el PDF del dashboard.");
+      notify(t("dashboard.pdfErrorToast"));
     } finally {
       setExporting(false);
     }
@@ -378,7 +390,7 @@ export function DashboardExportButton({ data }: { data: DashboardExportData }) {
   return (
     <>
       <button className="primary-button compact" disabled={exporting} onClick={exportDashboard} type="button">
-        <Icon name="picture_as_pdf" /> {exporting ? "Generando..." : "Exportar PDF"}
+        <Icon name="picture_as_pdf" /> {exporting ? t("dashboard.generating") : t("button.exportPdf")}
       </button>
       {portalTarget && message ? createPortal(<div className="expenses-action-toast" role="status">{message}</div>, portalTarget) : null}
     </>

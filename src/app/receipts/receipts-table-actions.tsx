@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
+import {
+  formatPreferenceDate,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 
 export type ReceiptDetail = {
   amount: number;
@@ -14,25 +20,18 @@ export type ReceiptDetail = {
   type: "Gasto" | "Ingreso";
 };
 
-const moneyFormatter = new Intl.NumberFormat("es-MX", {
-  currency: "MXN",
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "currency",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "long",
-  year: "numeric",
-});
-
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value || "Sin fecha" : dateFormatter.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, createTranslator(preferences.language)("common.noDate"));
 }
 
-export function ReceiptsTableActions({ receipt }: { receipt: ReceiptDetail }) {
+export function ReceiptsTableActions({
+  preferences,
+  receipt,
+}: {
+  preferences: UserPreferences;
+  receipt: ReceiptDetail;
+}) {
+  const t = createTranslator(preferences.language);
   const [open, setOpen] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
 
@@ -71,41 +70,41 @@ export function ReceiptsTableActions({ receipt }: { receipt: ReceiptDetail }) {
       >
         <header>
           <div>
-            <p>Detalle del comprobante</p>
+            <p>{t("receipts.detail")}</p>
             <h2 id={`receipt-detail-title-${receipt.id}`}>{receipt.folio}</h2>
-            <span>Información registrada en Fiscalix para este movimiento.</span>
+            <span>{t("receipts.detailHelp")}</span>
           </div>
-          <button aria-label="Cerrar detalle" onClick={() => setOpen(false)} type="button">
+          <button aria-label={t("button.close")} onClick={() => setOpen(false)} type="button">
             <Icon name="close" />
           </button>
         </header>
 
         <div className="receipts-detail-body">
           <div className={receipt.type === "Ingreso" ? "receipts-detail-total income" : "receipts-detail-total expense"}>
-            <small>Monto</small>
-            <strong>{moneyFormatter.format(receipt.amount)}</strong>
-            <span>{receipt.type}</span>
+            <small>{t("table.amount")}</small>
+            <strong>{formatPreferenceMoney(receipt.amount, preferences)}</strong>
+            <span>{receipt.type === "Ingreso" ? t("dashboard.income") : t("dashboard.expenses")}</span>
           </div>
 
           <dl className="receipts-detail-list">
             <div>
-              <dt>Empresa</dt>
+              <dt>{t("table.company")}</dt>
               <dd>{receipt.company}</dd>
             </div>
             <div>
-              <dt>Concepto</dt>
+              <dt>{t("table.concept")}</dt>
               <dd>{receipt.concept}</dd>
             </div>
             <div>
-              <dt>Fecha</dt>
-              <dd>{formatDate(receipt.date)}</dd>
+              <dt>{t("table.date")}</dt>
+              <dd>{formatDate(receipt.date, preferences)}</dd>
             </div>
             <div>
-              <dt>Estado</dt>
-              <dd><span className="receipt-status"><i />Registrado</span></dd>
+              <dt>{t("table.status")}</dt>
+              <dd><span className="receipt-status"><i />{t("common.registered")}</span></dd>
             </div>
             <div>
-              <dt>Identificador interno</dt>
+              <dt>{t("receipts.internalId")}</dt>
               <dd>{receipt.id}</dd>
             </div>
           </dl>
@@ -113,7 +112,7 @@ export function ReceiptsTableActions({ receipt }: { receipt: ReceiptDetail }) {
 
         <footer>
           <button className="receipts-detail-close" onClick={() => setOpen(false)} type="button">
-            Cerrar
+            {t("button.close")}
           </button>
         </footer>
       </section>
@@ -124,14 +123,14 @@ export function ReceiptsTableActions({ receipt }: { receipt: ReceiptDetail }) {
   return (
     <>
       <span className="receipt-actions">
-        <button aria-label={`Ver detalle de ${receipt.folio}`} className="receipt-action" onClick={() => setOpen(true)} type="button">
+        <button aria-label={t("receipts.viewDetail", { folio: receipt.folio })} className="receipt-action" onClick={() => setOpen(true)} type="button">
           <Icon name="search" />
         </button>
         <button
-          aria-label={`Más opciones para ${receipt.folio}. Próximamente.`}
+          aria-label={t("receipts.moreSoon", { folio: receipt.folio })}
           className="receipt-action"
           disabled
-          title="Más acciones próximamente"
+          title={t("receipts.moreActionsSoon")}
           type="button"
         >
           <Icon name="more_horiz" />

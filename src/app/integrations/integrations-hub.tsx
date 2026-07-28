@@ -4,7 +4,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
 import { useModal } from "@/lib/useModal";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 type IntegrationStatus = "active" | "inactive" | "pending";
 type IntegrationCategory = "Almacenamiento" | "Bancos" | "Contabilidad" | "Facturación" | "Otros" | "Pagos";
@@ -63,18 +65,17 @@ const catalog: Integration[] = [
 
 const definitions = [...seed, ...catalog];
 
-const syncFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-function formatSync(value: string | null) {
-  if (!value) return "Sin sincronizar";
+function formatSync(value: string | null, language: FiscalixLanguage) {
+  if (!value) return createTranslator(language)("integrations.unsynced");
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Sin sincronizar" : syncFormatter.format(date);
+  if (Number.isNaN(date.getTime())) return createTranslator(language)("integrations.unsynced");
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function categorySlug(category: IntegrationCategory) {
@@ -89,10 +90,11 @@ function categorySlug(category: IntegrationCategory) {
   return map[category];
 }
 
-function statusLabel(status: IntegrationStatus) {
-  if (status === "active") return "Activa";
-  if (status === "pending") return "Pendiente";
-  return "Inactiva";
+function statusLabel(status: IntegrationStatus, language: FiscalixLanguage) {
+  const t = createTranslator(language);
+  if (status === "active") return t("integrations.active");
+  if (status === "pending") return t("common.pending");
+  return t("integrations.inactive");
 }
 
 function normalizeStatus(value: string | null | undefined): IntegrationStatus {
@@ -128,9 +130,11 @@ function integrationFromRow(row: IntegrationRow): Integration {
 type IntegrationsHubProps = {
   canManage?: boolean;
   initialRows?: IntegrationRow[];
+  language?: FiscalixLanguage;
 };
 
-export function IntegrationsHub({ canManage = false, initialRows = [] }: IntegrationsHubProps) {
+export function IntegrationsHub({ canManage = false, initialRows = [], language = "es" }: IntegrationsHubProps) {
+  const t = createTranslator(language);
   const initialItems = initialRows.length ? initialRows.map(integrationFromRow) : seed;
   const [items, setItems] = useState(initialItems);
   const [query, setQuery] = useState("");
@@ -141,7 +145,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
   const [message, setMessage] = useState("");
   const [busyId, setBusyId] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
-  const closeNewModal = useCallback(() => setShowNewModal(false), []);
+  const closeNewModal = useCallback(() => setShowNewModal(false), [setShowNewModal]);
   useModal({ dialogRef, onClose: closeNewModal, open: showNewModal });
 
   const availableCatalog = useMemo(
@@ -169,6 +173,19 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
   function notify(value: string) {
     setMessage(value);
     window.setTimeout(() => setMessage(""), 3200);
+  }
+
+  function categoryLabel(value: (typeof categories)[number] | IntegrationCategory) {
+    const map: Record<string, ReturnType<typeof t>> = {
+      Almacenamiento: t("integrations.storage"),
+      Bancos: t("integrations.banks"),
+      Contabilidad: t("integrations.accounting"),
+      Facturación: t("integrations.billing"),
+      Otros: t("integrations.other"),
+      Pagos: t("integrations.payments"),
+      Todas: t("integrations.all"),
+    };
+    return map[value] ?? value;
   }
 
   function serializeIntegration(item: Integration) {
@@ -203,7 +220,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
     successMessage: string,
   ) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return null;
     }
 
@@ -224,7 +241,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       const payload = (await response.json().catch(() => ({}))) as IntegrationApiResponse;
 
       if (!response.ok) {
-        throw new Error(payload.message || "No fue posible guardar la integración.");
+        throw new Error(payload.message || t("integrations.saveError"));
       }
 
       const saved = mergeSavedIntegration(payload.integration, nextItem);
@@ -232,7 +249,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       notify(payload.message || successMessage);
       return saved;
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible guardar la integración.");
+      notify(error instanceof Error ? error.message : t("integrations.saveError"));
       return null;
     } finally {
       setBusyId("");
@@ -241,7 +258,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
 
   async function toggleAutoSync(id: string) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return;
     }
 
@@ -249,12 +266,12 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
     if (!item || item.status !== "active" || busyId) return;
 
     const nextItem = { ...item, autoSync: !item.autoSync };
-    await persistIntegration(item, "auto_sync", nextItem, "Auto-sync actualizado.");
+    await persistIntegration(item, "auto_sync", nextItem, t("integrations.autoSyncUpdated"));
   }
 
   async function syncNow(id: string) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return;
     }
 
@@ -266,7 +283,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       item,
       "sync",
       { ...item, status: "active", lastSync: now },
-      "Sincronización simulada guardada.",
+      t("integrations.syncSaved"),
     );
 
     if (saved) setSyncCount((count) => count + 1);
@@ -274,7 +291,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
 
   async function activate(id: string) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return;
     }
 
@@ -285,13 +302,13 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       item,
       "activate",
       { ...item, status: "active" },
-      "Integración activada correctamente.",
+      t("integrations.activated"),
     );
   }
 
   async function configure(id: string) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return;
     }
 
@@ -303,7 +320,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       item,
       "configure",
       { ...item, status: "active", autoSync: true, lastSync: now },
-      "Integración configurada correctamente.",
+      t("integrations.configured"),
     );
 
     if (saved) setSyncCount((count) => count + 1);
@@ -311,7 +328,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
 
   async function addIntegration(entry: Integration) {
     if (!canManage) {
-      notify("Solo administradores pueden gestionar integraciones.");
+      notify(t("integrations.adminOnly"));
       return;
     }
 
@@ -329,7 +346,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       const payload = (await response.json().catch(() => ({}))) as IntegrationApiResponse;
 
       if (!response.ok) {
-        throw new Error(payload.message || "No fue posible agregar la integración.");
+        throw new Error(payload.message || t("integrations.addError"));
       }
 
       const nextItem = mergeSavedIntegration(payload.integration, {
@@ -343,9 +360,9 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
       setShowNewModal(false);
       setCategory("Todas");
       setStatusFilter("all");
-      notify(payload.message || "Integración agregada correctamente.");
+      notify(payload.message || t("integrations.added"));
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible agregar la integración.");
+      notify(error instanceof Error ? error.message : t("integrations.addError"));
     } finally {
       setBusyId("");
     }
@@ -355,16 +372,16 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
     <main className="integrations-page">
       <header className="integrations-hero">
         <div className="integrations-hero-copy">
-          <p>CENTRO DE CONEXIONES</p>
-          <h1>Integraciones</h1>
-          <span>Conecta Fiscalix con bancos, facturación, almacenamiento y más — todo desde un hub unificado.</span>
+          <p>{t("integrations.eyebrow")}</p>
+          <h1>{t("integrations.title")}</h1>
+          <span>{t("integrations.description")}</span>
         </div>
         <div className="integrations-hero-actions">
           <label className="integrations-search">
             <Icon name="search" />
             <input
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar integración..."
+              placeholder={t("integrations.searchPlaceholder")}
               type="search"
               value={query}
             />
@@ -372,33 +389,33 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
           {canManage ? (
             <button className="integrations-new" onClick={() => setShowNewModal(true)} type="button">
               <Icon name="add" />
-              Nueva integración
+              {t("integrations.new")}
             </button>
           ) : null}
         </div>
       </header>
 
-      <section className="integrations-stats" aria-label="Resumen de integraciones">
+      <section className="integrations-stats" aria-label={t("integrations.summary")}>
         <article className="tone-green">
           <span><Icon name="check_circle" /></span>
-          <div><small>Conectadas</small><strong>{stats.active}</strong></div>
+          <div><small>{t("integrations.connected")}</small><strong>{stats.active}</strong></div>
         </article>
         <article className="tone-blue">
           <span><Icon name="event_note" /></span>
-          <div><small>Por configurar</small><strong>{stats.pending}</strong></div>
+          <div><small>{t("integrations.toConfigure")}</small><strong>{stats.pending}</strong></div>
         </article>
         <article className="tone-violet">
           <span><Icon name="help" /></span>
-          <div><small>Desconectadas</small><strong>{stats.inactive}</strong></div>
+          <div><small>{t("integrations.disconnected")}</small><strong>{stats.inactive}</strong></div>
         </article>
         <article className="tone-amber">
           <span><Icon name="sync_alt" /></span>
-          <div><small>Sincronizaciones hoy</small><strong>{stats.syncs}</strong></div>
+          <div><small>{t("integrations.syncsToday")}</small><strong>{stats.syncs}</strong></div>
         </article>
       </section>
 
       <section className="integrations-toolbar">
-        <div className="integrations-tabs" role="tablist" aria-label="Categorías">
+        <div className="integrations-tabs" role="tablist" aria-label={t("integrations.categories")}>
           {categories.map((tab) => (
             <button
               key={tab}
@@ -408,7 +425,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
               role="tab"
               type="button"
             >
-              {tab}
+              {categoryLabel(tab)}
             </button>
           ))}
         </div>
@@ -418,33 +435,33 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
             onClick={() => setStatusFilter("all")}
             type="button"
           >
-            Todas
+            {t("integrations.all")}
           </button>
           <button
             className={statusFilter === "active" ? "is-active" : undefined}
             onClick={() => setStatusFilter("active")}
             type="button"
           >
-            Activas
+            {t("integrations.activePlural")}
           </button>
           <button
             className={statusFilter === "pending" ? "is-active" : undefined}
             onClick={() => setStatusFilter("pending")}
             type="button"
           >
-            Pendientes
+            {t("integrations.pendingPlural")}
           </button>
           <button
             className={statusFilter === "inactive" ? "is-active" : undefined}
             onClick={() => setStatusFilter("inactive")}
             type="button"
           >
-            Inactivas
+            {t("integrations.inactivePlural")}
           </button>
         </div>
       </section>
 
-      <section className="integrations-grid" aria-label="Lista de integraciones">
+      <section className="integrations-grid" aria-label={t("integrations.list")}>
         {filtered.length ? (
           filtered.map((item) => {
             const isBusy = busyId === item.id;
@@ -461,17 +478,17 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
                 </div>
                 <span className={`integrations-status ${item.status}`}>
                   <i />
-                  {statusLabel(item.status)}
+                  {statusLabel(item.status, language)}
                 </span>
               </div>
 
               <div className="integrations-card-meta">
                 <span className={`integrations-category cat-${categorySlug(item.category)}`}>
-                  {item.category}
+                  {categoryLabel(item.category)}
                 </span>
                 <span className="integrations-sync">
                   <Icon name="history" />
-                  {formatSync(item.lastSync)}
+                  {formatSync(item.lastSync, language)}
                 </span>
               </div>
 
@@ -486,31 +503,31 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
                         type="checkbox"
                       />
                       <span />
-                      Auto-sync
+                      {t("integrations.autoSync")}
                     </label>
 
                     {item.status === "active" && (
                       <button className="integrations-action primary" disabled={isBusy} onClick={() => syncNow(item.id)} type="button">
                         <Icon name="sync_alt" />
-                        {isBusy ? "Guardando..." : "Sincronizar"}
+                        {isBusy ? t("integrations.saving") : t("integrations.sync")}
                       </button>
                     )}
                     {item.status === "pending" && (
                       <button className="integrations-action" disabled={isBusy} onClick={() => configure(item.id)} type="button">
                         <Icon name="settings" />
-                        {isBusy ? "Guardando..." : "Configurar"}
+                        {isBusy ? t("integrations.saving") : t("integrations.configure")}
                       </button>
                     )}
                     {item.status === "inactive" && (
                       <button className="integrations-action" disabled={isBusy} onClick={() => activate(item.id)} type="button">
                         <Icon name="check_circle" />
-                        {isBusy ? "Guardando..." : "Activar"}
+                        {isBusy ? t("integrations.saving") : t("integrations.activate")}
                       </button>
                     )}
                   </>
                 ) : (
                   <span className="integrations-managed-note">
-                    Integración administrada por Fiscalix
+                    {t("integrations.managed")}
                   </span>
                 )}
               </div>
@@ -520,14 +537,14 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
         ) : (
           <div className="integrations-empty">
             <span><Icon name="search" /></span>
-            <strong>No encontramos integraciones</strong>
-            <small>Prueba otra categoría o término de búsqueda.</small>
+            <strong>{t("integrations.noResults")}</strong>
+            <small>{t("integrations.noResultsHelp")}</small>
           </div>
         )}
       </section>
 
       <footer className="integrations-footer">
-        Mostrando {filtered.length} de {items.length} integraciones
+        {t("integrations.showing", { filtered: filtered.length, total: items.length })}
       </footer>
 
       {showNewModal && typeof document !== "undefined" && createPortal(
@@ -548,11 +565,11 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
           >
             <header className="integrations-modal-head">
               <div>
-                <span>CATÁLOGO</span>
-                <h2 id="integrations-new-title">Nueva integración</h2>
-                <p>Selecciona un servicio para agregarlo a tu centro de conexiones.</p>
+                <span>{t("integrations.catalog")}</span>
+                <h2 id="integrations-new-title">{t("integrations.new")}</h2>
+                <p>{t("integrations.modalHelp")}</p>
               </div>
-              <button aria-label="Cerrar" onClick={closeNewModal} type="button">×</button>
+              <button aria-label={t("button.close")} onClick={closeNewModal} type="button">×</button>
             </header>
 
             {availableCatalog.length ? (
@@ -571,7 +588,7 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
                     <div>
                       <strong>{entry.name}</strong>
                       <small>{entry.description}</small>
-                      <em>{entry.category}</em>
+                      <em>{categoryLabel(entry.category)}</em>
                     </div>
                     {busyId === entry.id ? <Icon name="sync_alt" /> : <Icon name="add" />}
                   </button>
@@ -580,8 +597,8 @@ export function IntegrationsHub({ canManage = false, initialRows = [] }: Integra
             ) : (
               <div className="integrations-modal-empty">
                 <span><Icon name="check_circle" /></span>
-                <strong>Todas las integraciones disponibles ya están agregadas</strong>
-                <small>Puedes configurarlas desde la lista principal.</small>
+                <strong>{t("integrations.allAdded")}</strong>
+                <small>{t("integrations.allAddedHelp")}</small>
               </div>
             )}
           </section>

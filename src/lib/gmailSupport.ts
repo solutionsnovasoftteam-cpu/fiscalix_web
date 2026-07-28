@@ -71,6 +71,12 @@ export type SupportReplyResult = {
   threadId: string;
 };
 
+export type SupportOutboundEmail = {
+  body: string;
+  subject: string;
+  to: string;
+};
+
 export type SupportInboxResult = {
   messages: SupportEmailSummary[];
   nextPageToken: string | null;
@@ -298,6 +304,29 @@ function buildReplyMime({
   return `${headers.join("\r\n")}\r\n\r\n${body.trim()}`;
 }
 
+function buildPlainEmailMime({
+  body,
+  from,
+  subject,
+  to,
+}: {
+  body: string;
+  from: string;
+  subject: string;
+  to: string;
+}) {
+  const headers = [
+    `To: ${sanitizeHeaderValue(to)}`,
+    `From: ${sanitizeHeaderValue(from)}`,
+    `Subject: ${encodeMimeHeader(subject || "(Sin asunto)")}`,
+    "MIME-Version: 1.0",
+    "Content-Type: text/plain; charset=\"UTF-8\"",
+    "Content-Transfer-Encoding: 8bit",
+  ];
+
+  return `${headers.join("\r\n")}\r\n\r\n${body.trim()}`;
+}
+
 function messageFromResponse(message: GmailMessageResponse): SupportEmailSummary {
   const headers = message.payload?.headers;
   const subject = getHeader(headers, "Subject") || "(Sin asunto)";
@@ -412,5 +441,33 @@ export async function sendSupportReply(messageId: string, body: string): Promise
   return {
     id: sent.id ?? "",
     threadId: sent.threadId ?? original.threadId ?? "",
+  };
+}
+
+export async function sendSupportEmail({ body, subject, to }: SupportOutboundEmail): Promise<SupportReplyResult> {
+  const config = getConfig();
+  const recipient = extractEmailAddress(to);
+
+  if (!recipient) {
+    throw new Error("No fue posible identificar el correo destinatario.");
+  }
+
+  const accessToken = await getAccessToken(config);
+  const raw = encodeBase64Url(buildPlainEmailMime({
+    body,
+    from: config.supportEmail,
+    subject,
+    to: recipient,
+  }));
+
+  const sent = await gmailJsonRequest<{ id?: string; threadId?: string }>("/messages/send", accessToken, {
+    body: JSON.stringify({ raw }),
+    headers: { "Content-Type": "application/json" },
+    method: "POST",
+  });
+
+  return {
+    id: sent.id ?? "",
+    threadId: sent.threadId ?? "",
   };
 }

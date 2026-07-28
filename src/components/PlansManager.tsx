@@ -2,8 +2,10 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
 import { mergePlansWithDbRows, planMonthlyAmount, type FiscalixPlan, type PlanDbRow } from "@/lib/plans";
 import { useModal } from "@/lib/useModal";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 type PlanDraft = {
   annualAmountText: string;
@@ -57,13 +59,16 @@ export function PlansManager({
   currentPlanDatabaseId,
   initialPlans,
   initialStatus = "",
+  language = "es",
 }: {
   canManagePlans: boolean;
   canSubscribePlans: boolean;
   currentPlanDatabaseId?: string | null;
   initialPlans: FiscalixPlan[];
   initialStatus?: string;
+  language?: FiscalixLanguage;
 }) {
+  const t = createTranslator(language);
   const [draft, setDraft] = useState<PlanDraft | null>(null);
   const [plans, setPlans] = useState(initialPlans);
   const [activePlanDatabaseId, setActivePlanDatabaseId] = useState(currentPlanDatabaseId ?? null);
@@ -71,15 +76,15 @@ export function PlansManager({
   const [savedMessage, setSavedMessage] = useState(initialStatus);
   const [isSaving, setIsSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const closeEditor = useCallback(() => setDraft(null), []);
+  const closeEditor = useCallback(() => setDraft(null), [setDraft]);
   useModal({ busy: isSaving, dialogRef, onClose: closeEditor, open: draft !== null });
 
   const featuredPlan = useMemo(() => plans.find((plan) => plan.id === "plus") ?? plans[2], [plans]);
-  const headerEyebrow = canManagePlans ? "PLANES COMERCIALES" : "ELIGE TU PLAN";
-  const headerTitle = canManagePlans ? "Planes para usuarios finales" : "Encuentra el plan ideal para tu negocio";
+  const headerEyebrow = canManagePlans ? t("plans.adminEyebrow") : t("plans.clientEyebrow");
+  const headerTitle = canManagePlans ? t("plans.adminTitle") : t("plans.clientTitle");
   const headerDescription = canManagePlans
-    ? "Consulta, compara y edita la oferta comercial de Fiscalix."
-    : "Compara las opciones disponibles y suscríbete al plan que mejor se adapte a tu operación.";
+    ? t("plans.adminDescription")
+    : t("plans.clientDescription");
 
   function editPlan(plan: FiscalixPlan) {
     if (!canManagePlans) return;
@@ -95,13 +100,13 @@ export function PlansManager({
     if (!draft) return;
     const monthlyAmount = textToNumber(draft.monthlyAmountText);
     if (monthlyAmount === null || monthlyAmount < 0) {
-      setSavedMessage("Ingresa un precio mensual válido.");
+      setSavedMessage(t("plans.invalidMonthly"));
       return;
     }
 
     const annualAmount = textToNumber(draft.annualAmountText);
     if (annualAmount !== null && annualAmount < 0) {
-      setSavedMessage("Ingresa un precio anual válido.");
+      setSavedMessage(t("plans.invalidAnnual"));
       return;
     }
 
@@ -129,7 +134,7 @@ export function PlansManager({
         method: "POST",
       });
       const result = (await response.json()) as { message?: string; plan?: PlanDbRow };
-      if (!response.ok || !result.plan) throw new Error(result.message ?? "No fue posible guardar el plan.");
+      if (!response.ok || !result.plan) throw new Error(result.message ?? t("plans.saveError"));
 
       const mergedPlan = mergePlansWithDbRows([result.plan]).find((plan) => plan.databaseId === result.plan?.id);
       setPlans((current) => current.map((plan) => {
@@ -141,9 +146,9 @@ export function PlansManager({
         };
       }));
       setDraft(null);
-      setSavedMessage("Plan guardado en Supabase.");
+      setSavedMessage(t("plans.saved"));
     } catch (error) {
-      setSavedMessage(error instanceof Error ? error.message : "No fue posible guardar el plan.");
+      setSavedMessage(error instanceof Error ? error.message : t("plans.saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -156,7 +161,7 @@ export function PlansManager({
   async function subscribeToPlan(plan: FiscalixPlan) {
     if (!canSubscribePlans) return;
     if (!plan.databaseId) {
-      setSavedMessage("Este plan todavía no está guardado en Supabase.");
+      setSavedMessage(t("plans.missingDb"));
       return;
     }
 
@@ -174,12 +179,12 @@ export function PlansManager({
         subscription?: { plan_id?: string | null };
       };
 
-      if (!response.ok) throw new Error(result.message ?? "No fue posible suscribirte a este plan.");
+      if (!response.ok) throw new Error(result.message ?? t("plans.subscribeError"));
 
       setActivePlanDatabaseId(result.subscription?.plan_id ?? plan.databaseId);
-      setSavedMessage(result.message ?? `Te suscribiste correctamente al ${plan.name}.`);
+      setSavedMessage(result.message ?? t("plans.subscribed", { plan: plan.name }));
     } catch (error) {
-      setSavedMessage(error instanceof Error ? error.message : "No fue posible suscribirte a este plan.");
+      setSavedMessage(error instanceof Error ? error.message : t("plans.subscribeError"));
     } finally {
       setSubscribingPlanId(null);
     }
@@ -195,7 +200,7 @@ export function PlansManager({
         </div>
         {!canSubscribePlans ? (
           <button className="plans-reset-button" type="button" onClick={resetPlans}>
-            Recargar desde Supabase
+            {t("plans.reload")}
           </button>
         ) : null}
       </header>
@@ -206,21 +211,21 @@ export function PlansManager({
         <section className="plans-overview">
           <article>
             <span><Icon name="payments" /></span>
-            <small>Plan destacado</small>
+            <small>{t("plans.featured")}</small>
             <strong>{featuredPlan?.name}</strong>
-            <p>{featuredPlan?.monthlyPrice} al mes</p>
+            <p>{featuredPlan?.monthlyPrice} {t("plans.monthlySuffix")}</p>
           </article>
           <article>
             <span><Icon name="business" /></span>
-            <small>Catálogo conectado</small>
-            <strong>{plans.filter((plan) => plan.source === "database").length} en Supabase</strong>
-            <p>Tabla planes; suscripciones asigna planes a empresas</p>
+            <small>{t("plans.catalogConnected")}</small>
+            <strong>{t("plans.inSupabase", { count: plans.filter((plan) => plan.source === "database").length })}</strong>
+            <p>{t("plans.catalogHelp")}</p>
           </article>
           <article>
             <span><Icon name="edit" /></span>
-            <small>{canManagePlans ? "Edición completa" : "Consulta disponible"}</small>
-            <strong>{canManagePlans ? "Oferta comercial" : "Planes comerciales"}</strong>
-            <p>{canManagePlans ? "Guarda precios, límites, beneficios y mensajes" : "Tu rol actual no puede modificar precios ni beneficios"}</p>
+            <small>{canManagePlans ? t("plans.fullEdit") : t("plans.readOnly")}</small>
+            <strong>{canManagePlans ? t("plans.commercialOffer") : t("plans.commercialPlans")}</strong>
+            <p>{canManagePlans ? t("plans.editHelp") : t("plans.readOnlyHelp")}</p>
           </article>
         </section>
       ) : null}
@@ -235,26 +240,26 @@ export function PlansManager({
               <div className="plan-card-top">
                 <span>{plan.badge}</span>
                 {canManagePlans && (
-                  <button type="button" onClick={() => editPlan(plan)}><Icon name="edit" /> Editar</button>
+                  <button type="button" onClick={() => editPlan(plan)}><Icon name="edit" /> {t("plans.edit")}</button>
                 )}
               </div>
               <h2>{plan.name}</h2>
               <p>{plan.description}</p>
               <div className="plan-db-limits">
-                <span>{plan.databaseId ? "Supabase" : "Base pendiente"}</span>
-                <b>{plan.companyLimit ?? "—"} empresa(s)</b>
-                <b>{plan.userLimit ?? "—"} usuario(s)</b>
+                <span>{plan.databaseId ? "Supabase" : t("plans.basePending")}</span>
+                <b>{plan.companyLimit == null ? "—" : t("plans.companyCount", { count: plan.companyLimit })}</b>
+                <b>{plan.userLimit == null ? "—" : t("plans.userCount", { count: plan.userLimit })}</b>
               </div>
               <div className="plan-price">
                 <strong>{plan.monthlyPrice}</strong>
-                <small>Mensual</small>
+                <small>{t("plans.monthly")}</small>
               </div>
               <div className="plan-annual">
                 <span>{plan.annualPrice}</span>
-                <small>Anual sugerido</small>
+                <small>{t("plans.annualSuggested")}</small>
               </div>
               <div className="plan-section">
-                <h3>Incluye</h3>
+                <h3>{t("plans.includes")}</h3>
                 <ul>
                   {plan.includes.map((item) => (
                     <li key={item}><Icon name="check" />{item}</li>
@@ -270,7 +275,7 @@ export function PlansManager({
                   type="button"
                 >
                   <Icon name={isCurrentPlan ? "check_circle" : "payments"} />
-                  {isCurrentPlan ? "Plan actual" : isSubscribing ? "Suscribiendo..." : "Suscribirme a este plan"}
+                  {isCurrentPlan ? t("plans.current") : isSubscribing ? t("plans.subscribing") : t("plans.subscribe")}
                 </button>
               ) : null}
             </article>
@@ -283,76 +288,76 @@ export function PlansManager({
           <div aria-labelledby="plan-editor-title" aria-modal="true" className="plans-editor-card" ref={dialogRef} role="dialog" tabIndex={-1}>
             <div className="plans-editor-heading">
               <div>
-                <p>EDITANDO PLAN</p>
+                <p>{t("plans.editing")}</p>
                 <h2 id="plan-editor-title">{draft.name}</h2>
-                <span>Estos cambios se guardan en la tabla planes de Supabase.</span>
+                <span>{t("plans.editorHelp")}</span>
               </div>
-              <button aria-label="Cerrar editor" disabled={isSaving} type="button" onClick={closeEditor}>×</button>
+              <button aria-label={t("button.close")} disabled={isSaving} type="button" onClick={closeEditor}>×</button>
             </div>
 
             <div className="plans-editor-grid">
               <label>
-                Nombre del plan
+                {t("plans.name")}
                 <input value={draft.name} onChange={(event) => updateDraft("name", event.target.value)} />
               </label>
               <label>
-                Precio mensual
+                {t("plans.monthlyPrice")}
                 <input inputMode="decimal" value={draft.monthlyAmountText} onChange={(event) => updateDraft("monthlyAmountText", event.target.value)} />
               </label>
               <label>
-                Precio anual
+                {t("plans.annualPrice")}
                 <input inputMode="decimal" value={draft.annualAmountText} onChange={(event) => updateDraft("annualAmountText", event.target.value)} />
               </label>
               <label>
-                Empresas incluidas
+                {t("plans.includedCompanies")}
                 <input inputMode="numeric" value={draft.companyLimitText} onChange={(event) => updateDraft("companyLimitText", event.target.value)} />
               </label>
               <label>
-                Usuarios incluidos
+                {t("plans.includedUsers")}
                 <input inputMode="numeric" value={draft.userLimitText} onChange={(event) => updateDraft("userLimitText", event.target.value)} />
               </label>
               <label>
-                Orden
+                {t("plans.order")}
                 <input inputMode="numeric" value={draft.orderText} onChange={(event) => updateDraft("orderText", event.target.value)} />
               </label>
               <label>
-                Badge
+                {t("plans.badge")}
                 <input value={draft.badge} onChange={(event) => updateDraft("badge", event.target.value)} />
               </label>
               <label className="wide">
-                Estado
+                {t("plans.status")}
                 <select value={draft.status} onChange={(event) => updateDraft("status", event.target.value)}>
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
+                  <option value="activo">{t("common.active")}</option>
+                  <option value="inactivo">{t("common.inactive")}</option>
                 </select>
               </label>
               <label className="wide">
-                Descripción
+                {t("plans.description")}
                 <textarea rows={3} value={draft.description} onChange={(event) => updateDraft("description", event.target.value)} />
               </label>
               <label className="wide">
-                Objetivo comercial
+                {t("plans.objective")}
                 <textarea rows={3} value={draft.objective} onChange={(event) => updateDraft("objective", event.target.value)} />
               </label>
               <label className="wide">
-                Qué incluye
+                {t("plans.whatIncludes")}
                 <textarea rows={8} value={draft.includesText} onChange={(event) => updateDraft("includesText", event.target.value)} />
-                <small>Escribe un beneficio por línea.</small>
+                <small>{t("plans.oneBenefitLine")}</small>
               </label>
               <label className="wide">
-                Limitaciones
+                {t("plans.limitations")}
                 <textarea rows={7} value={draft.limitsText} onChange={(event) => updateDraft("limitsText", event.target.value)} />
-                <small>Escribe una limitación por línea.</small>
+                <small>{t("plans.oneLimitLine")}</small>
               </label>
               <p className="plans-editor-note">
-                Estos campos se guardan directamente en Supabase. Los beneficios y limitaciones se almacenan como JSON para que después puedan reutilizarse en checkout, landing o administración.
+                {t("plans.editorNote")}
               </p>
             </div>
 
             <div className="plans-editor-actions">
-              <button type="button" disabled={isSaving} onClick={closeEditor}>Cancelar</button>
+              <button type="button" disabled={isSaving} onClick={closeEditor}>{t("button.cancel")}</button>
               <button className="primary-button compact" type="button" onClick={savePlan} disabled={isSaving}>
-                {isSaving ? "Guardando..." : "Guardar en Supabase"}
+                {isSaving ? t("common.saving") : t("plans.saveSupabase")}
               </button>
             </div>
           </div>

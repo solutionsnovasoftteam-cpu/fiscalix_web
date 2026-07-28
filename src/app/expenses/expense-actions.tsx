@@ -6,6 +6,14 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { notifyPdfDownload } from "@/lib/clientNotifications";
+import { createTranslator } from "@/lib/i18n";
+import {
+  convertPreferenceCurrencyToMxn,
+  formatPreferenceDate,
+  formatPreferenceDateTime,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 import fiscalixLogo from "../../../logo-fiscalix.png";
 
 export type ExpenseExportRow = {
@@ -39,13 +47,6 @@ type ExportDateRange = {
 
 const OTHER_COMPANY_VALUE = "__other__";
 
-const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
-const dateLabel = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "long",
-  year: "numeric",
-});
-
 const C = {
   deep: [19, 45, 70] as [number, number, number],
   green: [1, 195, 141] as [number, number, number],
@@ -65,15 +66,14 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateLabel.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, value);
 }
 
-function formatDateRange({ from, to }: ExportDateRange) {
-  if (from && to) return `${formatDate(from)} a ${formatDate(to)}`;
-  if (from) return `Desde ${formatDate(from)}`;
-  if (to) return `Hasta ${formatDate(to)}`;
+function formatDateRange(range: ExportDateRange, preferences: UserPreferences) {
+  if (range.from && range.to) return `${formatDate(range.from, preferences)} a ${formatDate(range.to, preferences)}`;
+  if (range.from) return `Desde ${formatDate(range.from, preferences)}`;
+  if (range.to) return `Hasta ${formatDate(range.to, preferences)}`;
   return "Todos los registros disponibles";
 }
 
@@ -117,7 +117,7 @@ function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number) {
   doc.text("Documento generado por Fiscalix · Control interno de egresos", pageWidth / 2, footerTop + 9, { align: "center" });
 }
 
-async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRange) {
+async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRange, preferences: UserPreferences) {
   const doc = new jsPDF({ format: "a4", unit: "mm" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -172,8 +172,8 @@ async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRa
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(159, 176, 192);
-  doc.text(`Generado · ${dateLabel.format(generatedAt)}`, pageWidth - margin, 23, { align: "right" });
-  doc.text(`Periodo · ${formatDateRange(range)}`, pageWidth - margin, 30, { align: "right" });
+  doc.text(`Generado · ${formatPreferenceDateTime(generatedAt.toISOString(), preferences)}`, pageWidth - margin, 23, { align: "right" });
+  doc.text(`Periodo · ${formatDateRange(range, preferences)}`, pageWidth - margin, 30, { align: "right" });
 
   doc.setFillColor(...C.panel);
   doc.roundedRect(margin, 52, contentWidth, 26, 3, 3, "F");
@@ -189,7 +189,7 @@ async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRa
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...C.text);
-  doc.text(money.format(total), totalSummaryX, 71, { align: "center" });
+  doc.text(formatPreferenceMoney(total, preferences), totalSummaryX, 71, { align: "center" });
   doc.text(String(rows.length), countSummaryX, 71, { align: "center" });
 
   doc.setFont("helvetica", "bold");
@@ -227,14 +227,14 @@ async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRa
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.3);
     doc.setTextColor(...C.muted);
-    doc.text(formatDate(row.fecha_gasto), margin + 4, y + 2);
+    doc.text(formatDate(row.fecha_gasto, preferences), margin + 4, y + 2);
     doc.setTextColor(...C.navy);
     doc.text(company, margin + 35, y + 2);
     doc.text(description, margin + 75, y + 2);
     doc.text(category, margin + 133, y + 2);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...C.greenDark);
-    doc.text(money.format(row.monto), pageWidth - margin - 4, y + 2, { align: "right" });
+    doc.text(formatPreferenceMoney(row.monto, preferences), pageWidth - margin - 4, y + 2, { align: "right" });
 
     y += rowHeight + 1;
   });
@@ -245,10 +245,12 @@ async function downloadExpensesPdf(rows: ExpenseExportRow[], range: ExportDateRa
 export function ExpenseActions({
   categories,
   companies,
+  preferences,
   rows,
 }: {
   categories: ExpenseCategoryOption[];
   companies: ExpenseCompanyOption[];
+  preferences: UserPreferences;
   rows: ExpenseExportRow[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -261,6 +263,7 @@ export function ExpenseActions({
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(defaultCompanyId);
   const [saving, setSaving] = useState(false);
+  const t = createTranslator(preferences.language);
 
   function notify(value: string) {
     setMessage(value);
@@ -283,7 +286,7 @@ export function ExpenseActions({
     setExportOpen(false);
 
     if (!rows.length) {
-      notify("No hay gastos para exportar.");
+      notify(t("expenses.exportEmpty"));
       return;
     }
 
@@ -303,20 +306,23 @@ export function ExpenseActions({
     };
 
     if (range.from && range.to && range.from > range.to) {
-      notify("La fecha inicial no puede ser mayor que la fecha final.");
+      notify(t("expenses.invalidDateRange"));
       return;
     }
 
     const filteredRows = rows.filter((row) => isInDateRange(row.fecha_gasto, range));
     if (!filteredRows.length) {
-      notify("No hay gastos en el rango seleccionado.");
+      notify(t("expenses.noRangeRows"));
       return;
     }
 
     setExportModalOpen(false);
-    await downloadExpensesPdf(filteredRows, range);
+    await downloadExpensesPdf(filteredRows, range, preferences);
     await notifyPdfDownload("expenses", { recordCount: filteredRows.length });
-    notify(`PDF generado con ${filteredRows.length} ${filteredRows.length === 1 ? "gasto" : "gastos"}.`);
+    notify(t("expenses.pdfGenerated", {
+      count: filteredRows.length,
+      label: t(filteredRows.length === 1 ? "expenses.singleLabel" : "expenses.pluralLabel"),
+    }));
   }
 
   async function submitExpense(event: React.FormEvent<HTMLFormElement>) {
@@ -337,7 +343,7 @@ export function ExpenseActions({
           empresaId: formData.get("empresaId"),
           empresaNombreOtro: formData.get("empresaNombreOtro"),
           fechaGasto: formData.get("fechaGasto"),
-          monto: formData.get("monto"),
+          monto: convertPreferenceCurrencyToMxn(Number(formData.get("monto")), preferences),
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -345,16 +351,16 @@ export function ExpenseActions({
 
       const payload = (await response.json().catch(() => ({}))) as ExpenseApiResponse;
       if (!response.ok || payload.success === false) {
-        throw new Error(payload.message || "No fue posible guardar el gasto.");
+        throw new Error(payload.message || t("expenses.saveError"));
       }
 
       formRef.current?.reset();
       setSelectedCompany(defaultCompanyId);
       setModalOpen(false);
-      notify(payload.message || "Gasto registrado correctamente.");
+      notify(payload.message || t("expenses.saved"));
       router.refresh();
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible guardar el gasto.");
+      notify(error instanceof Error ? error.message : t("expenses.saveError"));
     } finally {
       setSaving(false);
     }
@@ -370,24 +376,24 @@ export function ExpenseActions({
       >
         <header>
           <div>
-            <p>REGISTRO DE EGRESO</p>
-            <h2>Nuevo gasto</h2>
-            <span>Registra un gasto para una empresa registrada o personalizada.</span>
+            <p>{t("expenses.formEyebrow")}</p>
+            <h2>{t("expenses.new")}</h2>
+            <span>{t("expenses.formHelp")}</span>
           </div>
-          <button aria-label="Cerrar modal" disabled={saving} onClick={closeModal} type="button">
+          <button aria-label={t("button.close")} disabled={saving} onClick={closeModal} type="button">
             <Icon name="close" />
           </button>
         </header>
 
         <form className="expenses-form" onSubmit={submitExpense} ref={formRef}>
             <label>
-              Empresa
+              {t("expenses.company")}
               {singleRegisteredCompany ? (
                 <>
                   <input name="empresaId" readOnly type="hidden" value={singleRegisteredCompany.id} />
                   <div className="expenses-static-field">
                     <strong>{singleRegisteredCompany.nombre}</strong>
-                    <span>Predeterminada</span>
+                    <span>{t("expenses.defaultCompany")}</span>
                   </div>
                 </>
               ) : (
@@ -397,42 +403,42 @@ export function ExpenseActions({
                   required
                   value={selectedCompany}
                 >
-                  <option disabled value="">Selecciona una empresa</option>
+                  <option disabled value="">{t("expenses.selectCompany")}</option>
                   {companies.map((company) => (
                     <option key={company.id} value={company.id}>{company.nombre}</option>
                   ))}
-                  <option value={OTHER_COMPANY_VALUE}>Otro</option>
+                  <option value={OTHER_COMPANY_VALUE}>{t("expenses.other")}</option>
                 </select>
               )}
             </label>
 
             {selectedCompany === OTHER_COMPANY_VALUE && (
               <label>
-                Nombre de la empresa
-                <input maxLength={120} name="empresaNombreOtro" placeholder="Ej. Restaurante La Central" required type="text" />
+                {t("expenses.otherCompanyName")}
+                <input maxLength={120} name="empresaNombreOtro" placeholder={t("expenses.otherCompanyPlaceholder")} required type="text" />
               </label>
             )}
 
             <label>
-              Descripción
-              <input maxLength={180} name="concepto" placeholder="Ej. Papelería, internet, renta de oficina..." required type="text" />
+              {t("table.description")}
+              <input maxLength={180} name="concepto" placeholder={t("expenses.descriptionPlaceholder")} required type="text" />
             </label>
 
             <div className="expenses-form-grid">
               <label>
-                Monto
+                {t("expenses.amount", { currency: preferences.currency })}
                 <input min="0.01" name="monto" placeholder="0.00" required step="0.01" type="number" />
               </label>
               <label>
-                Fecha
+                {t("expenses.date")}
                 <input defaultValue={localDateKey()} name="fechaGasto" required type="date" />
               </label>
             </div>
 
             <label>
-              Categoría
+              {t("table.category")}
               <select defaultValue="" name="categoriaId">
-                <option value="">Sin categoría</option>
+                <option value="">{t("common.noCategory")}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>{category.nombre}</option>
                 ))}
@@ -440,9 +446,9 @@ export function ExpenseActions({
             </label>
 
             <footer>
-              <button disabled={saving} onClick={closeModal} type="button">Cancelar</button>
+              <button disabled={saving} onClick={closeModal} type="button">{t("button.cancel")}</button>
               <button className="primary-button compact" disabled={saving} type="submit">
-                {saving ? "Guardando..." : "Guardar gasto"}
+                {saving ? t("common.saving") : t("expenses.save")}
               </button>
             </footer>
           </form>
@@ -459,11 +465,11 @@ export function ExpenseActions({
       >
         <header>
           <div>
-            <p>EXPORTACIÓN PDF</p>
-            <h2>Rango de gastos</h2>
-            <span>Selecciona las fechas que quieres incluir en el reporte.</span>
+            <p>{t("expenses.exportEyebrow")}</p>
+            <h2>{t("expenses.exportRangeTitle")}</h2>
+            <span>{t("expenses.exportRangeHelp")}</span>
           </div>
-          <button aria-label="Cerrar modal" onClick={closeExportModal} type="button">
+          <button aria-label={t("button.close")} onClick={closeExportModal} type="button">
             <Icon name="close" />
           </button>
         </header>
@@ -471,21 +477,21 @@ export function ExpenseActions({
         <form className="expenses-form" onSubmit={submitExportRange}>
           <div className="expenses-form-grid">
             <label>
-              Desde
+              {t("expenses.from")}
               <input name="from" type="date" />
             </label>
             <label>
-              Hasta
+              {t("expenses.to")}
               <input name="to" type="date" />
             </label>
           </div>
           <p className="expenses-field-hint">
-            Si dejas una fecha vacía, Fiscalix incluirá todos los registros disponibles hacia ese lado del rango.
+            {t("expenses.openRangeHelp")}
           </p>
           <footer>
-            <button onClick={closeExportModal} type="button">Cancelar</button>
+            <button onClick={closeExportModal} type="button">{t("button.cancel")}</button>
             <button className="primary-button compact" type="submit">
-              Generar PDF
+              {t("button.generatePdf")}
             </button>
           </footer>
         </form>
@@ -504,19 +510,19 @@ export function ExpenseActions({
             onClick={() => setExportOpen((current) => !current)}
             type="button"
           >
-            Exportar <Icon name="keyboard_arrow_down" />
+            {t("button.exportPdf").replace(" PDF", "")} <Icon name="keyboard_arrow_down" />
           </button>
           {exportOpen && (
             <div className="expenses-export-menu">
               <button onClick={openExportModal} type="button">
-                <Icon name="picture_as_pdf" /> Descargar PDF
+                <Icon name="picture_as_pdf" /> {t("button.downloadPdf")}
               </button>
             </div>
           )}
         </div>
 
         <button className="primary-button compact" onClick={openModal} type="button">
-          Nuevo gasto <Icon name="add" />
+          {t("expenses.new")} <Icon name="add" />
         </button>
       </div>
 

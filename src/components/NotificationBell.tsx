@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { NOTIFICATIONS_UPDATED_EVENT } from "@/lib/clientNotifications";
+import { createTranslator } from "@/lib/i18n";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 type NotificationItem = {
   id: string;
@@ -20,12 +22,13 @@ type NotificationsResponse = {
   message?: string;
 };
 
-async function requestNotifications() {
+async function requestNotifications(language: FiscalixLanguage) {
+  const t = createTranslator(language);
   const response = await fetch("/api/notifications", { cache: "no-store" });
   const payload = (await response.json()) as NotificationsResponse;
 
   if (!response.ok) {
-    throw new Error(payload.message ?? "No fue posible cargar las notificaciones.");
+    throw new Error(payload.message ?? t("notifications.loadError"));
   }
 
   return {
@@ -34,13 +37,14 @@ async function requestNotifications() {
   };
 }
 
-function formatNotificationDate(value: string | null) {
-  if (!value) return "Ahora";
+function formatNotificationDate(value: string | null, language: FiscalixLanguage) {
+  const t = createTranslator(language);
+  if (!value) return t("notifications.now");
 
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Ahora";
+  if (Number.isNaN(date.getTime())) return t("notifications.now");
 
-  return new Intl.DateTimeFormat("es-MX", {
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "es-MX", {
     day: "2-digit",
     month: "short",
     hour: "2-digit",
@@ -56,7 +60,8 @@ function notificationTone(type: string) {
   return "info";
 }
 
-export function NotificationBell() {
+export function NotificationBell({ language = "es" }: { language?: FiscalixLanguage }) {
+  const t = useMemo(() => createTranslator(language), [language]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -71,11 +76,11 @@ export function NotificationBell() {
     setError("");
 
     try {
-      const payload = await requestNotifications();
+      const payload = await requestNotifications(language);
       setNotifications(payload.notifications);
       setUnreadCount(payload.unreadCount);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "No fue posible cargar las notificaciones.");
+      setError(loadError instanceof Error ? loadError.message : t("notifications.loadError"));
     } finally {
       setLoading(false);
     }
@@ -84,7 +89,7 @@ export function NotificationBell() {
   useEffect(() => {
     let isMounted = true;
 
-    requestNotifications()
+    requestNotifications(language)
       .then((payload) => {
         if (!isMounted) return;
         setNotifications(payload.notifications);
@@ -93,7 +98,7 @@ export function NotificationBell() {
       })
       .catch((loadError: unknown) => {
         if (!isMounted) return;
-        setError(loadError instanceof Error ? loadError.message : "No fue posible cargar las notificaciones.");
+        setError(loadError instanceof Error ? loadError.message : t("notifications.loadError"));
       })
       .finally(() => {
         if (!isMounted) return;
@@ -103,7 +108,7 @@ export function NotificationBell() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [language, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,20 +134,20 @@ export function NotificationBell() {
 
   useEffect(() => {
     function handleNotificationsUpdated() {
-      requestNotifications()
+      requestNotifications(language)
         .then((payload) => {
           setNotifications(payload.notifications);
           setUnreadCount(payload.unreadCount);
           setError("");
         })
         .catch((loadError: unknown) => {
-          setError(loadError instanceof Error ? loadError.message : "No fue posible cargar las notificaciones.");
+          setError(loadError instanceof Error ? loadError.message : t("notifications.loadError"));
         });
     }
 
     window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated);
     return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleNotificationsUpdated);
-  }, []);
+  }, [language, t]);
 
   async function markAllAsRead() {
     if (unreadCount === 0) return;
@@ -155,11 +160,11 @@ export function NotificationBell() {
 
     try {
       const response = await fetch("/api/notifications", { method: "PATCH" });
-      if (!response.ok) throw new Error("No fue posible marcar las notificaciones.");
+      if (!response.ok) throw new Error(t("notifications.markError"));
     } catch {
       setNotifications(previousNotifications);
       setUnreadCount(previousUnreadCount);
-      setError("No fue posible marcar las notificaciones.");
+      setError(t("notifications.markError"));
     }
   }
 
@@ -172,7 +177,7 @@ export function NotificationBell() {
 
       try {
         const response = await fetch(`/api/notifications/${encodeURIComponent(notification.id)}`, { method: "PATCH" });
-        if (!response.ok) throw new Error("No fue posible marcar la notificación.");
+        if (!response.ok) throw new Error(t("notifications.markOneError"));
       } catch {
         void loadNotifications();
         return;
@@ -192,7 +197,7 @@ export function NotificationBell() {
       <button
         className="icon-button notification-trigger"
         type="button"
-        aria-label={unreadCount > 0 ? `Notificaciones, ${unreadCount} sin leer` : "Notificaciones"}
+        aria-label={unreadCount > 0 ? t("notifications.unreadLabel", { count: unreadCount }) : t("notifications.label")}
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
@@ -204,15 +209,15 @@ export function NotificationBell() {
       {unreadCount > 0 ? <span className="notification-count">{visibleUnreadCount}</span> : null}
 
       {open ? (
-        <section className="notifications-panel" aria-label="Notificaciones recientes">
+        <section className="notifications-panel" aria-label={t("notifications.recent")}>
           <div className="notifications-panel-head">
             <div>
-              <span>Centro de avisos</span>
-              <h2>Notificaciones</h2>
+              <span>{t("notifications.center")}</span>
+              <h2>{t("notifications.title")}</h2>
             </div>
             {unreadCount > 0 ? (
               <button type="button" onClick={markAllAsRead}>
-                Marcar todas
+                {t("notifications.markAll")}
               </button>
             ) : null}
           </div>
@@ -223,15 +228,15 @@ export function NotificationBell() {
                 <span>
                   <Icon name="notifications" />
                 </span>
-                <strong>Cargando avisos...</strong>
+                <strong>{t("notifications.loading")}</strong>
               </div>
             ) : error ? (
               <div className="notifications-empty">
                 <span>!</span>
-                <strong>No se pudieron cargar</strong>
+                <strong>{t("notifications.couldNotLoad")}</strong>
                 <small>{error}</small>
                 <button type="button" onClick={loadNotifications}>
-                  Reintentar
+                  {t("notifications.retry")}
                 </button>
               </div>
             ) : notifications.length === 0 ? (
@@ -239,8 +244,8 @@ export function NotificationBell() {
                 <span>
                   <Icon name="notifications" />
                 </span>
-                <strong>No tienes notificaciones</strong>
-                <small>Cuando haya avisos importantes aparecerán aquí.</small>
+                <strong>{t("notifications.empty")}</strong>
+                <small>{t("notifications.emptyHelp")}</small>
               </div>
             ) : (
               <div className="notifications-list">
@@ -261,7 +266,7 @@ export function NotificationBell() {
                         <strong>{notification.titulo}</strong>
                         <small>{notification.mensaje}</small>
                       </span>
-                      <time>{formatNotificationDate(notification.created_at)}</time>
+                      <time>{formatNotificationDate(notification.created_at, language)}</time>
                     </button>
                   );
                 })}

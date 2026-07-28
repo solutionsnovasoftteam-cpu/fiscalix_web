@@ -11,12 +11,14 @@ import {
   type PayrollRunRow,
 } from "@/lib/payroll";
 import { supabase } from "@/lib/supabase";
+import { defaultUserPreferences } from "@/lib/userPreferences.shared";
 import { getQuincenaByOffset } from "@/app/payroll/payroll-dates";
 import { PayrollHub, type PayrollHubInitialData } from "@/app/payroll/payroll-hub";
 
 export default async function PayrollPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
 
   const { companyId, error: companyError } = await getPrimaryPayrollCompanyId(user);
   let initialData: PayrollHubInitialData | undefined;
@@ -60,7 +62,7 @@ export default async function PayrollPage() {
 
   return (
     <AppShell activeHref="/payroll" user={user}>
-      <PayrollHub databaseStatusMessage={databaseStatusMessage} initialData={initialData} />
+      <PayrollHub databaseStatusMessage={databaseStatusMessage} initialData={initialData} preferences={preferences} />
     </AppShell>
   );
 }

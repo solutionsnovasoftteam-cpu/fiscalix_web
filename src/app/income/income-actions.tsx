@@ -6,6 +6,14 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { notifyPdfDownload } from "@/lib/clientNotifications";
+import { createTranslator } from "@/lib/i18n";
+import {
+  convertPreferenceCurrencyToMxn,
+  formatPreferenceDate,
+  formatPreferenceDateTime,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 import fiscalixLogo from "../../../logo-fiscalix.png";
 
 export type IncomeExportRow = {
@@ -39,13 +47,6 @@ type ExportDateRange = {
 
 const OTHER_COMPANY_VALUE = "__other__";
 
-const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
-const dateLabel = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "long",
-  year: "numeric",
-});
-
 const C = {
   deep: [19, 45, 70] as [number, number, number],
   green: [1, 195, 141] as [number, number, number],
@@ -65,15 +66,14 @@ function localDateKey(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateLabel.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, value);
 }
 
-function formatDateRange({ from, to }: ExportDateRange) {
-  if (from && to) return `${formatDate(from)} a ${formatDate(to)}`;
-  if (from) return `Desde ${formatDate(from)}`;
-  if (to) return `Hasta ${formatDate(to)}`;
+function formatDateRange(range: ExportDateRange, preferences: UserPreferences) {
+  if (range.from && range.to) return `${formatDate(range.from, preferences)} a ${formatDate(range.to, preferences)}`;
+  if (range.from) return `Desde ${formatDate(range.from, preferences)}`;
+  if (range.to) return `Hasta ${formatDate(range.to, preferences)}`;
   return "Todos los registros disponibles";
 }
 
@@ -117,7 +117,7 @@ function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number) {
   doc.text("Documento generado por Fiscalix · Control interno de ingresos", pageWidth / 2, footerTop + 9, { align: "center" });
 }
 
-async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange) {
+async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange, preferences: UserPreferences) {
   const doc = new jsPDF({ format: "a4", unit: "mm" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -172,8 +172,8 @@ async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(159, 176, 192);
-  doc.text(`Generado · ${dateLabel.format(generatedAt)}`, pageWidth - margin, 23, { align: "right" });
-  doc.text(`Periodo · ${formatDateRange(range)}`, pageWidth - margin, 30, { align: "right" });
+  doc.text(`Generado · ${formatPreferenceDateTime(generatedAt.toISOString(), preferences)}`, pageWidth - margin, 23, { align: "right" });
+  doc.text(`Periodo · ${formatDateRange(range, preferences)}`, pageWidth - margin, 30, { align: "right" });
 
   doc.setFillColor(...C.panel);
   doc.roundedRect(margin, 52, contentWidth, 26, 3, 3, "F");
@@ -189,7 +189,7 @@ async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(...C.text);
-  doc.text(money.format(total), totalSummaryX, 71, { align: "center" });
+  doc.text(formatPreferenceMoney(total, preferences), totalSummaryX, 71, { align: "center" });
   doc.text(String(rows.length), countSummaryX, 71, { align: "center" });
 
   doc.setFont("helvetica", "bold");
@@ -227,14 +227,14 @@ async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.3);
     doc.setTextColor(...C.muted);
-    doc.text(formatDate(row.fecha_ingreso), margin + 4, y + 2);
+    doc.text(formatDate(row.fecha_ingreso, preferences), margin + 4, y + 2);
     doc.setTextColor(...C.navy);
     doc.text(company, margin + 35, y + 2);
     doc.text(description, margin + 75, y + 2);
     doc.text(category, margin + 133, y + 2);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...C.greenDark);
-    doc.text(money.format(row.monto), pageWidth - margin - 4, y + 2, { align: "right" });
+    doc.text(formatPreferenceMoney(row.monto, preferences), pageWidth - margin - 4, y + 2, { align: "right" });
 
     y += rowHeight + 1;
   });
@@ -245,10 +245,12 @@ async function downloadIncomePdf(rows: IncomeExportRow[], range: ExportDateRange
 export function IncomeActions({
   categories,
   companies,
+  preferences,
   rows,
 }: {
   categories: IncomeCategoryOption[];
   companies: IncomeCompanyOption[];
+  preferences: UserPreferences;
   rows: IncomeExportRow[];
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -261,6 +263,7 @@ export function IncomeActions({
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedCompany, setSelectedCompany] = useState(defaultCompanyId);
   const [saving, setSaving] = useState(false);
+  const t = createTranslator(preferences.language);
 
   function notify(value: string) {
     setMessage(value);
@@ -283,7 +286,7 @@ export function IncomeActions({
     setExportOpen(false);
 
     if (!rows.length) {
-      notify("No hay ingresos para exportar.");
+      notify(t("income.exportEmpty"));
       return;
     }
 
@@ -303,20 +306,23 @@ export function IncomeActions({
     };
 
     if (range.from && range.to && range.from > range.to) {
-      notify("La fecha inicial no puede ser mayor que la fecha final.");
+      notify(t("expenses.invalidDateRange"));
       return;
     }
 
     const filteredRows = rows.filter((row) => isInDateRange(row.fecha_ingreso, range));
     if (!filteredRows.length) {
-      notify("No hay ingresos en el rango seleccionado.");
+      notify(t("income.noRangeRows"));
       return;
     }
 
     setExportModalOpen(false);
-    await downloadIncomePdf(filteredRows, range);
+    await downloadIncomePdf(filteredRows, range, preferences);
     await notifyPdfDownload("income", { recordCount: filteredRows.length });
-    notify(`PDF generado con ${filteredRows.length} ${filteredRows.length === 1 ? "ingreso" : "ingresos"}.`);
+    notify(t("income.pdfGenerated", {
+      count: filteredRows.length,
+      label: t(filteredRows.length === 1 ? "income.singleLabel" : "income.pluralLabel"),
+    }));
   }
 
   async function submitIncome(event: React.FormEvent<HTMLFormElement>) {
@@ -335,7 +341,7 @@ export function IncomeActions({
           empresaId: formData.get("empresaId"),
           empresaNombreOtro: formData.get("empresaNombreOtro"),
           fechaIngreso: formData.get("fechaIngreso"),
-          monto: formData.get("monto"),
+          monto: convertPreferenceCurrencyToMxn(Number(formData.get("monto")), preferences),
         }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
@@ -343,16 +349,16 @@ export function IncomeActions({
 
       const payload = (await response.json().catch(() => ({}))) as IncomeApiResponse;
       if (!response.ok || payload.success === false) {
-        throw new Error(payload.message || "No fue posible guardar el ingreso.");
+        throw new Error(payload.message || t("income.saveError"));
       }
 
       formRef.current?.reset();
       setSelectedCompany(defaultCompanyId);
       setModalOpen(false);
-      notify(payload.message || "Ingreso registrado correctamente.");
+      notify(payload.message || t("income.saved"));
       router.refresh();
     } catch (error) {
-      notify(error instanceof Error ? error.message : "No fue posible guardar el ingreso.");
+      notify(error instanceof Error ? error.message : t("income.saveError"));
     } finally {
       setSaving(false);
     }
@@ -368,24 +374,24 @@ export function IncomeActions({
       >
         <header>
           <div>
-            <p>REGISTRO DE INGRESO</p>
-            <h2>Nuevo ingreso</h2>
-            <span>Registra un ingreso para una empresa registrada o personalizada.</span>
+            <p>{t("income.formEyebrow")}</p>
+            <h2>{t("income.new")}</h2>
+            <span>{t("income.formHelp")}</span>
           </div>
-          <button aria-label="Cerrar modal" disabled={saving} onClick={closeModal} type="button">
+          <button aria-label={t("button.close")} disabled={saving} onClick={closeModal} type="button">
             <Icon name="close" />
           </button>
         </header>
 
         <form className="expenses-form" onSubmit={submitIncome} ref={formRef}>
           <label>
-            Empresa
+            {t("expenses.company")}
             {singleRegisteredCompany ? (
               <>
                 <input name="empresaId" readOnly type="hidden" value={singleRegisteredCompany.id} />
                 <div className="expenses-static-field">
                   <strong>{singleRegisteredCompany.nombre}</strong>
-                  <span>Predeterminada</span>
+                  <span>{t("expenses.defaultCompany")}</span>
                 </div>
               </>
             ) : (
@@ -395,42 +401,42 @@ export function IncomeActions({
                 required
                 value={selectedCompany}
               >
-                <option disabled value="">Selecciona una empresa</option>
+                <option disabled value="">{t("expenses.selectCompany")}</option>
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>{company.nombre}</option>
                 ))}
-                <option value={OTHER_COMPANY_VALUE}>Otro</option>
+                <option value={OTHER_COMPANY_VALUE}>{t("expenses.other")}</option>
               </select>
             )}
           </label>
 
           {selectedCompany === OTHER_COMPANY_VALUE && (
             <label>
-              Nombre de la empresa
-              <input maxLength={120} name="empresaNombreOtro" placeholder="Ej. Cliente externo" required type="text" />
+              {t("expenses.otherCompanyName")}
+              <input maxLength={120} name="empresaNombreOtro" placeholder={t("income.otherCompanyPlaceholder")} required type="text" />
             </label>
           )}
 
           <label>
-            Descripción
-            <input maxLength={180} name="concepto" placeholder="Ej. Venta de servicios, consultoría..." required type="text" />
+            {t("table.description")}
+            <input maxLength={180} name="concepto" placeholder={t("income.descriptionPlaceholder")} required type="text" />
           </label>
 
           <div className="expenses-form-grid">
             <label>
-              Monto
+              {t("expenses.amount", { currency: preferences.currency })}
               <input min="0.01" name="monto" placeholder="0.00" required step="0.01" type="number" />
             </label>
             <label>
-              Fecha
+              {t("expenses.date")}
               <input defaultValue={localDateKey()} name="fechaIngreso" required type="date" />
             </label>
           </div>
 
           <label>
-            Categoría
+            {t("table.category")}
             <select defaultValue="" name="categoriaId">
-              <option value="">Sin categoría</option>
+              <option value="">{t("common.noCategory")}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.nombre}</option>
               ))}
@@ -438,9 +444,9 @@ export function IncomeActions({
           </label>
 
           <footer>
-            <button disabled={saving} onClick={closeModal} type="button">Cancelar</button>
+            <button disabled={saving} onClick={closeModal} type="button">{t("button.cancel")}</button>
             <button className="primary-button compact" disabled={saving} type="submit">
-              {saving ? "Guardando..." : "Guardar ingreso"}
+              {saving ? t("common.saving") : t("income.save")}
             </button>
           </footer>
         </form>
@@ -457,11 +463,11 @@ export function IncomeActions({
       >
         <header>
           <div>
-            <p>EXPORTACIÓN PDF</p>
-            <h2>Rango de ingresos</h2>
-            <span>Selecciona las fechas que quieres incluir en el reporte.</span>
+            <p>{t("expenses.exportEyebrow")}</p>
+            <h2>{t("income.exportRangeTitle")}</h2>
+            <span>{t("expenses.exportRangeHelp")}</span>
           </div>
-          <button aria-label="Cerrar modal" onClick={closeExportModal} type="button">
+          <button aria-label={t("button.close")} onClick={closeExportModal} type="button">
             <Icon name="close" />
           </button>
         </header>
@@ -469,21 +475,21 @@ export function IncomeActions({
         <form className="expenses-form" onSubmit={submitExportRange}>
           <div className="expenses-form-grid">
             <label>
-              Desde
+              {t("expenses.from")}
               <input name="from" type="date" />
             </label>
             <label>
-              Hasta
+              {t("expenses.to")}
               <input name="to" type="date" />
             </label>
           </div>
           <p className="expenses-field-hint">
-            Si dejas una fecha vacía, Fiscalix incluirá todos los registros disponibles hacia ese lado del rango.
+            {t("expenses.openRangeHelp")}
           </p>
           <footer>
-            <button onClick={closeExportModal} type="button">Cancelar</button>
+            <button onClick={closeExportModal} type="button">{t("button.cancel")}</button>
             <button className="primary-button compact" type="submit">
-              Generar PDF
+              {t("button.generatePdf")}
             </button>
           </footer>
         </form>
@@ -502,19 +508,19 @@ export function IncomeActions({
             onClick={() => setExportOpen((current) => !current)}
             type="button"
           >
-            Exportar <Icon name="keyboard_arrow_down" />
+            {t("button.exportPdf").replace(" PDF", "")} <Icon name="keyboard_arrow_down" />
           </button>
           {exportOpen && (
             <div className="expenses-export-menu">
               <button onClick={openExportModal} type="button">
-                <Icon name="picture_as_pdf" /> Descargar PDF
+                <Icon name="picture_as_pdf" /> {t("button.downloadPdf")}
               </button>
             </div>
           )}
         </div>
 
         <button className="primary-button compact" onClick={openModal} type="button">
-          Nuevo ingreso <Icon name="add" />
+          {t("income.new")} <Icon name="add" />
         </button>
       </div>
 

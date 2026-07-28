@@ -4,6 +4,8 @@ import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 import { useModal } from "@/lib/useModal";
 
 type Regime = { clave: string; id: string; nombre: string };
@@ -19,11 +21,13 @@ type CompanyEditorData = {
 };
 type CompanyDraft = Pick<CompanyEditorData, "nombre" | "regimeId" | "rfc">;
 
-export function CompanyFiscalEditor({ company, regimes }: {
+export function CompanyFiscalEditor({ company, language = "es", regimes }: {
   company: CompanyEditorData | null;
+  language?: FiscalixLanguage;
   regimes: Regime[];
 }) {
   const router = useRouter();
+  const t = createTranslator(language);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -33,7 +37,7 @@ export function CompanyFiscalEditor({ company, regimes }: {
     regimeId: company?.regimeId ?? "",
     rfc: company?.rfc ?? "",
   });
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => setOpen(false), [setOpen]);
   useModal({ busy, dialogRef, onClose: close, open });
 
   if (!company) return null;
@@ -49,10 +53,10 @@ export function CompanyFiscalEditor({ company, regimes }: {
         headers: { "Content-Type": "application/json" }, method: "PATCH",
       });
       const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? "No fue posible guardar los cambios.");
+      if (!response.ok) throw new Error(result.message ?? t("preferences.saveError"));
       setOpen(false);
       router.refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "No fue posible guardar los cambios."); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : t("preferences.saveError")); }
     finally { setBusy(false); }
   }
 
@@ -80,11 +84,11 @@ export function CompanyFiscalEditor({ company, regimes }: {
       >
         <div className="profile-editor-heading">
           <div>
-            <span>DATOS FISCALES</span>
-            <h2 id="company-editor-title">Información de la empresa</h2>
-            <p>Actualiza los datos fiscales principales de la empresa vinculada.</p>
+            <span>{t("company.editorEyebrow")}</span>
+            <h2 id="company-editor-title">{t("company.info")}</h2>
+            <p>{t("company.editorHelp")}</p>
           </div>
-          <button aria-label="Cerrar" disabled={busy} onClick={cancelEdition} type="button">
+          <button aria-label={t("button.close")} disabled={busy} onClick={cancelEdition} type="button">
             <Icon name="close" />
           </button>
         </div>
@@ -92,7 +96,7 @@ export function CompanyFiscalEditor({ company, regimes }: {
         <form onSubmit={submit}>
           <div className="profile-editor-grid">
             <label className="wide">
-              Nombre comercial
+              {t("company.commercialName")}
               <input
                 disabled={busy}
                 maxLength={160}
@@ -102,7 +106,7 @@ export function CompanyFiscalEditor({ company, regimes }: {
               />
             </label>
             <label className="wide">
-              Razón social
+              {t("company.legalName")}
               <input disabled value={companyData.legalName} />
             </label>
             <label>
@@ -119,29 +123,29 @@ export function CompanyFiscalEditor({ company, regimes }: {
               />
             </label>
             <label>
-              Régimen fiscal
+              {t("profile.fiscalRegime")}
               <select
                 disabled={busy}
                 onChange={(event) => setDraft((value) => ({ ...value, regimeId: event.target.value }))}
                 required
                 value={draft.regimeId}
               >
-                <option disabled value="">Selecciona un régimen</option>
+                <option disabled value="">{t("company.selectRegime")}</option>
                 {regimes.map((regime) => (
                   <option key={regime.id} value={regime.id}>{regime.clave} · {regime.nombre}</option>
                 ))}
               </select>
             </label>
             <label className="wide">
-              Dirección fiscal
+              {t("company.fiscalAddress")}
               <input disabled value={companyData.address} />
             </label>
             <label>
-              Teléfono
+              {t("profile.phone")}
               <input disabled value={companyData.phone} />
             </label>
             <label>
-              Correo electrónico
+              {t("profile.email")}
               <input disabled type="email" value={companyData.email} />
             </label>
           </div>
@@ -149,9 +153,9 @@ export function CompanyFiscalEditor({ company, regimes }: {
           {message && <p className="profile-editor-message company-editor-message" role="alert">{message}</p>}
 
           <div className="profile-editor-actions">
-            <button disabled={busy} onClick={cancelEdition} type="button">Cancelar</button>
+            <button disabled={busy} onClick={cancelEdition} type="button">{t("button.cancel")}</button>
             <button className="primary-button" disabled={busy || !regimes.length} type="submit">
-              {busy ? "Guardando..." : "Guardar cambios"}
+              {busy ? t("common.saving") : t("button.saveChanges")}
             </button>
           </div>
         </form>
@@ -171,7 +175,7 @@ export function CompanyFiscalEditor({ company, regimes }: {
         type="button"
       >
         <Icon name="edit" />
-        Editar información
+        {t("button.editInfo")}
       </button>
 
       {open && createPortal(modal, document.body)}

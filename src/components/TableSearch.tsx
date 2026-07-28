@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
+import { createTranslator } from "@/lib/i18n";
 import type { PageSearchParams } from "@/lib/pagination";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 function paramValue(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
@@ -37,6 +39,7 @@ function clearHref(pathname: string, searchParams: PageSearchParams, excludedKey
 
 export function TableSearch({
   label,
+  language = "es",
   name = "q",
   pathname,
   placeholder,
@@ -44,12 +47,14 @@ export function TableSearch({
   searchParams,
 }: {
   label: string;
+  language?: FiscalixLanguage;
   name?: string;
   pathname: string;
   placeholder: string;
   resetPageKeys?: string[];
   searchParams: PageSearchParams;
 }) {
+  const t = createTranslator(language);
   const value = paramValue(searchParams[name]);
   const excludedKeys = [name, ...resetPageKeys];
 
@@ -60,11 +65,11 @@ export function TableSearch({
       <input aria-label={label} defaultValue={value} name={name} placeholder={placeholder} type="search" />
       {value.trim() ? (
         <Link className="table-search-clear" href={clearHref(pathname, searchParams, excludedKeys)}>
-          Limpiar
+          {t("button.clear")}
         </Link>
       ) : (
         <button className="table-search-submit" type="submit">
-          Buscar
+          {t("button.search")}
         </button>
       )}
     </form>

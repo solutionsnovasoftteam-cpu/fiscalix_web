@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Icon } from "@/components/Icon";
-import { paginationRangeLabel, TABLE_PAGE_SIZE, totalPagesFor } from "@/lib/pagination";
+import { createTranslator } from "@/lib/i18n";
+import { TABLE_PAGE_SIZE, totalPagesFor } from "@/lib/pagination";
+import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 function visiblePages(currentPage: number, totalPages: number) {
   const start = Math.max(1, Math.min(currentPage - 2, totalPages - 4));
@@ -8,10 +10,16 @@ function visiblePages(currentPage: number, totalPages: number) {
   return Array.from({ length: end - start + 1 }, (_, index) => start + index);
 }
 
+function rangeLabel(totalItems: number, start: number, end: number, language: FiscalixLanguage) {
+  if (!totalItems) return language === "en" ? "0 records" : "0 registros";
+  return language === "en" ? `${start + 1}-${end} of ${totalItems}` : `${start + 1}-${end} de ${totalItems}`;
+}
+
 export function TablePagination({
   currentPage,
   end,
   hrefForPage,
+  language = "es",
   pageSize = TABLE_PAGE_SIZE,
   start,
   totalItems,
@@ -19,10 +27,12 @@ export function TablePagination({
   currentPage: number;
   end: number;
   hrefForPage: (page: number) => string;
+  language?: FiscalixLanguage;
   pageSize?: number;
   start: number;
   totalItems: number;
 }) {
+  const t = createTranslator(language);
   const totalPages = totalPagesFor(totalItems, pageSize);
   if (totalItems <= pageSize) return null;
 
@@ -30,8 +40,8 @@ export function TablePagination({
   const nextPage = Math.min(totalPages, currentPage + 1);
 
   return (
-    <nav className="table-pagination" aria-label="Paginación de tabla">
-      <span>Mostrando {paginationRangeLabel(totalItems, start, end)}</span>
+    <nav className="table-pagination" aria-label={t("pagination.label")}>
+      <span>{t("pagination.showing", { range: rangeLabel(totalItems, start, end, language) })}</span>
       <div>
         <Link
           aria-disabled={currentPage === 1}

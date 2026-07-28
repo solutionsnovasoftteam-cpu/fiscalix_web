@@ -29,9 +29,9 @@ export function paginateItems<T>(items: T[], page: number, pageSize = TABLE_PAGE
   };
 }
 
-export function paginationRangeLabel(totalItems: number, start: number, end: number) {
-  if (!totalItems) return "0 registros";
-  return `${start + 1}-${end} de ${totalItems}`;
+export function paginationRangeLabel(totalItems: number, start: number, end: number, language: "en" | "es" = "es") {
+  if (!totalItems) return language === "en" ? "0 records" : "0 registros";
+  return language === "en" ? `${start + 1}-${end} of ${totalItems}` : `${start + 1}-${end} de ${totalItems}`;
 }
 
 export function pageHref(pathname: string, searchParams: PageSearchParams, pageKey: string, page: number) {

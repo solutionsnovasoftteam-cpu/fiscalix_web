@@ -5,9 +5,16 @@ import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
+import {
+  defaultUserPreferences,
+  formatPreferenceMoney,
+  formatPreferenceMonth,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 
 type FinanceRow = {
   empresa_id: string | null;
@@ -16,16 +23,14 @@ type FinanceRow = {
   monto: number | string;
 };
 
-const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
-const monthLabel = new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" });
-
 function number(value: number | string) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatMonth(key: string) {
-  return monthLabel.format(new Date(`${key}-01T00:00:00`));
+function formatMonth(key: string, preferences: UserPreferences) {
+  const date = new Date(`${key}-01T00:00:00`);
+  return Number.isNaN(date.getTime()) ? key : formatPreferenceMonth(date, preferences, true);
 }
 
 export default async function ReportsPage({
@@ -35,6 +40,9 @@ export default async function ReportsPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
+  const money = (value: number) => formatPreferenceMoney(value, preferences);
   const resolvedSearchParams = await searchParams;
   const query = searchParamText(resolvedSearchParams, "q");
 
@@ -88,12 +96,12 @@ export default async function ReportsPage({
   const filteredRows = rows.filter(([key, period]) => {
     const balance = period.incomes - period.expenses;
     return matchesSearch([
-      formatMonth(key),
+      formatMonth(key, preferences),
       key,
       period.movements,
-      money.format(period.incomes),
-      money.format(period.expenses),
-      money.format(balance),
+      money(period.incomes),
+      money(period.expenses),
+      money(balance),
     ], query);
   });
   const reportsPage = paginateItems(filteredRows, pageFromParam(resolvedSearchParams.page));
@@ -107,40 +115,41 @@ export default async function ReportsPage({
     <AppShell activeHref="/reports" user={user}>
       <main className="reports-content">
         <header className="reports-header">
-          <div><p>ANÁLISIS FINANCIERO</p><h1>Reportes</h1><span>Resumen consolidado de los movimientos registrados.</span></div>
+          <div><p>{t("reports.eyebrow")}</p><h1>{t("reports.title")}</h1><span>{t("reports.description")}</span></div>
         </header>
 
-        {hasError && <section className="dashboard-alert" role="alert"><strong>No fue posible cargar todo el reporte.</strong><span>Revisa la conexión o los permisos financieros.</span></section>}
+        {hasError && <section className="dashboard-alert" role="alert"><strong>{t("reports.loadError")}</strong><span>{t("reports.loadErrorHelp")}</span></section>}
 
         <section className="reports-stats">
-          <article><span><Icon name="trending_up" /></span><small>Ingresos acumulados</small><strong>{money.format(totalIncome)}</strong></article>
-          <article><span><Icon name="trending_down" /></span><small>Gastos acumulados</small><strong>{money.format(totalExpense)}</strong></article>
-          <article><span><Icon name="account_balance_wallet" /></span><small>Balance acumulado</small><strong className={totalIncome - totalExpense >= 0 ? "positive" : "negative"}>{money.format(totalIncome - totalExpense)}</strong></article>
-          <article><span><Icon name="calendar_month" /></span><small>Periodos con actividad</small><strong>{rows.length}</strong></article>
+          <article><span><Icon name="trending_up" /></span><small>{t("transactions.totalIncome")}</small><strong>{money(totalIncome)}</strong></article>
+          <article><span><Icon name="trending_down" /></span><small>{t("transactions.totalExpenses")}</small><strong>{money(totalExpense)}</strong></article>
+          <article><span><Icon name="account_balance_wallet" /></span><small>{t("reports.balanceAccumulated")}</small><strong className={totalIncome - totalExpense >= 0 ? "positive" : "negative"}>{money(totalIncome - totalExpense)}</strong></article>
+          <article><span><Icon name="calendar_month" /></span><small>{t("reports.periods")}</small><strong>{rows.length}</strong></article>
         </section>
 
         <section className="reports-card">
           <div className="reports-card-heading">
-            <div><h2>Reporte mensual</h2><p>Ingresos, gastos y balance por periodo</p></div>
+            <div><h2>{t("reports.monthly")}</h2><p>{t("reports.monthlyHelp")}</p></div>
             <div className="table-card-actions">
-              <TableSearch label="Buscar reportes" pathname="/reports" placeholder="Buscar periodo, monto o balance..." searchParams={resolvedSearchParams} />
-              <span>{filteredRows.length} resultado{filteredRows.length === 1 ? "" : "s"}</span>
+              <TableSearch label={t("reports.searchLabel")} language={preferences.language} pathname="/reports" placeholder={t("reports.searchPlaceholder")} searchParams={resolvedSearchParams} />
+              <span>{resultCount(filteredRows.length, preferences.language)}</span>
             </div>
           </div>
           {filteredRows.length ? (
             <>
-              <div className="reports-table-scroll"><table className="reports-table"><thead><tr><th>Periodo</th><th>Movimientos</th><th>Ingresos</th><th>Gastos</th><th>Balance</th></tr></thead><tbody>
-                {reportsPage.items.map(([key, period]) => { const balance = period.incomes - period.expenses; return <tr key={key}><td>{formatMonth(key)}</td><td>{period.movements}</td><td className="positive">{money.format(period.incomes)}</td><td className="negative">{money.format(period.expenses)}</td><td className={balance >= 0 ? "positive" : "negative"}>{money.format(balance)}</td></tr>; })}
+              <div className="reports-table-scroll"><table className="reports-table"><thead><tr><th>{t("reports.period")}</th><th>{t("reports.movements")}</th><th>{t("dashboard.income")}</th><th>{t("dashboard.expenses")}</th><th>{t("dashboard.balance")}</th></tr></thead><tbody>
+                {reportsPage.items.map(([key, period]) => { const balance = period.incomes - period.expenses; return <tr key={key}><td>{formatMonth(key, preferences)}</td><td>{period.movements}</td><td className="positive">{money(period.incomes)}</td><td className="negative">{money(period.expenses)}</td><td className={balance >= 0 ? "positive" : "negative"}>{money(balance)}</td></tr>; })}
               </tbody></table></div>
               <TablePagination
                 currentPage={reportsPage.currentPage}
                 end={reportsPage.end}
                 hrefForPage={(page) => pageHref("/reports", resolvedSearchParams, "page", page)}
+                language={preferences.language}
                 start={reportsPage.start}
                 totalItems={filteredRows.length}
               />
             </>
-          ) : <div className="reports-empty"><span><Icon name="bar_chart" /></span><strong>{query ? "No encontramos reportes" : "Aún no hay periodos para analizar"}</strong><small>{query ? "Prueba con otro término de búsqueda." : "Registra ingresos o gastos y el reporte se generará automáticamente."}</small></div>}
+          ) : <div className="reports-empty"><span><Icon name="bar_chart" /></span><strong>{query ? t("reports.noSearch") : t("reports.empty")}</strong><small>{query ? t("common.tryAnotherSearch") : t("reports.emptyHelp")}</small></div>}
         </section>
       </main>
     </AppShell>

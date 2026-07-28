@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { PlansManager } from "@/components/PlansManager";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator } from "@/lib/i18n";
 import {
   basicPlanSelect,
   extendedPlanSelect,
@@ -20,6 +21,7 @@ type PlanQueryResult = {
 export default async function PlansPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const t = createTranslator(user.preferences?.language);
 
   let planResult = await supabase
     .from("planes")
@@ -64,7 +66,8 @@ export default async function PlansPage() {
         canSubscribePlans={canSubscribePlans}
         currentPlanDatabaseId={currentPlanDatabaseId}
         initialPlans={plans}
-        initialStatus={planResult.error ? "No fue posible cargar los planes desde Supabase. Se muestra la configuración base." : ""}
+        initialStatus={planResult.error ? t("plans.loadError") : ""}
+        language={user.preferences?.language}
       />
     </AppShell>
   );

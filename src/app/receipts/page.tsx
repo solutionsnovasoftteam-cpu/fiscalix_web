@@ -6,8 +6,15 @@ import { TableSearch } from "@/components/TableSearch";
 import { ReceiptsTableActions } from "@/app/receipts/receipts-table-actions";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
+import {
+  defaultUserPreferences,
+  formatPreferenceDate,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 
 type FinancialRecord = {
   concepto: string | null;
@@ -27,17 +34,13 @@ type Receipt = {
   type: "Gasto" | "Ingreso";
 };
 
-const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
-const dateFormatter = new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", year: "numeric" });
-
 function amount(value: number | string | null) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, value);
 }
 
 export default async function ReceiptsPage({
@@ -47,6 +50,9 @@ export default async function ReceiptsPage({
 }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
+  const money = (value: number) => formatPreferenceMoney(value, preferences);
 
   const resolvedSearchParams = await searchParams;
   const q = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : "";
@@ -54,7 +60,7 @@ export default async function ReceiptsPage({
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
-  const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || "Sin empresa"]));
+  const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
     companyIds.length
       ? supabase.from("ingresos").select("id,concepto,monto,fecha_ingreso,empresa_id").in("empresa_id", companyIds).order("fecha_ingreso", { ascending: false }).limit(100)
@@ -70,8 +76,8 @@ export default async function ReceiptsPage({
     const folio = `${type === "Ingreso" ? "ING" : "GAS"}-${record.id.slice(0, 8).toUpperCase()}`;
     return {
       amount: amount(record.monto),
-      company: companyNameById.get(record.empresa_id ?? "") ?? "Sin empresa",
-      concept: record.concepto || `${type} sin descripción`,
+      company: companyNameById.get(record.empresa_id ?? "") ?? t("common.noCompany"),
+      concept: record.concepto || (type === "Ingreso" ? t("receipts.incomeNoDescription") : t("receipts.expenseNoDescription")),
       date: record.fecha || "",
       folio,
       id: `${type}-${record.id}`,
@@ -112,45 +118,46 @@ export default async function ReceiptsPage({
         <section className="receipts-hero">
           <div className="receipts-title">
             <span className="receipts-title-icon"><Icon name="receipt_long" /></span>
-            <div><p>DOCUMENTOS FISCALES</p><h1>Comprobantes</h1><span>Organiza y consulta los comprobantes generados por tu actividad.</span></div>
+            <div><p>{t("receipts.eyebrow")}</p><h1>{t("receipts.title")}</h1><span>{t("receipts.description")}</span></div>
           </div>
-          <button className="receipts-new" type="button"><Icon name="add" /> Nuevo comprobante</button>
+          <button className="receipts-new" type="button"><Icon name="add" /> {t("receipts.new")}</button>
         </section>
 
-        <section className="receipts-summary" aria-label="Resumen de comprobantes">
-          <article><span><Icon name="receipt_long" /></span><div><small>Comprobantes</small><strong>{allReceipts.length}</strong></div></article>
-          <article><span><Icon name="trending_up" /></span><div><small>Ingresos respaldados</small><strong>{money.format(incomes.reduce((sum, receipt) => sum + receipt.amount, 0))}</strong></div></article>
-          <article><span><Icon name="trending_down" /></span><div><small>Gastos respaldados</small><strong>{money.format(expenses.reduce((sum, receipt) => sum + receipt.amount, 0))}</strong></div></article>
+        <section className="receipts-summary" aria-label={t("receipts.summary")}>
+          <article><span><Icon name="receipt_long" /></span><div><small>{t("receipts.count")}</small><strong>{allReceipts.length}</strong></div></article>
+          <article><span><Icon name="trending_up" /></span><div><small>{t("receipts.incomeBacked")}</small><strong>{money(incomes.reduce((sum, receipt) => sum + receipt.amount, 0))}</strong></div></article>
+          <article><span><Icon name="trending_down" /></span><div><small>{t("receipts.expensesBacked")}</small><strong>{money(expenses.reduce((sum, receipt) => sum + receipt.amount, 0))}</strong></div></article>
         </section>
 
-        {hasError && <section className="receipts-alert" role="alert"><Icon name="help" /> No fue posible cargar todos los comprobantes. Revisa la conexión con Supabase.</section>}
+        {hasError && <section className="receipts-alert" role="alert"><Icon name="help" /> {t("receipts.loadError")}</section>}
 
         <section className="receipts-card">
           <div className="receipts-card-top">
             <TableSearch
-              label="Buscar comprobantes"
+              label={t("receipts.searchLabel")}
+              language={preferences.language}
               pathname="/receipts"
-              placeholder="Buscar por folio, empresa, concepto o tipo..."
+              placeholder={t("receipts.searchPlaceholder")}
               searchParams={resolvedSearchParams}
             />
-            <span className="receipts-count">{receipts.length} resultado{receipts.length === 1 ? "" : "s"}</span>
+            <span className="receipts-count">{resultCount(receipts.length, preferences.language)}</span>
           </div>
 
           {receipts.length ? (
             <>
               <div className="receipts-table-wrap">
                 <table className="receipts-table">
-                  <thead><tr><th>Folio</th><th>Fecha</th><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Estado</th><th aria-label="Acciones" /></tr></thead>
+                  <thead><tr><th>{t("table.folio")}</th><th>{t("table.date")}</th><th>{t("table.concept")}</th><th>{t("table.type")}</th><th>{t("table.amount")}</th><th>{t("table.status")}</th><th aria-label={t("table.actions")} /></tr></thead>
                   <tbody>
                     {receiptsPage.items.map((receipt) => (
                       <tr key={receipt.id}>
                         <td><span className="receipt-folio">{receipt.folio}</span><small>{receipt.company}</small></td>
-                        <td>{formatDate(receipt.date)}</td>
+                        <td>{formatDate(receipt.date, preferences)}</td>
                         <td><strong>{receipt.concept}</strong></td>
-                        <td><span className={receipt.type === "Ingreso" ? "receipt-type income" : "receipt-type expense"}>{receipt.type}</span></td>
-                        <td className={receipt.type === "Ingreso" ? "receipt-amount income" : "receipt-amount expense"}>{money.format(receipt.amount)}</td>
-                        <td><span className="receipt-status"><i />Registrado</span></td>
-                        <td><ReceiptsTableActions receipt={receipt} /></td>
+                        <td><span className={receipt.type === "Ingreso" ? "receipt-type income" : "receipt-type expense"}>{receipt.type === "Ingreso" ? t("dashboard.income") : t("dashboard.expenses")}</span></td>
+                        <td className={receipt.type === "Ingreso" ? "receipt-amount income" : "receipt-amount expense"}>{money(receipt.amount)}</td>
+                        <td><span className="receipt-status"><i />{t("common.registered")}</span></td>
+                        <td><ReceiptsTableActions preferences={preferences} receipt={receipt} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -160,12 +167,13 @@ export default async function ReceiptsPage({
                 currentPage={receiptsPage.currentPage}
                 end={receiptsPage.end}
                 hrefForPage={(page) => pageHref("/receipts", resolvedSearchParams, "page", page)}
+                language={preferences.language}
                 start={receiptsPage.start}
                 totalItems={receipts.length}
               />
             </>
           ) : (
-            <div className="receipts-empty"><span><Icon name="receipt_long" /></span><strong>{query ? "No encontramos comprobantes" : "Aún no hay comprobantes registrados"}</strong><small>{query ? "Prueba con otro término de búsqueda." : "Los ingresos y gastos registrados aparecerán aquí como comprobantes."}</small></div>
+            <div className="receipts-empty"><span><Icon name="receipt_long" /></span><strong>{query ? t("receipts.noSearch") : t("receipts.empty")}</strong><small>{query ? t("common.tryAnotherSearch") : t("receipts.emptyHelp")}</small></div>
           )}
         </section>
       </main>

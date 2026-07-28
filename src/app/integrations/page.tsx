@@ -13,7 +13,7 @@ export default async function IntegrationsPage() {
 
   return (
     <AppShell activeHref="/integrations" user={user}>
-      <IntegrationsHub canManage={canManageIntegrations(user)} initialRows={(data ?? []) as IntegrationRow[]} />
+      <IntegrationsHub canManage={canManageIntegrations(user)} initialRows={(data ?? []) as IntegrationRow[]} language={user.preferences?.language} />
     </AppShell>
   );
 }

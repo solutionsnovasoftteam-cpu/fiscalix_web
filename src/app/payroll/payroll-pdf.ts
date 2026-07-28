@@ -1,13 +1,12 @@
 import { jsPDF } from "jspdf";
 import fiscalixLogo from "../../../logo-fiscalix.png";
 import type { PayrollRun } from "@/app/payroll/payroll-dates";
-
-const money = new Intl.NumberFormat("es-MX", { currency: "MXN", style: "currency" });
-const dateFmt = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "long",
-  year: "numeric",
-});
+import {
+  formatPreferenceDate,
+  formatPreferenceDateTime,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 
 const C = {
   navy: [25, 30, 41] as [number, number, number],
@@ -129,7 +128,7 @@ function drawFooter(doc: jsPDF, pageWidth: number, pageHeight: number, margin: n
   doc.text("Comprobante válido para control interno y respaldo de dispersión.", margin, footerTop + 24);
 }
 
-export async function downloadPayrollPdf(run: PayrollRun) {
+export async function downloadPayrollPdf(run: PayrollRun, preferences: UserPreferences) {
   const doc = new jsPDF({ format: "a4", unit: "mm" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -173,7 +172,7 @@ export async function downloadPayrollPdf(run: PayrollRun) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(...C.muted);
-  doc.text(`Generado · ${dateFmt.format(new Date())}`, pageWidth - margin, 25, { align: "right" });
+  doc.text(`Generado · ${formatPreferenceDateTime(new Date().toISOString(), preferences)}`, pageWidth - margin, 25, { align: "right" });
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7.5);
   doc.text("Tu contabilidad simplificada", pageWidth - margin, 30, { align: "right" });
@@ -185,7 +184,7 @@ export async function downloadPayrollPdf(run: PayrollRun) {
   drawLabelValue(
     doc,
     "Fecha de pago",
-    dateFmt.format(new Date(`${run.payDate}T12:00:00`)),
+    formatPreferenceDate(run.payDate, preferences, run.payDate),
     margin + 10,
     infoTop + 24,
     58,
@@ -207,9 +206,9 @@ export async function downloadPayrollPdf(run: PayrollRun) {
 
   const cards = [
     { label: "Empleados", value: String(run.employees) },
-    { label: "Percepciones", value: money.format(run.perceptions) },
-    { label: "Deducciones", value: money.format(run.deductions) },
-    { label: "Total pagado", value: money.format(run.paid) },
+    { label: "Percepciones", value: formatPreferenceMoney(run.perceptions, preferences) },
+    { label: "Deducciones", value: formatPreferenceMoney(run.deductions, preferences) },
+    { label: "Total pagado", value: formatPreferenceMoney(run.paid, preferences) },
   ];
 
   const cardWidth = (contentWidth - 10) / 2;
@@ -239,9 +238,9 @@ export async function downloadPayrollPdf(run: PayrollRun) {
   drawLightCard(doc, margin, detailCardTop, contentWidth, 32);
 
   const rows = [
-    { label: "Percepciones totales", value: money.format(run.perceptions), accent: false },
-    { label: "Deducciones aplicadas", value: `-${money.format(run.deductions)}`, accent: false },
-    { label: "Neto dispersado", value: money.format(run.paid), accent: true },
+    { label: "Percepciones totales", value: formatPreferenceMoney(run.perceptions, preferences), accent: false },
+    { label: "Deducciones aplicadas", value: `-${formatPreferenceMoney(run.deductions, preferences)}`, accent: false },
+    { label: "Neto dispersado", value: formatPreferenceMoney(run.paid, preferences), accent: true },
   ];
 
   rows.forEach((row, index) => {
@@ -270,7 +269,7 @@ export async function downloadPayrollPdf(run: PayrollRun) {
   doc.setTextColor(...C.navy);
   doc.text("Total neto a dispersar", margin + 10, totalTop + 10);
   doc.setFontSize(16);
-  doc.text(money.format(run.paid), pageWidth - margin - 10, totalTop + 15, { align: "right" });
+  doc.text(formatPreferenceMoney(run.paid, preferences), pageWidth - margin - 10, totalTop + 15, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(...C.navy);
