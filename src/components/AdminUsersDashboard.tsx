@@ -1,14 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Icon } from "@/components/Icon";
 import { type AdminDashboardUser } from "@/lib/adminUsers";
+import { createTranslator, resultCount } from "@/lib/i18n";
+import { paginateItems, paginationRangeLabel, TABLE_PAGE_SIZE } from "@/lib/pagination";
 import { canManageAdminUsers, canSuspendUserAccounts } from "@/lib/roles";
+import { matchesSearch } from "@/lib/tableSearch";
 import type { FiscalixUser } from "@/models/User";
 
-function formatDate(value: string | null) {
+function formatDate(value: string | null, language = "es") {
   if (!value) return "—";
-  return new Intl.DateTimeFormat("es-MX", {
+  return new Intl.DateTimeFormat(language === "en" ? "en-US" : "es-MX", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -43,11 +46,39 @@ export function AdminUsersDashboard({
   currentUser: FiscalixUser;
   users: AdminDashboardUser[];
 }) {
+  const language = currentUser.preferences?.language ?? "es";
+  const t = createTranslator(language);
   const [message, setMessage] = useState("");
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [query, setQuery] = useState("");
   const canDelete = canManageAdminUsers(currentUser);
   const canSuspend = canSuspendUserAccounts(currentUser);
   const canShowActions = canDelete || canSuspend;
+  const billingLabels = useMemo(() => ({
+    pago_no_acreditado: createTranslator(language)("billing.pago_no_acreditado"),
+    pagado_exito_mes: createTranslator(language)("billing.pagado_exito_mes"),
+    proxima_a_pagar: createTranslator(language)("billing.proxima_a_pagar"),
+    revision_manual: createTranslator(language)("billing.revision_manual"),
+  }) as const, [language]);
+  const billingLabel = useCallback(
+    (status: string, fallback: string) => billingLabels[status as keyof typeof billingLabels] ?? fallback,
+    [billingLabels],
+  );
+  const filteredUsers = useMemo(() => users.filter((user) => matchesSearch([
+    fullName(user),
+    user.correo,
+    user.telefono,
+    user.rolLabel,
+    user.companyName,
+    user.planName,
+    billingLabel(user.billingStatus, user.billingStatusLabel),
+    formatMoney(user.billingAmount),
+    user.estado,
+    formatDate(user.nextBillingDate, language),
+    formatDate(user.fechaRegistro, language),
+  ], query)), [billingLabel, language, query, users]);
+  const usersPage = useMemo(() => paginateItems(filteredUsers, page, TABLE_PAGE_SIZE), [filteredUsers, page]);
 
   const stats = useMemo(() => {
     const active = users.filter((user) => user.estado === "activo").length;
@@ -63,10 +94,10 @@ export function AdminUsersDashboard({
     if (action === "delete" && !canDelete) return;
     if (action !== "delete" && !canSuspend) return;
 
-    const actionLabel = action === "delete" ? "eliminar" : action === "suspend" ? "suspender" : "reactivar";
+    const actionLabel = action === "delete" ? t("admin.deleteAction") : action === "suspend" ? t("admin.suspendAction") : t("admin.activateAction");
     const confirmation = action === "delete"
-      ? `¿Seguro que deseas eliminar la cuenta de ${fullName(user)}? Esta acción no se puede deshacer.`
-      : `¿Seguro que deseas ${actionLabel} la cuenta de ${fullName(user)}?`;
+      ? t("admin.confirmDelete", { name: fullName(user) })
+      : t("admin.confirmAction", { action: actionLabel, name: fullName(user) });
 
     if (!window.confirm(confirmation)) return;
 
@@ -80,12 +111,12 @@ export function AdminUsersDashboard({
         method: action === "delete" ? "DELETE" : "PATCH",
       });
       const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? "No fue posible completar la acción.");
+      if (!response.ok) throw new Error(result.message ?? t("admin.actionError"));
 
-      setMessage(result.message ?? "Acción completada.");
+      setMessage(result.message ?? t("admin.actionDone"));
       window.location.reload();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "No fue posible completar la acción.");
+      setMessage(error instanceof Error ? error.message : t("admin.actionError"));
     } finally {
       setBusyUserId(null);
     }
@@ -95,12 +126,12 @@ export function AdminUsersDashboard({
     <main className="admin-content">
       <header className="admin-header">
         <div>
-          <p>CONTROL DE USUARIOS</p>
-          <h1>Dashboard administrativo</h1>
+          <p>{t("admin.eyebrow")}</p>
+          <h1>{t("admin.title")}</h1>
           <span>
             {canDelete
-              ? "Superadmin: consulta, suspende, reactiva y elimina clientes o administradores."
-              : "Administrador: consulta, suspende y reactiva clientes registrados en Fiscalix."}
+              ? t("admin.superDescription")
+              : t("admin.adminDescription")}
           </span>
         </div>
       </header>
@@ -110,22 +141,22 @@ export function AdminUsersDashboard({
       <section className="admin-stat-grid">
         <article>
           <span><Icon name="manage_accounts" /></span>
-          <small>Total visible</small>
+          <small>{t("admin.totalVisible")}</small>
           <strong>{stats.total}</strong>
         </article>
         <article>
           <span><Icon name="check_circle" /></span>
-          <small>Suscripciones activas</small>
+          <small>{t("admin.activeSubscriptions")}</small>
           <strong>{stats.activeSubscriptions}</strong>
         </article>
         <article>
           <span><Icon name="payments" /></span>
-          <small>Pagos exitosos este mes</small>
+          <small>{t("admin.successfulPayments")}</small>
           <strong>{stats.paidThisMonth}</strong>
         </article>
         <article>
           <span><Icon name="fact_check" /></span>
-          <small>Atención facturación</small>
+          <small>{t("admin.billingAttention")}</small>
           <strong>{stats.billingAttention}</strong>
         </article>
       </section>
@@ -133,28 +164,48 @@ export function AdminUsersDashboard({
       <section className="admin-table-card">
         <div className="admin-table-heading">
           <div>
-            <h2>Usuarios registrados</h2>
-            <p>{stats.suspended} cuenta(s) suspendida(s) dentro del alcance de tu rol.</p>
+            <h2>{t("admin.registeredUsers")}</h2>
+            <p>{t("admin.suspendedCount", { count: stats.suspended })}</p>
           </div>
-          <span>{canDelete ? "Acciones de superadmin habilitadas" : "Suspensión de clientes habilitada"}</span>
+          <div className="table-card-actions">
+            <label className="table-search">
+              <Icon name="search" />
+              <input
+                aria-label={t("admin.searchUsers")}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  setPage(1);
+                }}
+                placeholder={t("admin.searchPlaceholder")}
+                type="search"
+                value={query}
+              />
+              {query && (
+                <button className="table-search-submit" onClick={() => { setQuery(""); setPage(1); }} type="button">
+                  {t("button.clear")}
+                </button>
+              )}
+            </label>
+            <span>{resultCount(filteredUsers.length, language)}</span>
+          </div>
         </div>
 
         <div className="admin-table-scroll">
           <table className="admin-table">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Rol</th>
-                <th>Empresa</th>
-                <th>Plan activo</th>
-                <th>Facturación</th>
-                <th>Estado</th>
-                <th>Registro</th>
-                {canShowActions && <th>Acciones</th>}
+                <th>{t("admin.user")}</th>
+                <th>{t("admin.role")}</th>
+                <th>{t("table.company")}</th>
+                <th>{t("admin.activePlan")}</th>
+                <th>{t("admin.billing")}</th>
+                <th>{t("table.status")}</th>
+                <th>{t("admin.registration")}</th>
+                {canShowActions && <th>{t("table.actions")}</th>}
               </tr>
             </thead>
             <tbody>
-              {users.length ? users.map((user) => {
+              {filteredUsers.length ? usersPage.items.map((user) => {
                 const isSuspended = user.estado === "suspendido";
                 const isBusy = busyUserId === user.id;
 
@@ -166,19 +217,19 @@ export function AdminUsersDashboard({
                     </td>
                     <td><span className="admin-role-pill">{user.rolLabel}</span></td>
                     <td>
-                      <strong>{user.companyName ?? "Sin empresa"}</strong>
-                      <small>{user.telefono || "Sin teléfono"}</small>
+                      <strong>{user.companyName ?? t("common.noCompany")}</strong>
+                      <small>{user.telefono || t("admin.noPhone")}</small>
                     </td>
                     <td>
-                      <strong>{user.planName ?? "Sin plan"}</strong>
-                      <small>{formatMoney(user.billingAmount)} / mes</small>
+                      <strong>{user.planName ?? t("admin.noPlan")}</strong>
+                      <small>{formatMoney(user.billingAmount)} / {t("admin.perMonth")}</small>
                     </td>
                     <td>
-                      <span className={billingStatusClass(user.billingStatus)}>{user.billingStatusLabel}</span>
-                      <small>Próxima: {formatDate(user.nextBillingDate)}</small>
+                      <span className={billingStatusClass(user.billingStatus)}>{billingLabel(user.billingStatus, user.billingStatusLabel)}</span>
+                      <small>{t("admin.next")}: {formatDate(user.nextBillingDate, language)}</small>
                     </td>
                     <td><span className={isSuspended ? "admin-status suspended" : "admin-status"}>{user.estado ?? "activo"}</span></td>
-                    <td>{formatDate(user.fechaRegistro)}</td>
+                    <td>{formatDate(user.fechaRegistro, language)}</td>
                     {canShowActions && (
                       <td>
                         <div className="admin-actions">
@@ -188,7 +239,7 @@ export function AdminUsersDashboard({
                               disabled={isBusy}
                               onClick={() => mutateUser(user, isSuspended ? "activate" : "suspend")}
                             >
-                              {isSuspended ? "Reactivar" : "Suspender"}
+                              {isSuspended ? t("admin.activate") : t("admin.suspend")}
                             </button>
                           )}
                           {canDelete && (
@@ -198,7 +249,7 @@ export function AdminUsersDashboard({
                               disabled={isBusy}
                               onClick={() => mutateUser(user, "delete")}
                             >
-                              Eliminar
+                              {t("admin.delete")}
                             </button>
                           )}
                         </div>
@@ -211,8 +262,8 @@ export function AdminUsersDashboard({
                   <td colSpan={canShowActions ? 8 : 7}>
                     <div className="admin-empty">
                       <span><Icon name="manage_accounts" /></span>
-                      <strong>No hay usuarios para mostrar</strong>
-                      <small>Cuando existan usuarios dentro del alcance de tu rol aparecerán aquí.</small>
+                      <strong>{query ? t("admin.noUsersSearch") : t("admin.noUsers")}</strong>
+                      <small>{query ? t("common.tryAnotherSearch") : t("admin.noUsersHelp")}</small>
                     </div>
                   </td>
                 </tr>
@@ -220,6 +271,29 @@ export function AdminUsersDashboard({
             </tbody>
           </table>
         </div>
+        {filteredUsers.length > TABLE_PAGE_SIZE && (
+          <nav className="table-pagination" aria-label={t("pagination.label")}>
+            <span>{t("pagination.showing", { range: paginationRangeLabel(filteredUsers.length, usersPage.start, usersPage.end, language) })}</span>
+            <div>
+              <button disabled={usersPage.currentPage === 1} onClick={() => setPage((value) => Math.max(1, value - 1))} type="button">
+                <Icon name="chevron_left" />
+              </button>
+              {Array.from({ length: usersPage.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button
+                  className={pageNumber === usersPage.currentPage ? "is-active" : undefined}
+                  key={pageNumber}
+                  onClick={() => setPage(pageNumber)}
+                  type="button"
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button disabled={usersPage.currentPage === usersPage.totalPages} onClick={() => setPage((value) => Math.min(usersPage.totalPages, value + 1))} type="button">
+                <Icon name="chevron_right" />
+              </button>
+            </div>
+          </nav>
+        )}
       </section>
     </main>
   );

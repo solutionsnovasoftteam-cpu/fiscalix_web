@@ -7,4 +7,24 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/admin/:path*", "/dashboard/:path*", "/profile/:path*", "/companies/:path*", "/plans/:path*", "/reports/:path*", "/taxes/:path*", "/transactions/:path*", "/settings/:path*"] };
+export const config = {
+  matcher: [
+    "/admin/:path*",
+    "/centro-fiscal/:path*",
+    "/companies/:path*",
+    "/dashboard/:path*",
+    "/expenses/:path*",
+    "/income/:path*",
+    "/integrations/:path*",
+    "/payroll/:path*",
+    "/plans/:path*",
+    "/profile/:path*",
+    "/receipts/:path*",
+    "/reports/:path*",
+    "/settings/:path*",
+    "/support/:path*",
+    "/taxes/:path*",
+    "/transactions/:path*",
+    "/web-fiscal/:path*",
+  ],
+};

@@ -7,12 +7,16 @@ export async function PATCH(request: Request, context: RouteContext<"/api/compan
   if (!user) return NextResponse.json({ message: "No autorizado" }, { status: 401 });
 
   const { id } = await context.params;
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipError } = await supabase
     .from("empresa_usuario")
     .select("id")
     .eq("empresa_id", id)
     .eq("usuario_id", user.id)
     .maybeSingle();
+  if (membershipError) {
+    console.error("Error al validar acceso a empresa:", membershipError.message);
+    return NextResponse.json({ message: "No fue posible validar el acceso a esta empresa." }, { status: 500 });
+  }
   if (!membership) return NextResponse.json({ message: "No tienes permiso para editar esta empresa." }, { status: 403 });
 
   let body: unknown;
@@ -25,13 +29,15 @@ export async function PATCH(request: Request, context: RouteContext<"/api/compan
   if (!nombreComercial || !regimenId || !rfc) return NextResponse.json({ message: "Empresa, RFC y régimen fiscal son obligatorios." }, { status: 400 });
   if (!/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(rfc)) return NextResponse.json({ message: "El RFC debe tener 12 o 13 caracteres y una homoclave válida." }, { status: 400 });
 
-  const { data: regime } = await supabase.from("regimenes_fiscales").select("id").eq("id", regimenId).maybeSingle();
+  const { data: regime, error: regimeError } = await supabase.from("regimenes_fiscales").select("id").eq("id", regimenId).maybeSingle();
+  if (regimeError) return NextResponse.json({ message: "No fue posible validar el régimen fiscal." }, { status: 500 });
   if (!regime) return NextResponse.json({ message: "El régimen fiscal seleccionado no existe." }, { status: 400 });
 
   const { error: companyError } = await supabase.from("empresas").update({ nombre_comercial: nombreComercial, rfc }).eq("id", id);
   if (companyError) return NextResponse.json({ message: "No fue posible actualizar la empresa." }, { status: 500 });
 
-  const { data: fiscal } = await supabase.from("empresa_fiscal").select("id").eq("empresa_id", id).maybeSingle();
+  const { data: fiscal, error: fiscalQueryError } = await supabase.from("empresa_fiscal").select("id").eq("empresa_id", id).maybeSingle();
+  if (fiscalQueryError) return NextResponse.json({ message: "No fue posible consultar la información fiscal." }, { status: 500 });
   const fiscalPayload = { empresa_id: id, regimen_id: regimenId, rfc };
   const { error: fiscalError } = fiscal
     ? await supabase.from("empresa_fiscal").update(fiscalPayload).eq("id", fiscal.id)

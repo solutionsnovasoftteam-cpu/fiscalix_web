@@ -14,6 +14,21 @@ const icons: Record<string, ReactNode> = {
       <path d="M5 12h14" />
     </>
   ),
+  arrow_forward: (
+    <>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </>
+  ),
+  api: (
+    <>
+      <path d="M7 8c-1.7 0-3 1.1-3 2.5v3c0 1.4 1.3 2.5 3 2.5" />
+      <path d="M7 8v8" />
+      <path d="M17 8c1.7 0 3 1.1 3 2.5v3c0 1.4-1.3 2.5-3 2.5" />
+      <path d="M17 8v8" />
+      <path d="M10 12h4" />
+    </>
+  ),
   attach_money: (
     <>
       <path d="M12 3v18" />
@@ -51,6 +66,13 @@ const icons: Record<string, ReactNode> = {
       <path d="M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01" />
     </>
   ),
+  calendar_month: (
+    <>
+      <rect x="4" y="5" width="16" height="15" rx="2" />
+      <path d="M8 3v4M16 3v4M4 9h16" />
+      <path d="M8 13h.01M12 13h.01M16 13h.01M8 17h.01M12 17h.01M16 17h.01" />
+    </>
+  ),
   call: (
     <>
       <path d="M7.5 4.5 9.8 7a1.8 1.8 0 0 1 .3 1.9l-.7 1.5a12 12 0 0 0 4.2 4.2l1.5-.7a1.8 1.8 0 0 1 1.9.3l2.5 2.3a1.4 1.4 0 0 1 .1 2 3.7 3.7 0 0 1-3.6 1.1C9.8 18.1 5.9 14.2 4.4 8a3.7 3.7 0 0 1 1.1-3.6 1.4 1.4 0 0 1 2 .1Z" />
@@ -73,6 +95,22 @@ const icons: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.5" />
       <path d="m8.4 12.4 2.4 2.4 4.8-5.2" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="M6 6l12 12" />
+      <path d="M18 6 6 18" />
+    </>
+  ),
+  chevron_left: (
+    <>
+      <path d="m15 18-6-6 6-6" />
+    </>
+  ),
+  chevron_right: (
+    <>
+      <path d="m9 6 6 6-6 6" />
     </>
   ),
   corporate_fare: (
@@ -132,9 +170,23 @@ const icons: Record<string, ReactNode> = {
       <path d="M5.5 10.5V20h5v-5h3v5h5v-9.5" />
     </>
   ),
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 10.5V17" />
+      <path d="M12 7h.01" />
+    </>
+  ),
   keyboard_arrow_down: (
     <>
       <path d="m6 9 6 6 6-6" />
+    </>
+  ),
+  language: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M2 12h20" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
     </>
   ),
   location_on: (
@@ -200,6 +252,15 @@ const icons: Record<string, ReactNode> = {
     <>
       <circle cx="12" cy="8" r="3.5" />
       <path d="M4.8 20a7.2 7.2 0 0 1 14.4 0" />
+    </>
+  ),
+  picture_as_pdf: (
+    <>
+      <path d="M7 3.8h7l3 3V20a1.8 1.8 0 0 1-1.8 1.8H7A1.8 1.8 0 0 1 5.2 20V5.6A1.8 1.8 0 0 1 7 3.8Z" />
+      <path d="M14 3.8V7h3" />
+      <path d="M7.8 16.5v-5h1.7a1.4 1.4 0 1 1 0 2.8H7.8" />
+      <path d="M11.7 16.5v-5h1.2c1.3 0 2.1 1 2.1 2.5s-.8 2.5-2.1 2.5h-1.2Z" />
+      <path d="M16.1 16.5v-5h2.6M16.1 14h2" />
     </>
   ),
   receipt_long: (

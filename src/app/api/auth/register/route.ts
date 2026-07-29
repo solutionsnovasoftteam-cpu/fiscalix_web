@@ -2,7 +2,10 @@ import { getAuth } from "firebase-admin/auth";
 import { NextResponse } from "next/server";
 import { createSession, SESSION_COOKIE, SESSION_MAX_AGE, verifyToken } from "@/lib/auth";
 import { getFirebaseAdmin, normalizeEnvValue } from "@/lib/firebaseAdmin";
+import { sendFirebaseVerificationEmail } from "@/lib/emailVerification";
+import { assignFreePlanToNewUser } from "@/lib/defaultSubscription";
 import { supabase } from "@/lib/supabase";
+import { ensureDefaultUserPreferences } from "@/lib/userPreferences";
 import { assignDefaultRoleToUser } from "@/lib/userRoles";
 
 interface SignUpResponse {
@@ -109,9 +112,32 @@ export async function POST(request: Request) {
     }
 
     await assignDefaultRoleToUser(uid);
+    await ensureDefaultUserPreferences(uid);
+    const defaultPlan = await assignFreePlanToNewUser(data);
+    let emailVerificationSent = false;
+
+    if (idToken) {
+      try {
+        await sendFirebaseVerificationEmail(idToken, request.url);
+        emailVerificationSent = true;
+      } catch (verificationError) {
+        console.error(
+          "No fue posible enviar el correo de verificación:",
+          verificationError instanceof Error ? verificationError.message : verificationError,
+        );
+      }
+    }
 
     const response = isJson
-      ? NextResponse.json({ success: true, message: "Cuenta creada correctamente", data }, { status: 201 })
+      ? NextResponse.json({
+        success: true,
+        message: defaultPlan.assigned
+          ? "Cuenta creada correctamente con Plan Free"
+          : "Cuenta creada correctamente",
+        data,
+        defaultPlan,
+        emailVerificationSent,
+      }, { status: 201 })
       : NextResponse.redirect(new URL("/dashboard", request.url), 303);
     if (idToken) {
       const sessionCookie = await createSession(idToken);

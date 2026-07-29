@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#232f3e"/>
+  <path d="M32 14c-10 2-18 8-18 14v4c0 6 8 12 18 14 10-2 18-8 18-14v-4c0-6-8-12-18-14z" fill="#ff9900"/>
+  <ellipse cx="32" cy="28" rx="18" ry="6" fill="#ffb84d"/>
+  <path d="M14 32v4c0 6 8 12 18 14 10-2 18-8 18-14v-4" stroke="#ff9900" stroke-width="2"/>
+  <text x="32" y="52" text-anchor="middle" fill="#ff9900" font-family="Arial,sans-serif" font-size="10" font-weight="800">S3</text>
+</svg>

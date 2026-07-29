@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { createPlanSavedNotification } from "@/lib/notifications";
 import { basicPlanSelect, extendedPlanSelect, isMissingPlanColumnError, type PlanDbRow } from "@/lib/plans";
 import { canManagePlans } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
@@ -55,7 +56,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "Solo el superadministrador puede editar planes." }, { status: 403 });
   }
 
-  const body = (await request.json()) as PlanPayload;
+  let body: PlanPayload;
+  try {
+    body = (await request.json()) as PlanPayload;
+  } catch {
+    return NextResponse.json({ message: "Solicitud inválida." }, { status: 400 });
+  }
+
   const nombre = typeof body.name === "string" ? body.name.trim() : "";
   const precioMensual = cleanPrice(body.monthlyAmount);
   const precioAnual = cleanPrice(body.annualAmount);
@@ -107,6 +114,12 @@ export async function POST(request: Request) {
     console.error("Error al guardar plan:", error.message);
     return NextResponse.json({ message: "No fue posible guardar el plan." }, { status: 500 });
   }
+
+  await createPlanSavedNotification({
+    action: body.databaseId ? "updated" : "created",
+    planName: nombre,
+    userId: user.id,
+  });
 
   return NextResponse.json({ plan: data });
 }

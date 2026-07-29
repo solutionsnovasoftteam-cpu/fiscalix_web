@@ -3,7 +3,9 @@ import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { CompanyFiscalEditor } from "@/components/CompanyFiscalEditor";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
+import { defaultUserPreferences } from "@/lib/userPreferences.shared";
 
 type Company = {
   id: string;
@@ -35,19 +37,21 @@ function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
-function fallback(value: string | null | undefined) {
-  return value?.trim() || "Pendiente de registrar";
+function fallback(value: string | null | undefined, fallbackText = "Pendiente de registrar") {
+  return value?.trim() || fallbackText;
 }
 
-function regimenLabel(fiscal: FiscalInfo | undefined) {
+function regimenLabel(fiscal: FiscalInfo | undefined, fallbackText = "Pendiente de registrar") {
   const regimen = firstRelation(fiscal?.regimenes_fiscales);
-  if (!regimen) return "Pendiente de registrar";
-  return [regimen.clave_sat, regimen.nombre].filter(Boolean).join(" · ") || "Pendiente de registrar";
+  if (!regimen) return fallbackText;
+  return [regimen.clave_sat, regimen.nombre].filter(Boolean).join(" · ") || fallbackText;
 }
 
 export default async function CompaniesPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
 
   const { data: memberships, error: membershipError } = await supabase
     .from("empresa_usuario")
@@ -84,79 +88,93 @@ export default async function CompaniesPage() {
       <main className="companies-content">
         <header className="companies-header">
           <div>
-            <h1>Mi empresa</h1>
-            <span>Información de tu empresa registrada en la base de datos.</span>
+            <h1>{t("company.title")}</h1>
+            <span>{t("company.description")}</span>
           </div>
-          <CompanyFiscalEditor company={selectedCompany ? { id:selectedCompany.id, nombre:selectedCompany.nombre_comercial ?? "", regimeId:selectedFiscal?.regimen_id ?? "", rfc:selectedFiscal?.rfc || selectedCompany.rfc || "" } : null} regimes={regimes.map((regime) => ({ clave:regime.clave_sat, id:regime.id, nombre:regime.nombre }))} />
+          <CompanyFiscalEditor
+            company={selectedCompany ? {
+              address: t("profile.pendingRegister"),
+              email: fallback(user.correo, t("profile.pendingRegister")),
+              id: selectedCompany.id,
+              legalName: fallback(selectedCompany.nombre_comercial, t("profile.pendingRegister")),
+              nombre: selectedCompany.nombre_comercial ?? "",
+              phone: fallback(user.telefono, t("profile.pendingRegister")),
+              regimeId: selectedFiscal?.regimen_id ?? "",
+              rfc: selectedFiscal?.rfc || selectedCompany.rfc || "",
+            } : null}
+            key={selectedCompany ? `${selectedCompany.id}-${selectedCompany.nombre_comercial ?? ""}-${selectedFiscal?.rfc ?? selectedCompany.rfc ?? ""}-${selectedFiscal?.regimen_id ?? ""}` : "company-editor-empty"}
+            language={preferences.language}
+            regimes={regimes.map((regime) => ({ clave: regime.clave_sat, id: regime.id, nombre: regime.nombre }))}
+          />
         </header>
 
         {hasError && (
           <section className="companies-alert" role="alert">
-            <strong>No fue posible cargar toda la información de empresa.</strong>
-            <span>Revisa la conexión con Supabase o los permisos de las tablas empresariales.</span>
+            <strong>{t("company.loadError")}</strong>
+            <span>{t("company.loadErrorHelp")}</span>
           </section>
         )}
 
         <section className="companies-summary-grid">
           <article>
-            <small>Empresa</small>
-            <strong>{fallback(selectedCompany?.nombre_comercial)}</strong>
+            <small>{t("company.company")}</small>
+            <strong>{fallback(selectedCompany?.nombre_comercial, t("profile.pendingRegister"))}</strong>
           </article>
           <article>
             <small>RFC</small>
-            <strong>{fallback(selectedFiscal?.rfc || selectedCompany?.rfc)}</strong>
+            <strong>{fallback(selectedFiscal?.rfc || selectedCompany?.rfc, t("profile.pendingRegister"))}</strong>
           </article>
           <article>
-            <small>Régimen fiscal</small>
-            <strong>{regimenLabel(selectedFiscal)}</strong>
+            <small>{t("profile.fiscalRegime")}</small>
+            <strong>{regimenLabel(selectedFiscal, t("profile.pendingRegister"))}</strong>
           </article>
           <article>
-            <small>Estado</small>
-            <strong>{fallback(selectedCompany?.estado)}</strong>
+            <small>{t("company.status")}</small>
+            <strong>{fallback(selectedCompany?.estado, t("profile.pendingRegister"))}</strong>
           </article>
         </section>
 
         {selectedCompany ? (
           <section className="company-card">
             <div className="company-card-heading">
-              <h2><Icon name="corporate_fare" />Información fiscal</h2>
-              {companies.length > 1 && <small>{companies.length} empresas vinculadas</small>}
+              <h2><Icon name="corporate_fare" />{t("company.info")}</h2>
+              {companies.length > 1 && <small>{t("company.linkedCompanies", { count: companies.length })}</small>}
             </div>
 
             <div className="company-info-grid">
               <div className="company-info-list">
-                <div><span>Nombre comercial</span><strong>{fallback(selectedCompany.nombre_comercial)}</strong></div>
-                <div><span>RFC de empresa</span><strong>{fallback(selectedCompany.rfc)}</strong></div>
-                <div><span>RFC fiscal</span><strong>{fallback(selectedFiscal?.rfc)}</strong></div>
-                <div><span>Régimen fiscal</span><strong>{regimenLabel(selectedFiscal)}</strong></div>
+                <div><span>{t("company.commercialName")}</span><strong>{fallback(selectedCompany.nombre_comercial, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("company.companyRfc")}</span><strong>{fallback(selectedCompany.rfc, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("company.fiscalRfc")}</span><strong>{fallback(selectedFiscal?.rfc, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("profile.fiscalRegime")}</span><strong>{regimenLabel(selectedFiscal, t("profile.pendingRegister"))}</strong></div>
               </div>
 
               <div className="company-info-list">
-                <div><span>Estado</span><strong>{fallback(selectedCompany.estado)}</strong></div>
-                <div><span>Obligaciones registradas</span><strong>{selectedObligations.length}</strong></div>
-                <div><span>Obligaciones activas</span><strong>{activeObligations.length}</strong></div>
-                <div><span>Empresas vinculadas a tu usuario</span><strong>{companies.length}</strong></div>
+                <div><span>{t("company.status")}</span><strong>{fallback(selectedCompany.estado, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("company.registeredObligations")}</span><strong>{selectedObligations.length}</strong></div>
+                <div><span>{t("company.activeObligations")}</span><strong>{activeObligations.length}</strong></div>
+                <div><span>{t("company.linkedToUser")}</span><strong>{companies.length}</strong></div>
               </div>
             </div>
           </section>
         ) : (
           <section className="company-card company-empty">
             <span aria-hidden="true"><Icon name="business" /></span>
-            <strong>No hay empresa vinculada a tu usuario</strong>
-            <small>Cuando exista un registro en empresa_usuario y empresas, aparecerá aquí automáticamente.</small>
+            <strong>{t("company.noLinked")}</strong>
+            <small>{t("company.noLinkedHelp")}</small>
           </section>
         )}
 
         {activeObligations.length > 0 && (
           <section className="company-card obligations-card">
             <div className="company-card-heading">
-              <h2><Icon name="fact_check" />Obligaciones fiscales</h2>
+              <h2><Icon name="fact_check" />{t("company.fiscalObligations")}</h2>
             </div>
             <div className="obligations-list">
               {activeObligations.map((obligation) => (
                 <article key={obligation.id}>
-                  <strong>{fallback(obligation.nombre)}</strong>
-                  <span>{fallback(obligation.periodicidad)}</span>
+                  <strong>{fallback(obligation.nombre, t("profile.pendingRegister"))}</strong>
+                  <span>{fallback(obligation.periodicidad, t("profile.pendingRegister"))}</span>
                   {obligation.descripcion && <p>{obligation.descripcion}</p>}
                 </article>
               ))}

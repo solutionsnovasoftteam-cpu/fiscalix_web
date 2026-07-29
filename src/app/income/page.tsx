@@ -1,13 +1,27 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
+import { TablePagination } from "@/components/TablePagination";
+import { TableSearch } from "@/components/TableSearch";
+import { IncomeActions } from "@/app/income/income-actions";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { createTranslator } from "@/lib/i18n";
+import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
+import { matchesSearch, searchParamText } from "@/lib/tableSearch";
+import {
+  defaultUserPreferences,
+  formatPreferenceDate,
+  formatPreferenceMoney,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 
 type IncomeRow = {
   id: string;
   concepto: string;
   monto: number | string;
+  usuario_id?: string | null;
   fecha_ingreso: string;
   empresa_id: string | null;
   categoria_id: string | null;
@@ -15,71 +29,145 @@ type IncomeRow = {
   categorias_financieras: { nombre: string | null; tipo: string | null } | { nombre: string | null; tipo: string | null }[] | null;
 };
 
-const moneyFormatter = new Intl.NumberFormat("es-MX", {
-  currency: "MXN",
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "currency",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
+type CategoryRow = {
+  id: string;
+  nombre: string | null;
+  tipo: string | null;
+};
 
 function asNumber(value: number | string) {
   const parsed = typeof value === "number" ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatDate(value: string) {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+function formatDate(value: string, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences, value);
 }
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
 
-function categoryLabel(income: IncomeRow) {
-  return firstRelation(income.categorias_financieras)?.nombre || "Sin categoría";
+function categoryLabel(income: IncomeRow, fallbackText = "Sin categoría") {
+  return firstRelation(income.categorias_financieras)?.nombre || fallbackText;
 }
 
-export default async function IncomePage() {
+function splitCustomCompanyConcept(value: string | null | undefined) {
+  const cleanValue = value?.trim() ?? "";
+  const [companyName, ...descriptionParts] = cleanValue.split(" · ");
+  if (!descriptionParts.length) return { companyName: "", description: cleanValue };
+
+  const description = descriptionParts.join(" · ").trim();
+  return {
+    companyName: companyName.trim(),
+    description: description || cleanValue,
+  };
+}
+
+function companyLabel(income: IncomeRow, fallbackText = "Independiente") {
+  const registeredCompany = firstRelation(income.empresas)?.nombre_comercial;
+  if (registeredCompany) return registeredCompany;
+
+  return splitCustomCompanyConcept(income.concepto).companyName || fallbackText;
+}
+
+function incomeDescription(income: IncomeRow, fallbackText = "Sin registrar") {
+  if (firstRelation(income.empresas)?.nombre_comercial) return fallback(income.concepto, fallbackText);
+  return fallback(splitCustomCompanyConcept(income.concepto).description, fallbackText);
+}
+
+function fallback(value: string | null | undefined, fallbackText = "Sin registrar") {
+  return value?.trim() || fallbackText;
+}
+
+function isIncomeCategory(category: CategoryRow) {
+  const normalized = category.tipo?.trim().toLowerCase();
+  return !normalized || ["ingreso", "ingresos", "income", "incomes", "revenue", "venta", "ventas"].includes(normalized);
+}
+
+export default async function IncomePage({
+  searchParams,
+}: {
+  searchParams: Promise<PageSearchParams>;
+}) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
+  const money = (value: number) => formatPreferenceMoney(value, preferences);
+  const resolvedSearchParams = await searchParams;
+  const query = searchParamText(resolvedSearchParams, "q");
 
-  const { data, error } = await supabase
-    .from("ingresos")
-    .select("id,concepto,monto,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
-    .order("fecha_ingreso", { ascending: false })
-    .limit(50);
+  const { companies, error: companiesError } = await getAccessibleCompanies(user);
+  const companyIds = companies.map((company) => company.id);
 
-  const incomes = (data ?? []) as IncomeRow[];
+  const [companyIncomeResult, userIncomeResult, categoriesResult] = await Promise.all([
+    companyIds.length
+      ? supabase
+          .from("ingresos")
+          .select("id,concepto,monto,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
+          .in("empresa_id", companyIds)
+          .order("fecha_ingreso", { ascending: false })
+          .limit(50)
+      : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,categoria_id,empresas(nombre_comercial),categorias_financieras(nombre,tipo)")
+      .eq("usuario_id", user.id)
+      .order("fecha_ingreso", { ascending: false })
+      .limit(50),
+    supabase.from("categorias_financieras").select("id,nombre,tipo").order("nombre", { ascending: true }),
+  ]);
+
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
+  const incomesById = new Map<string, IncomeRow>();
+  for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) {
+    incomesById.set(income.id, income);
+  }
+  const incomes = Array.from(incomesById.values()).sort((a, b) => String(b.fecha_ingreso ?? "").localeCompare(String(a.fecha_ingreso ?? ""))).slice(0, 50);
+  const incomeCategories = ((categoriesResult.data ?? []) as CategoryRow[]).filter(isIncomeCategory);
   const total = incomes.reduce((sum, income) => sum + asNumber(income.monto), 0);
   const average = incomes.length ? total / incomes.length : 0;
   const categories = new Set(incomes.map((income) => income.categoria_id).filter(Boolean)).size;
   const uncategorized = incomes.filter((income) => !income.categoria_id).length;
+  const filteredIncomes = incomes.filter((income) => matchesSearch([
+    formatDate(income.fecha_ingreso, preferences),
+    income.fecha_ingreso,
+    companyLabel(income, t("common.independent")),
+    incomeDescription(income, t("common.notRegistered")),
+    categoryLabel(income, t("common.noCategory")),
+    asNumber(income.monto),
+    money(asNumber(income.monto)),
+  ], query));
+  const incomePage = paginateItems(filteredIncomes, pageFromParam(resolvedSearchParams.page));
 
   return (
     <AppShell activeHref="/income" user={user}>
       <main className="income-content">
         <header className="income-header">
           <div>
-            <h1>Ingresos</h1>
-            <span>Gestiona todos los ingresos registrados en tu base de datos.</span>
+            <h1>{t("income.title")}</h1>
+            <span>{t("income.description")}</span>
           </div>
-          <div className="income-actions">
-            <button type="button">Exportar <Icon name="keyboard_arrow_down" /></button>
-            <button className="primary-button compact" type="button">Nuevo ingreso <Icon name="add" /></button>
-          </div>
+          <IncomeActions
+            categories={incomeCategories.map((category) => ({ id: category.id, nombre: fallback(category.nombre, t("common.notRegistered")) }))}
+            companies={companies.map((company) => ({ id: company.id, nombre: fallback(company.nombre_comercial, t("common.notRegistered")) }))}
+            rows={incomes.map((income) => ({
+              categoria: categoryLabel(income, t("common.noCategory")),
+              concepto: incomeDescription(income, t("common.notRegistered")),
+              empresa: companyLabel(income, t("common.independent")),
+              fecha_ingreso: income.fecha_ingreso,
+              id: income.id,
+              monto: asNumber(income.monto),
+            }))}
+            preferences={preferences}
+          />
         </header>
 
-        {error && (
+        {(companiesError || companyIncomeResult.error || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error) || categoriesResult.error) && (
           <section className="income-alert" role="alert">
-            <strong>No fue posible cargar los ingresos.</strong>
-            <span>Revisa la conexión con Supabase o los permisos de la tabla ingresos.</span>
+            <strong>{t("income.loadError")}</strong>
+            <span>{t("income.loadErrorHelp")}</span>
           </section>
         )}
 
@@ -87,33 +175,33 @@ export default async function IncomePage() {
           <article>
             <span><Icon name="attach_money" /></span>
             <div>
-              <small>Ingresos totales</small>
-              <strong>{moneyFormatter.format(total)}</strong>
-              <p>Calculado desde la tabla ingresos</p>
+              <small>{t("income.totalMoney")}</small>
+              <strong>{money(total)}</strong>
+              <p>{t("income.calculated")}</p>
             </div>
           </article>
           <article>
             <span><Icon name="receipt_long" /></span>
             <div>
-              <small>Total de ingresos</small>
+              <small>{t("income.totalCount")}</small>
               <strong>{incomes.length}</strong>
-              <p>{incomes.length === 1 ? "registro" : "registros"}</p>
+              <p>{t(incomes.length === 1 ? "income.record" : "income.records")}</p>
             </div>
           </article>
           <article>
             <span><Icon name="calculate" /></span>
             <div>
-              <small>Promedio por ingreso</small>
-              <strong>{moneyFormatter.format(average)}</strong>
-              <p>{incomes.length ? "Promedio real registrado" : "Sin registros"}</p>
+              <small>{t("income.average")}</small>
+              <strong>{money(average)}</strong>
+              <p>{incomes.length ? t("income.realAverage") : t("income.noRecords")}</p>
             </div>
           </article>
           <article>
             <span><Icon name="category" /></span>
             <div>
-              <small>Categorías usadas</small>
+              <small>{t("income.categories")}</small>
               <strong>{categories}</strong>
-              <p>{uncategorized ? `${uncategorized} sin categoría` : "Sin pendientes de categoría"}</p>
+              <p>{uncategorized ? t("income.uncategorized", { count: uncategorized }) : t("income.noCategoryPending")}</p>
             </div>
           </article>
         </section>
@@ -121,16 +209,19 @@ export default async function IncomePage() {
         <section className="income-table-card">
           <div className="income-toolbar">
             <div className="income-tabs" aria-label="Filtros de ingresos">
-              <button className="active" type="button">Todos</button>
-              <button type="button">Categorizados</button>
-              <button type="button">Sin categoría</button>
+              <button className="active" type="button">{t("income.all")}</button>
+              <button type="button">{t("income.categorized")}</button>
+              <button type="button">{t("income.uncategorizedTab")}</button>
             </div>
             <div className="income-tools">
-              <label>
-                <Icon name="search" />
-                <input placeholder="Buscar ingresos..." type="search" />
-              </label>
-              <button type="button"><Icon name="filter_list" /> Filtrar</button>
+              <TableSearch
+                label={t("income.searchLabel")}
+                language={preferences.language}
+                pathname="/income"
+                placeholder={t("income.searchPlaceholder")}
+                searchParams={resolvedSearchParams}
+              />
+              <button type="button"><Icon name="filter_list" /> {t("button.filter")}</button>
             </div>
           </div>
 
@@ -138,22 +229,22 @@ export default async function IncomePage() {
             <table className="income-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Descripción</th>
-                  <th>Empresa</th>
-                  <th>Monto</th>
-                  <th>Categoría</th>
+                  <th>{t("table.date")}</th>
+                  <th>{t("table.company")}</th>
+                  <th>{t("table.description")}</th>
+                  <th>{t("table.amount")}</th>
+                  <th>{t("table.category")}</th>
                 </tr>
               </thead>
               <tbody>
-                {incomes.length ? (
-                  incomes.map((income) => (
+                {filteredIncomes.length ? (
+                  incomePage.items.map((income) => (
                     <tr key={income.id}>
-                      <td>{formatDate(income.fecha_ingreso)}</td>
-                      <td>{income.concepto}</td>
-                      <td>{firstRelation(income.empresas)?.nombre_comercial || "Sin empresa"}</td>
-                      <td>{moneyFormatter.format(asNumber(income.monto))}</td>
-                      <td><span className="income-category"><Icon name="trending_up" /> {categoryLabel(income)}</span></td>
+                      <td>{formatDate(income.fecha_ingreso, preferences)}</td>
+                      <td>{companyLabel(income, t("common.independent"))}</td>
+                      <td>{incomeDescription(income, t("common.notRegistered"))}</td>
+                      <td>{money(asNumber(income.monto))}</td>
+                      <td><span className="income-category"><Icon name="trending_up" /> {categoryLabel(income, t("common.noCategory"))}</span></td>
                     </tr>
                   ))
                 ) : (
@@ -161,8 +252,8 @@ export default async function IncomePage() {
                     <td colSpan={5}>
                       <div className="income-empty">
                         <span><Icon name="trending_up" /></span>
-                        <strong>No hay ingresos registrados</strong>
-                        <small>Cuando registres ingresos en Supabase, aparecerán aquí automáticamente.</small>
+                        <strong>{query ? t("income.noSearch") : t("income.empty")}</strong>
+                        <small>{query ? t("common.tryAnotherSearch") : t("income.emptyHelp")}</small>
                       </div>
                     </td>
                   </tr>
@@ -170,6 +261,14 @@ export default async function IncomePage() {
               </tbody>
             </table>
           </div>
+          <TablePagination
+            currentPage={incomePage.currentPage}
+            end={incomePage.end}
+            hrefForPage={(page) => pageHref("/income", resolvedSearchParams, "page", page)}
+            language={preferences.language}
+            start={incomePage.start}
+            totalItems={filteredIncomes.length}
+          />
         </section>
       </main>
     </AppShell>

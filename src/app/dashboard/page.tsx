@@ -1,17 +1,20 @@
 import { redirect } from "next/navigation";
+import { DashboardExportButton } from "@/app/dashboard/dashboard-export-button";
 import { Icon } from "@/components/Icon";
+import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
-import { canViewAdminDashboard } from "@/lib/roles";
+import { createTranslator } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
+import {
+  defaultUserPreferences,
+  formatPreferenceDate,
+  formatPreferenceMoney,
+  formatPreferenceMonth,
+  type UserPreferences,
+} from "@/lib/userPreferences.shared";
 import { firstName } from "@/lib/utils";
 
 type Relation<T> = T | T[] | null;
-
-type CompanyRow = {
-  estado: string | null;
-  id: string;
-  nombre_comercial: string | null;
-};
 
 type FinanceRelation = {
   nombre: string | null;
@@ -25,6 +28,7 @@ type IncomeRow = {
   fecha_ingreso: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ExpenseRow = {
@@ -35,6 +39,7 @@ type ExpenseRow = {
   fecha_gasto: string | null;
   id: string;
   monto: number | string | null;
+  usuario_id?: string | null;
 };
 
 type ObligationRow = {
@@ -64,30 +69,6 @@ type Movement = {
   type: "Ingreso" | "Gasto";
 };
 
-const moneyFormatter = new Intl.NumberFormat("es-MX", {
-  currency: "MXN",
-  maximumFractionDigits: 2,
-  minimumFractionDigits: 2,
-  style: "currency",
-});
-
-const dateFormatter = new Intl.DateTimeFormat("es-MX", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
-
-const monthFormatter = new Intl.DateTimeFormat("es-MX", {
-  month: "short",
-});
-
-const billingStatusLabels: Record<string, string> = {
-  pago_no_acreditado: "Pago no acreditado",
-  pagado_exito_mes: "Pagado con éxito este mes",
-  proxima_a_pagar: "Próxima a pagar",
-  revision_manual: "Revisión manual",
-};
-
 function firstRelation<T>(value: Relation<T> | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
 }
@@ -104,10 +85,13 @@ function dateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function formatDate(value: string | null | undefined) {
-  if (!value) return "Sin fecha";
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+function formatDate(value: string | null | undefined, preferences: UserPreferences) {
+  return formatPreferenceDate(value, preferences);
+}
+
+function formatMonthPeriod(key: string, preferences: UserPreferences) {
+  const date = new Date(`${key}-01T00:00:00`);
+  return Number.isNaN(date.getTime()) ? key : formatPreferenceMonth(date, preferences, true);
 }
 
 function compareDatesDesc(a: string | null | undefined, b: string | null | undefined) {
@@ -118,40 +102,7 @@ function compareDatesAsc(a: string | null | undefined, b: string | null | undefi
   return String(a ?? "").localeCompare(String(b ?? ""));
 }
 
-async function getAccessibleCompanies(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  if (canViewAdminDashboard(user)) {
-    const { data, error } = await supabase
-      .from("empresas")
-      .select("id,nombre_comercial,estado")
-      .order("nombre_comercial", { ascending: true });
-
-    return {
-      companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-      error,
-    };
-  }
-
-  const { data: memberships, error: membershipError } = await supabase
-    .from("empresa_usuario")
-    .select("empresa_id")
-    .eq("usuario_id", user.id);
-
-  const companyIds = [...new Set((memberships ?? []).map((item) => item.empresa_id).filter(Boolean))] as string[];
-  if (!companyIds.length || membershipError) return { companies: [] as CompanyRow[], error: membershipError };
-
-  const { data, error } = await supabase
-    .from("empresas")
-    .select("id,nombre_comercial,estado")
-    .in("id", companyIds)
-    .order("nombre_comercial", { ascending: true });
-
-  return {
-    companies: ((data ?? []) as CompanyRow[]).filter((company) => company.estado !== "suspendida"),
-    error,
-  };
-}
-
-function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[]) {
+function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[], preferences: UserPreferences) {
   const now = new Date();
   const months = Array.from({ length: 6 }, (_, index) => {
     const date = new Date(now.getFullYear(), now.getMonth() - 5 + index, 1);
@@ -160,7 +111,7 @@ function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[]) {
       expenses: 0,
       incomes: 0,
       key,
-      label: monthFormatter.format(date).replace(".", ""),
+      label: formatPreferenceMonth(date, preferences),
     };
   });
 
@@ -181,9 +132,70 @@ function buildMonthlySummary(incomes: IncomeRow[], expenses: ExpenseRow[]) {
   return months;
 }
 
+function buildFinanceLinePoints(
+  months: ReturnType<typeof buildMonthlySummary>,
+  field: "expenses" | "incomes",
+  maxValue: number,
+) {
+  const left = 86;
+  const right = 28;
+  const top = 24;
+  const bottom = 198;
+  const width = 680 - left - right;
+  const height = bottom - top;
+  const divisor = Math.max(1, months.length - 1);
+
+  return months.map((month, index) => {
+    const x = left + (width / divisor) * index;
+    const y = bottom - (Math.max(0, month[field]) / maxValue) * height;
+    return {
+      label: month.label,
+      value: month[field],
+      x: Number(x.toFixed(2)),
+      y: Number(y.toFixed(2)),
+    };
+  });
+}
+
+function buildSvgPath(points: Array<{ x: number; y: number }>) {
+  return points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+}
+
+function buildSvgAreaPath(points: Array<{ x: number; y: number }>) {
+  if (!points.length) return "";
+  const bottom = 198;
+  const firstPoint = points[0];
+  const lastPoint = points[points.length - 1];
+  return `${buildSvgPath(points)} L ${lastPoint.x} ${bottom} L ${firstPoint.x} ${bottom} Z`;
+}
+
+function buildFinanceTicks(maxValue: number) {
+  const top = 24;
+  const bottom = 198;
+  const height = bottom - top;
+
+  return [1, 2 / 3, 1 / 3, 0].map((ratio) => ({
+    value: maxValue * ratio,
+    y: Number((bottom - height * ratio).toFixed(2)),
+  }));
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 export default async function DashboardPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  const preferences = user.preferences ?? defaultUserPreferences;
+  const t = createTranslator(preferences.language);
+  const money = (value: number) => formatPreferenceMoney(value, preferences);
+  const billingStatusLabels: Record<string, string> = {
+    pago_no_acreditado: t("billing.pago_no_acreditado"),
+    pagado_exito_mes: t("billing.pagado_exito_mes"),
+    proxima_a_pagar: t("billing.proxima_a_pagar"),
+    revision_manual: t("billing.revision_manual"),
+  };
 
   const today = new Date();
   const currentMonthStart = dateKey(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -193,44 +205,69 @@ export default async function DashboardPage() {
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
-  const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || "Sin empresa"]));
+  const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
 
-  const [incomeResult, expenseResult, obligationsResult, subscriptionsResult] = companyIds.length
-    ? await Promise.all([
-        supabase
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationsResult, subscriptionsResult] = await Promise.all([
+    companyIds.length
+      ? supabase
           .from("ingresos")
           .select("id,concepto,monto,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
           .in("empresa_id", companyIds)
           .gte("fecha_ingreso", sixMonthStart)
-          .order("fecha_ingreso", { ascending: false }),
-        supabase
+          .order("fecha_ingreso", { ascending: false })
+      : Promise.resolve({ data: [] as IncomeRow[], error: null }),
+    supabase
+      .from("ingresos")
+      .select("id,concepto,monto,usuario_id,fecha_ingreso,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .gte("fecha_ingreso", sixMonthStart)
+      .order("fecha_ingreso", { ascending: false }),
+    companyIds.length
+      ? supabase
           .from("gastos")
           .select("id,concepto,monto,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
           .in("empresa_id", companyIds)
           .gte("fecha_gasto", sixMonthStart)
-          .order("fecha_gasto", { ascending: false }),
-        supabase
+          .order("fecha_gasto", { ascending: false })
+      : Promise.resolve({ data: [] as ExpenseRow[], error: null }),
+    supabase
+      .from("gastos")
+      .select("id,concepto,monto,usuario_id,fecha_gasto,empresa_id,empresas(nombre_comercial),categorias_financieras(nombre)")
+      .eq("usuario_id", user.id)
+      .gte("fecha_gasto", sixMonthStart)
+      .order("fecha_gasto", { ascending: false }),
+    companyIds.length
+      ? supabase
           .from("obligaciones_fiscales")
           .select("id,empresa_id,nombre,periodicidad,descripcion,activa")
           .in("empresa_id", companyIds)
-          .eq("activa", true),
-        supabase
+          .eq("activa", true)
+      : Promise.resolve({ data: [] as ObligationRow[], error: null }),
+    companyIds.length
+      ? supabase
           .from("suscripciones")
           .select("id,empresa_id,estado_pago,fecha_proxima_facturacion,planes(nombre)")
-          .in("empresa_id", companyIds),
-      ])
-    : [
-        { data: [] as IncomeRow[], error: null },
-        { data: [] as ExpenseRow[], error: null },
-        { data: [] as ObligationRow[], error: null },
-        { data: [] as SubscriptionRow[], error: null },
-      ];
+          .in("empresa_id", companyIds)
+      : Promise.resolve({ data: [] as SubscriptionRow[], error: null }),
+  ]);
 
-  const incomes = (incomeResult.data ?? []) as IncomeRow[];
-  const expenses = (expenseResult.data ?? []) as ExpenseRow[];
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
+  const userExpenses = isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as ExpenseRow[];
+  const incomesById = new Map<string, IncomeRow>();
+  const expensesById = new Map<string, ExpenseRow>();
+  for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) incomesById.set(income.id, income);
+  for (const expense of [...((companyExpenseResult.data ?? []) as ExpenseRow[]), ...userExpenses]) expensesById.set(expense.id, expense);
+  const incomes = Array.from(incomesById.values());
+  const expenses = Array.from(expensesById.values());
   const obligations = (obligationsResult.data ?? []) as ObligationRow[];
   const subscriptions = (subscriptionsResult.data ?? []) as SubscriptionRow[];
-  const hasError = companiesError || incomeResult.error || expenseResult.error || obligationsResult.error || subscriptionsResult.error;
+  const hasError = companiesError
+    || companyIncomeResult.error
+    || (!isMissingColumnError(userIncomeResult.error, "usuario_id") && userIncomeResult.error)
+    || companyExpenseResult.error
+    || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error)
+    || obligationsResult.error
+    || subscriptionsResult.error;
 
   const monthIncomes = incomes.filter((income) => income.fecha_ingreso && income.fecha_ingreso >= currentMonthStart && income.fecha_ingreso < nextMonthStart);
   const monthExpenses = expenses.filter((expense) => expense.fecha_gasto && expense.fecha_gasto >= currentMonthStart && expense.fecha_gasto < nextMonthStart);
@@ -243,51 +280,59 @@ export default async function DashboardPage() {
     .sort((a, b) => compareDatesAsc(a.fecha_proxima_facturacion, b.fecha_proxima_facturacion));
   const nextSubscription = sortedSubscriptions.find((subscription) => String(subscription.fecha_proxima_facturacion) >= todayKey) ?? sortedSubscriptions[0] ?? null;
   const firstObligation = obligations[0] ?? null;
-  const nextObligationValue = nextSubscription ? "Facturación" : firstObligation?.nombre || "—";
+  const nextObligationValue = nextSubscription ? t("dashboard.billing") : firstObligation?.nombre || "—";
   const nextObligationHelp = nextSubscription
-    ? `${formatDate(nextSubscription.fecha_proxima_facturacion)} · ${billingStatusLabels[nextSubscription.estado_pago ?? ""] ?? "Suscripción activa"}`
+    ? `${formatDate(nextSubscription.fecha_proxima_facturacion, preferences)} · ${billingStatusLabels[nextSubscription.estado_pago ?? ""] ?? t("dashboard.activeSubscription")}`
     : firstObligation
-      ? firstObligation.periodicidad || "Obligación fiscal activa"
+      ? firstObligation.periodicidad || t("dashboard.activeFiscalObligation")
       : companyIds.length
-        ? "Sin obligaciones próximas"
-        : "Agrega una empresa para comenzar";
+        ? t("dashboard.noUpcomingObligations")
+        : t("dashboard.addCompany");
 
   const stats = [
     {
-      help: monthIncomes.length ? `${monthIncomes.length} registros este mes` : "Sin ingresos este mes",
+      help: monthIncomes.length ? t("dashboard.recordsThisMonth", { count: monthIncomes.length }) : t("dashboard.noIncomeMonth"),
       icon: "trending_up",
-      title: "Ingresos del mes",
-      value: moneyFormatter.format(monthlyIncomeTotal),
+      title: t("dashboard.incomeMonth"),
+      value: money(monthlyIncomeTotal),
     },
     {
-      help: monthExpenses.length ? `${monthExpenses.length} registros este mes` : "Sin gastos este mes",
+      help: monthExpenses.length ? t("dashboard.recordsThisMonth", { count: monthExpenses.length }) : t("dashboard.noExpensesMonth"),
       icon: "trending_down",
-      title: "Gastos del mes",
-      value: moneyFormatter.format(monthlyExpenseTotal),
+      title: t("dashboard.expensesMonth"),
+      value: money(monthlyExpenseTotal),
     },
     {
-      help: "Ingresos menos gastos del mes",
+      help: t("dashboard.balanceHelp"),
       icon: "account_balance_wallet",
-      title: "Balance",
-      value: moneyFormatter.format(balance),
+      title: t("dashboard.balance"),
+      value: money(balance),
     },
     {
       help: nextObligationHelp,
       icon: "event_note",
-      title: "Próxima obligación",
+      title: t("dashboard.nextObligation"),
       value: nextObligationValue,
     },
   ];
 
-  const monthlySummary = buildMonthlySummary(incomes, expenses);
+  const monthlySummary = buildMonthlySummary(incomes, expenses, preferences);
   const highestMonthlyValue = Math.max(0, ...monthlySummary.flatMap((month) => [month.incomes, month.expenses]));
+  const chartMaxValue = Math.max(1, highestMonthlyValue);
+  const incomeLinePoints = buildFinanceLinePoints(monthlySummary, "incomes", chartMaxValue);
+  const expenseLinePoints = buildFinanceLinePoints(monthlySummary, "expenses", chartMaxValue);
+  const incomeLinePath = buildSvgPath(incomeLinePoints);
+  const expenseLinePath = buildSvgPath(expenseLinePoints);
+  const incomeAreaPath = buildSvgAreaPath(incomeLinePoints);
+  const expenseAreaPath = buildSvgAreaPath(expenseLinePoints);
+  const financeTicks = buildFinanceTicks(chartMaxValue);
   const hasFinancialData = incomes.length > 0 || expenses.length > 0;
 
   const movements: Movement[] = [
     ...incomes.map((income) => ({
       amount: asNumber(income.monto),
-      company: firstRelation(income.empresas)?.nombre_comercial || (income.empresa_id ? companyNameById.get(income.empresa_id) : null) || "Sin empresa",
-      concept: income.concepto || "Ingreso sin descripción",
+      company: firstRelation(income.empresas)?.nombre_comercial || (income.empresa_id ? companyNameById.get(income.empresa_id) : null) || t("common.noCompany"),
+      concept: income.concepto || t("dashboard.incomeNoDescription"),
       date: income.fecha_ingreso || "",
       id: `income-${income.id}`,
       tone: "positive" as const,
@@ -295,8 +340,8 @@ export default async function DashboardPage() {
     })),
     ...expenses.map((expense) => ({
       amount: asNumber(expense.monto),
-      company: firstRelation(expense.empresas)?.nombre_comercial || (expense.empresa_id ? companyNameById.get(expense.empresa_id) : null) || "Sin empresa",
-      concept: expense.concepto || "Gasto sin descripción",
+      company: firstRelation(expense.empresas)?.nombre_comercial || (expense.empresa_id ? companyNameById.get(expense.empresa_id) : null) || t("common.noCompany"),
+      concept: expense.concepto || t("dashboard.expenseNoDescription"),
       date: expense.fecha_gasto || "",
       id: `expense-${expense.id}`,
       tone: "negative" as const,
@@ -309,34 +354,46 @@ export default async function DashboardPage() {
 
   const obligationItems = [
     ...sortedSubscriptions.slice(0, 3).map((subscription) => ({
-      description: billingStatusLabels[subscription.estado_pago ?? ""] ?? "Suscripción activa",
+      description: billingStatusLabels[subscription.estado_pago ?? ""] ?? t("dashboard.activeSubscription"),
       id: `subscription-${subscription.id}`,
-      meta: `${companyNameById.get(subscription.empresa_id ?? "") ?? "Sin empresa"} · ${formatDate(subscription.fecha_proxima_facturacion)}`,
-      title: firstRelation(subscription.planes)?.nombre ? `Plan ${firstRelation(subscription.planes)?.nombre}` : "Próxima facturación",
+      meta: `${companyNameById.get(subscription.empresa_id ?? "") ?? t("common.noCompany")} · ${formatDate(subscription.fecha_proxima_facturacion, preferences)}`,
+      title: firstRelation(subscription.planes)?.nombre ? `Plan ${firstRelation(subscription.planes)?.nombre}` : t("dashboard.nextBilling"),
     })),
     ...obligations.slice(0, 3).map((obligation) => ({
-      description: obligation.descripcion || companyNameById.get(obligation.empresa_id ?? "") || "Obligación fiscal activa",
+      description: obligation.descripcion || companyNameById.get(obligation.empresa_id ?? "") || t("dashboard.activeFiscalObligation"),
       id: `obligation-${obligation.id}`,
-      meta: obligation.periodicidad || "Periodicidad pendiente",
-      title: obligation.nombre || "Obligación fiscal",
+      meta: obligation.periodicidad || t("common.pending"),
+      title: obligation.nombre || t("dashboard.fiscalObligation"),
     })),
   ].slice(0, 4);
+
+  const exportData = {
+    generatedFor: [user.nombre, user.apellido].filter(Boolean).join(" ") || user.correo,
+    monthlySummary,
+    movements,
+    obligations: obligationItems,
+    stats: stats.map((stat) => ({
+      help: stat.help,
+      title: stat.title,
+      value: stat.value,
+    })),
+  };
 
   return (
     <main className="dashboard-content">
       <div className="welcome">
         <div>
-          <p>RESUMEN GENERAL</p>
-          <h1>Hola, {firstName(user.nombre)} <span>👋</span></h1>
-          <span>Aquí tienes el resumen de tu actividad fiscal.</span>
+          <p>{t("dashboard.eyebrow")}</p>
+          <h1>{t("dashboard.greeting", { name: firstName(user.nombre) })}</h1>
+          <span>{t("dashboard.help")}</span>
         </div>
-        <button className="primary-button compact" type="button"><Icon name="add" /> Registrar movimiento</button>
+        <DashboardExportButton data={exportData} preferences={preferences} />
       </div>
 
       {hasError && (
         <section className="dashboard-alert" role="alert">
-          <strong>No fue posible cargar todo el resumen.</strong>
-          <span>Revisa la conexión con Supabase o los permisos de las tablas financieras.</span>
+          <strong>{t("dashboard.errorTitle")}</strong>
+          <span>{t("dashboard.errorHelp")}</span>
         </section>
       )}
 
@@ -357,41 +414,117 @@ export default async function DashboardPage() {
         <article className="panel chart-panel">
           <div className="panel-heading">
             <div>
-              <h2>Resumen financiero</h2>
-              <p>Ingresos y gastos de los últimos 6 meses</p>
+              <h2>{t("dashboard.chartTitle")}</h2>
+              <p>{t("dashboard.chartHelp")}</p>
             </div>
-            <select aria-label="Periodo" defaultValue="6">
-              <option value="6">Últimos 6 meses</option>
+            <select aria-label={t("reports.period")} defaultValue="6">
+              <option value="6">{t("dashboard.last6Months")}</option>
             </select>
           </div>
           {hasFinancialData ? (
-            <div className="finance-summary">
-              {monthlySummary.map((month) => {
-                const incomeWidth = highestMonthlyValue ? Math.max(3, (month.incomes / highestMonthlyValue) * 100) : 0;
-                const expenseWidth = highestMonthlyValue ? Math.max(3, (month.expenses / highestMonthlyValue) * 100) : 0;
-                return (
-                  <div className="finance-month" key={month.key}>
-                    <span>{month.label}</span>
-                    <div>
-                      <i className="income-bar" style={{ width: `${incomeWidth}%` }} />
-                      <i className="expense-bar" style={{ width: `${expenseWidth}%` }} />
-                    </div>
-                    <small>{moneyFormatter.format(month.incomes - month.expenses)}</small>
-                  </div>
-                );
-              })}
+            <div className="finance-summary finance-line-summary">
+              <div className="finance-line-chart">
+                <svg aria-label={t("dashboard.chartAria")} role="img" viewBox="0 0 680 252">
+                  <title>{t("dashboard.chartHelp")}</title>
+                  <defs>
+                    <linearGradient id="finance-income-area" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#01c38d" stopOpacity="0.22" />
+                      <stop offset="100%" stopColor="#01c38d" stopOpacity="0" />
+                    </linearGradient>
+                    <linearGradient id="finance-expense-area" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="#ff8b69" stopOpacity="0.18" />
+                      <stop offset="100%" stopColor="#ff8b69" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {financeTicks.map((tick) => (
+                    <g key={tick.y}>
+                      <line className="finance-grid-line" x1="86" x2="652" y1={tick.y} y2={tick.y} />
+                      <text className="finance-money-label" textAnchor="end" x="76" y={tick.y + 4}>
+                        {money(tick.value)}
+                      </text>
+                    </g>
+                  ))}
+                  {monthlySummary.map((month, index) => {
+                    const x = incomeLinePoints[index]?.x ?? 86;
+                    return (
+                      <g key={month.key}>
+                        <line className="finance-grid-line vertical" x1={x} x2={x} y1="24" y2="198" />
+                        <text className="finance-axis-label" textAnchor="middle" x={x} y="229">{month.label}</text>
+                      </g>
+                    );
+                  })}
+                  <path className="finance-area finance-area-income" d={incomeAreaPath} />
+                  <path className="finance-area finance-area-expense" d={expenseAreaPath} />
+                  <path className="finance-line-path finance-line-income" d={incomeLinePath} />
+                  <path className="finance-line-path finance-line-expense" d={expenseLinePath} />
+                  {incomeLinePoints.map((point, index) => (
+                    <g className="finance-point-group" key={`income-${point.label}`} style={{ animationDelay: `${520 + index * 90}ms` }}>
+                      <circle className="finance-point-halo finance-point-halo-income" cx={point.x} cy={point.y} r="9" />
+                      <circle className="finance-point finance-point-income" cx={point.x} cy={point.y} r="5">
+                        <title>{`${point.label} · ${t("dashboard.income")}: ${money(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  ))}
+                  {expenseLinePoints.map((point, index) => (
+                    <g className="finance-point-group" key={`expense-${point.label}`} style={{ animationDelay: `${620 + index * 90}ms` }}>
+                      <circle className="finance-point-halo finance-point-halo-expense" cx={point.x} cy={point.y} r="9" />
+                      <circle className="finance-point finance-point-expense" cx={point.x} cy={point.y} r="5">
+                        <title>{`${point.label} · ${t("dashboard.expenses")}: ${money(point.value)}`}</title>
+                      </circle>
+                    </g>
+                  ))}
+                  {monthlySummary.map((month, index) => {
+                    const incomePoint = incomeLinePoints[index];
+                    const expensePoint = expenseLinePoints[index];
+                    if (!incomePoint || !expensePoint) return null;
+
+                    const x = incomePoint.x;
+                    const tooltipWidth = 156;
+                    const tooltipX = clamp(x - tooltipWidth / 2, 92, 680 - tooltipWidth - 18);
+                    const balanceValue = month.incomes - month.expenses;
+
+                    return (
+                      <g
+                        aria-label={`${formatMonthPeriod(month.key, preferences)}. ${t("dashboard.income")} ${money(month.incomes)}. ${t("dashboard.expenses")} ${money(month.expenses)}. ${t("dashboard.balance")} ${money(balanceValue)}.`}
+                        className="finance-hover-group"
+                        key={`hover-${month.key}`}
+                        tabIndex={0}
+                      >
+                        <rect className="finance-hover-zone" height="212" rx="18" width="66" x={x - 33} y="16" />
+                        <line className="finance-hover-guide" x1={x} x2={x} y1="24" y2="198" />
+                        <g className="finance-tooltip-anchor" transform={`translate(${tooltipX} 31)`}>
+                          <g className="finance-tooltip">
+                            <rect className="finance-tooltip-card" height="82" rx="12" width={tooltipWidth} />
+                            <text className="finance-tooltip-title" x="12" y="18">{formatMonthPeriod(month.key, preferences)}</text>
+                            <circle className="finance-tooltip-dot income" cx="15" cy="34" r="4" />
+                            <text className="finance-tooltip-label" x="25" y="38">{t("dashboard.income")}</text>
+                            <text className="finance-tooltip-value income" textAnchor="end" x={tooltipWidth - 12} y="38">{money(month.incomes)}</text>
+                            <circle className="finance-tooltip-dot expense" cx="15" cy="52" r="4" />
+                            <text className="finance-tooltip-label" x="25" y="56">{t("dashboard.expenses")}</text>
+                            <text className="finance-tooltip-value expense" textAnchor="end" x={tooltipWidth - 12} y="56">{money(month.expenses)}</text>
+                            <text className="finance-tooltip-label balance" x="12" y="74">{t("dashboard.balance")}</text>
+                            <text className={balanceValue >= 0 ? "finance-tooltip-value income" : "finance-tooltip-value expense"} textAnchor="end" x={tooltipWidth - 12} y="74">
+                              {money(balanceValue)}
+                            </text>
+                          </g>
+                        </g>
+                      </g>
+                    );
+                  })}
+                </svg>
+              </div>
               <div className="finance-legend">
-                <span><i className="income-bar" />Ingresos</span>
-                <span><i className="expense-bar" />Gastos</span>
+                <span><i className="income-bar" />{t("dashboard.income")}</span>
+                <span><i className="expense-bar" />{t("dashboard.expenses")}</span>
               </div>
             </div>
           ) : (
             <div className="empty-chart">
               <div className="chart-lines"><i /><i /><i /><i /></div>
               <span><Icon name="bar_chart" /></span>
-              <h3>Aún no hay información para mostrar</h3>
-              <p>Registra tus primeros movimientos para ver la gráfica.</p>
-              <button type="button">Registrar movimiento</button>
+              <h3>{t("dashboard.noChartTitle")}</h3>
+              <p>{t("dashboard.noChartHelp")}</p>
+              <button type="button">{t("nav.movements")}</button>
             </div>
           )}
         </article>
@@ -399,10 +532,10 @@ export default async function DashboardPage() {
         <article className="panel obligations">
           <div className="panel-heading">
             <div>
-              <h2>Próximas obligaciones</h2>
-              <p>Mantente al día con tus fechas</p>
+              <h2>{t("dashboard.upcomingObligations")}</h2>
+              <p>{t("dashboard.keepDates")}</p>
             </div>
-            <a href="/companies">Ver todas</a>
+            <a href="/companies">{t("dashboard.viewAll")}</a>
           </div>
           {obligationItems.length ? (
             <div className="obligation-list">
@@ -420,8 +553,8 @@ export default async function DashboardPage() {
           ) : (
             <div className="empty-small">
               <span><Icon name="check" /></span>
-              <h3>Todo en orden</h3>
-              <p>No tienes obligaciones próximas.</p>
+              <h3>{t("profile.allGood")}</h3>
+              <p>{t("dashboard.noUpcomingHelp")}</p>
             </div>
           )}
         </article>
@@ -429,12 +562,12 @@ export default async function DashboardPage() {
         <article className="panel movements">
           <div className="panel-heading">
             <div>
-              <h2>Movimientos recientes</h2>
-              <p>Tu actividad más reciente</p>
+              <h2>{t("dashboard.recentMovements")}</h2>
+              <p>{t("dashboard.recentActivity")}</p>
             </div>
-            <a href="/income">Ver ingresos</a>
+            <a href="/income">{t("nav.income")}</a>
           </div>
-          <div className="table-head"><span>DESCRIPCIÓN</span><span>TIPO</span><span>FECHA</span><span>MONTO</span></div>
+          <div className="table-head"><span>{t("dashboard.description").toUpperCase()}</span><span>{t("dashboard.type").toUpperCase()}</span><span>{t("dashboard.date").toUpperCase()}</span><span>{t("dashboard.amount").toUpperCase()}</span></div>
           {movements.length ? (
             <div className="movement-list">
               {movements.map((movement) => (
@@ -443,16 +576,16 @@ export default async function DashboardPage() {
                     <strong>{movement.concept}</strong>
                     <small>{movement.company}</small>
                   </div>
-                  <span className={`movement-type ${movement.tone}`}>{movement.type}</span>
-                  <time>{formatDate(movement.date)}</time>
+                  <span className={`movement-type ${movement.tone}`}>{movement.type === "Ingreso" ? t("dashboard.income") : t("dashboard.expenses")}</span>
+                  <time>{formatDate(movement.date, preferences)}</time>
                   <b className={movement.tone}>
-                    {movement.tone === "positive" ? "+" : "-"}{moneyFormatter.format(movement.amount)}
+                    {movement.tone === "positive" ? "+" : "-"}{money(movement.amount)}
                   </b>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="empty-row"><span><Icon name="sync_alt" /></span><p>No hay movimientos registrados</p></div>
+            <div className="empty-row"><span><Icon name="sync_alt" /></span><p>{t("transactions.empty")}</p></div>
           )}
         </article>
       </section>
