@@ -7,6 +7,7 @@ import {
   type GmailApiError,
 } from "@/lib/gmailSupport";
 import { canViewAdminDashboard } from "@/lib/roles";
+import { setSupportMessageReviewed } from "@/lib/supportReviews";
 
 type ReplyBody = {
   body?: unknown;
@@ -52,6 +53,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const sent = await sendSupportReply(id, body);
+    await setSupportMessageReviewed({
+      messageId: id,
+      reviewed: true,
+      reviewedBy: user.id,
+      threadId: sent.threadId,
+    }).catch(() => null);
+
     return NextResponse.json({
       message: "Respuesta enviada correctamente.",
       sent,

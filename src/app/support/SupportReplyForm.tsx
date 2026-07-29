@@ -17,7 +17,8 @@ export function SupportReplyForm({
 }) {
   const router = useRouter();
   const t = createTranslator(language);
-  const [body, setBody] = useState("");
+  const defaultReply = t("support.defaultReply");
+  const [body, setBody] = useState(defaultReply);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState("");
@@ -47,7 +48,7 @@ export function SupportReplyForm({
         throw new Error(payload.message || t("support.replyError"));
       }
 
-      setBody("");
+      setBody(defaultReply);
       setSuccess(payload.message || t("support.replySuccess"));
       router.refresh();
     } catch (reason) {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getSupportMessage, isGmailConfigurationError } from "@/lib/gmailSupport";
 import { canViewAdminDashboard } from "@/lib/roles";
+import { getSupportReviewStatus } from "@/lib/supportReviews";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -14,8 +15,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (!id) return NextResponse.json({ message: "Mensaje no válido." }, { status: 400 });
 
   try {
-    const message = await getSupportMessage(id);
-    return NextResponse.json({ message });
+    const [message, review] = await Promise.all([
+      getSupportMessage(id),
+      getSupportReviewStatus(id),
+    ]);
+    return NextResponse.json({ message: { ...message, ...review } });
   } catch (error) {
     if (isGmailConfigurationError(error)) {
       return NextResponse.json({

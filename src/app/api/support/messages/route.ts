@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { isGmailConfigurationError, listSupportMessages } from "@/lib/gmailSupport";
+import { createTranslator } from "@/lib/i18n";
 import { canViewAdminDashboard } from "@/lib/roles";
+import { sendPendingSupportAutoReplies } from "@/lib/supportAutoReply";
+import { withSupportReviewStatus } from "@/lib/supportReviews";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -16,7 +19,14 @@ export async function GET(request: Request) {
 
   try {
     const inbox = await listSupportMessages({ pageToken, query });
-    return NextResponse.json({ configured: true, inbox });
+    await sendPendingSupportAutoReplies({
+      body: createTranslator(user.preferences?.language ?? "es")("support.defaultReply"),
+      messages: inbox.messages,
+    }).catch((error) => {
+      console.error("Error al procesar acuses automáticos:", error instanceof Error ? error.message : error);
+    });
+    const messages = await withSupportReviewStatus(inbox.messages);
+    return NextResponse.json({ configured: true, inbox: { ...inbox, messages } });
   } catch (error) {
     if (isGmailConfigurationError(error)) {
       return NextResponse.json({

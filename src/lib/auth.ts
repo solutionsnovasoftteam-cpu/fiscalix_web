@@ -42,11 +42,9 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
         .getUser(decoded.uid)
         .then((userRecord) => ({
           emailVerified: userRecord.emailVerified,
-          phoneNumber: userRecord.phoneNumber ?? null,
         }))
         .catch(() => ({
           emailVerified: Boolean(decoded.email_verified),
-          phoneNumber: typeof decoded.phone_number === "string" ? decoded.phone_number : null,
         })),
       getUserRoleByUserId(decoded.uid),
       getUserPreferences(decoded.uid),
@@ -55,8 +53,7 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
     return {
       ...(data as Omit<FiscalixUser, "rol">),
       emailVerified: firebaseUser.emailVerified,
-      phoneVerified: Boolean(firebaseUser.phoneNumber),
-      telefono: data.telefono ?? firebaseUser.phoneNumber,
+      telefono: data.telefono ?? null,
       preferences,
       rol: role,
     };

@@ -7,7 +7,6 @@ export interface FiscalixUser {
   apellido: string;
   correo: string;
   emailVerified?: boolean;
-  phoneVerified?: boolean;
   preferences?: UserPreferences;
   rol: UserRole;
   telefono?: string | null;

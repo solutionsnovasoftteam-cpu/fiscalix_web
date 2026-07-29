@@ -3,7 +3,6 @@ import Link from "next/link";
 import { AppShell } from "@/components/AppShell";
 import { EmailVerificationCard } from "@/components/EmailVerificationCard";
 import { Icon } from "@/components/Icon";
-import { PhoneVerificationButton } from "@/components/PhoneVerificationButton";
 import { ProfileEditor } from "@/components/ProfileEditor";
 import { ProfilePreferences } from "@/components/ProfilePreferences";
 import { getAccessibleCompanyIds } from "@/lib/access-control";
@@ -31,8 +30,7 @@ export default async function ProfilePage() {
   const t = createTranslator(preferences.language);
   const fullName = `${user.nombre} ${user.apellido}`.trim();
   const emailVerified = user.emailVerified === true;
-  const phoneVerified = user.phoneVerified === true;
-  const securityScore = emailVerified && phoneVerified ? "100%" : emailVerified || phoneVerified ? "75%" : "50%";
+  const securityScore = emailVerified ? "100%" : "75%";
   const phone = fallback(user.telefono, t("profile.pendingRegister"));
   const state = fallback(user.estado, t("profile.accountActive"));
   const currencyLabel = userPreferenceOptions.currencies.find((option) => option.value === preferences.currency)?.label ?? preferences.currency;
@@ -132,25 +130,20 @@ export default async function ProfilePage() {
               <h2><Icon name="verified_user" />{t("profile.securityStatus")}</h2>
             </div>
             <div className="security-layout">
-              <div className={`security-ring${emailVerified && phoneVerified ? "" : " pending"}`}>
+              <div className={`security-ring${emailVerified ? "" : " pending"}`}>
                 <strong>{securityScore}</strong>
                 <span>{t("profile.security")}</span>
-                <small>{emailVerified && phoneVerified ? t("profile.high") : t("profile.medium")}</small>
+                <small>{emailVerified ? t("profile.high") : t("profile.medium")}</small>
               </div>
               <ul className="security-list">
                 <li className={emailVerified ? "" : "is-pending"}>
                   <span><Icon name={emailVerified ? "check" : "mail"} /></span>
                   {emailVerified ? t("profile.emailConfirmed") : t("profile.emailPending")}
                 </li>
-                <li className={phoneVerified ? "" : "is-pending"}>
-                  <span><Icon name={phoneVerified ? "check" : "call"} /></span>
-                  {phoneVerified ? t("profile.phoneVerified") : t("profile.phonePending")}
-                </li>
                 <li><span><Icon name="check" /></span>{t("profile.securePassword")}</li>
                 <li><span><Icon name="check" /></span>{t("profile.protectedSession")}</li>
               </ul>
             </div>
-            <PhoneVerificationButton email={user.correo} initialPhone={user.telefono} language={preferences.language} phoneVerified={phoneVerified} />
           </article>
 
           <article className="profile-card activity-card">

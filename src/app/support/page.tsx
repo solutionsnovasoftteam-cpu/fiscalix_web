@@ -5,6 +5,7 @@ import { Icon } from "@/components/Icon";
 import { SupportReplyForm } from "@/app/support/SupportReplyForm";
 import { getCurrentUser } from "@/lib/auth";
 import { createTranslator } from "@/lib/i18n";
+import { sendPendingSupportAutoReplies } from "@/lib/supportAutoReply";
 import {
   getGmailSetupStatus,
   getSupportMessage,
@@ -14,6 +15,13 @@ import {
   type SupportInboxResult,
 } from "@/lib/gmailSupport";
 import { canViewAdminDashboard } from "@/lib/roles";
+import {
+  getSupportReviewStatus,
+  isSupportReviewTableMissingError,
+  setSupportMessageReviewed,
+  withSupportReviewStatus,
+  type SupportReviewStatus,
+} from "@/lib/supportReviews";
 import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 
 type PageSearchParams = {
@@ -21,6 +29,12 @@ type PageSearchParams = {
   pageToken?: string;
   q?: string;
 };
+
+type ReviewedSupportEmailSummary = SupportInboxResult["messages"][number] & SupportReviewStatus;
+type ReviewedSupportInboxResult = Omit<SupportInboxResult, "messages"> & {
+  messages: ReviewedSupportEmailSummary[];
+};
+type ReviewedSupportEmailDetail = SupportEmailDetail & SupportReviewStatus;
 
 function cleanParam(value: string | string[] | undefined) {
   return typeof value === "string" ? value.trim() : "";
@@ -50,14 +64,23 @@ function buildHref(current: PageSearchParams, next: Partial<PageSearchParams>) {
   return query ? `/support?${query}` : "/support";
 }
 
-async function loadInbox(params: PageSearchParams) {
+async function loadInbox(params: PageSearchParams, language: FiscalixLanguage) {
   try {
     const inbox = await listSupportMessages({
       pageToken: params.pageToken,
       query: params.q,
     });
 
-    return { inbox, setupError: null, systemError: "" };
+    await sendPendingSupportAutoReplies({
+      body: createTranslator(language)("support.defaultReply"),
+      messages: inbox.messages,
+    }).catch((error) => {
+      console.error("Error al procesar acuses automáticos:", error instanceof Error ? error.message : error);
+    });
+
+    const messages = await withSupportReviewStatus(inbox.messages);
+
+    return { inbox: { ...inbox, messages }, setupError: null, systemError: "" };
   } catch (error) {
     if (isGmailConfigurationError(error)) {
       return { inbox: null, setupError: error, systemError: "" };
@@ -72,11 +95,25 @@ async function loadInbox(params: PageSearchParams) {
   }
 }
 
-async function loadSelectedMessage(messageId: string) {
+async function loadSelectedMessage(messageId: string, reviewedBy: string) {
   if (!messageId) return null;
 
   try {
-    return await getSupportMessage(messageId);
+    const message = await getSupportMessage(messageId);
+    const review = await setSupportMessageReviewed({
+      messageId,
+      reviewed: true,
+      reviewedBy,
+      threadId: message.threadId,
+    }).catch(async (error) => {
+      if (!isSupportReviewTableMissingError(error)) {
+        console.error("Error al marcar aclaración como revisada:", error instanceof Error ? error.message : error);
+      }
+
+      return getSupportReviewStatus(messageId);
+    });
+
+    return { ...message, ...review };
   } catch (error) {
     console.error("Error al cargar mensaje seleccionado:", error instanceof Error ? error.message : error);
     return null;
@@ -115,7 +152,7 @@ function MessageList({
   language = "es",
   params,
 }: {
-  inbox: SupportInboxResult;
+  inbox: ReviewedSupportInboxResult;
   language?: FiscalixLanguage;
   params: PageSearchParams;
 }) {
@@ -134,17 +171,22 @@ function MessageList({
     <div className="support-message-list">
       {inbox.messages.map((message) => (
         <Link
-          className={params.messageId === message.id ? "support-message active" : "support-message"}
+          className={`${params.messageId === message.id ? "support-message active" : "support-message"}${message.reviewed ? " reviewed" : " pending-review"}`}
           href={buildHref(params, { messageId: message.id })}
           key={message.id}
         >
-          <span className={message.unread ? "support-unread-dot active" : "support-unread-dot"} />
+          <span className={message.reviewed ? "support-unread-dot" : "support-unread-dot active"} />
           <div>
             <strong>{message.subject}</strong>
             <small>{message.from}</small>
             <p>{message.snippet || t("support.noPreview")}</p>
           </div>
-          <time>{formatDate(message.date, language)}</time>
+          <div className="support-message-meta">
+            <time>{formatDate(message.date, language)}</time>
+            <span className={message.reviewed ? "support-review-pill reviewed" : "support-review-pill pending"}>
+              {message.reviewed ? t("support.reviewed") : t("support.unreviewed")}
+            </span>
+          </div>
         </Link>
       ))}
     </div>
@@ -156,7 +198,7 @@ function MessageDetail({
   message,
 }: {
   language?: FiscalixLanguage;
-  message: SupportEmailDetail | null;
+  message: ReviewedSupportEmailDetail | null;
 }) {
   const t = createTranslator(language);
   if (!message) {
@@ -177,7 +219,12 @@ function MessageDetail({
         <p>{t("support.detail")}</p>
         <h2>{message.subject}</h2>
         <small>{message.from}</small>
-        <time>{formatDate(message.date, language)}</time>
+        <div className="support-detail-meta">
+          <time>{formatDate(message.date, language)}</time>
+          <span className={message.reviewed ? "support-review-pill reviewed" : "support-review-pill pending"}>
+            {message.reviewed ? t("support.reviewed") : t("support.unreviewed")}
+          </span>
+        </div>
       </header>
       <article>
         {message.body.split(/\n{2,}/).map((paragraph, index) => (
@@ -207,8 +254,18 @@ export default async function SupportPage({
     q: cleanParam(resolvedParams.q),
   };
   const setupStatus = getGmailSetupStatus();
-  const { inbox, setupError, systemError } = await loadInbox(params);
-  const selectedMessage = inbox && params.messageId ? await loadSelectedMessage(params.messageId) : null;
+  const { inbox, setupError, systemError } = await loadInbox(params, language);
+  const selectedMessage = inbox && params.messageId ? await loadSelectedMessage(params.messageId, user.id) : null;
+  const visibleInbox = inbox && selectedMessage
+    ? {
+        ...inbox,
+        messages: inbox.messages.map((message) => (
+          message.id === selectedMessage.id
+            ? { ...message, reviewed: selectedMessage.reviewed, reviewedAt: selectedMessage.reviewedAt, reviewedBy: selectedMessage.reviewedBy }
+            : message
+        )),
+      }
+    : inbox;
 
   return (
     <AppShell activeHref="/support" user={user}>
@@ -246,7 +303,7 @@ export default async function SupportPage({
             <span><Icon name="inbox" /></span>
             <div>
               <small>{t("support.estimatedResults")}</small>
-              <strong>{inbox?.resultSizeEstimate ?? 0}</strong>
+              <strong>{visibleInbox?.resultSizeEstimate ?? 0}</strong>
             </div>
           </article>
           <article>
@@ -271,11 +328,11 @@ export default async function SupportPage({
               {params.q ? <Link href="/support">{t("support.clearSearch")}</Link> : null}
             </header>
 
-            {inbox ? <MessageList inbox={inbox} language={language} params={params} /> : null}
+            {visibleInbox ? <MessageList inbox={visibleInbox} language={language} params={params} /> : null}
 
-            {inbox?.nextPageToken ? (
+            {visibleInbox?.nextPageToken ? (
               <footer>
-                <Link href={buildHref(params, { messageId: "", pageToken: inbox.nextPageToken })}>
+                <Link href={buildHref(params, { messageId: "", pageToken: visibleInbox.nextPageToken })}>
                   {t("support.nextPage")}
                   <Icon name="arrow_forward" />
                 </Link>
