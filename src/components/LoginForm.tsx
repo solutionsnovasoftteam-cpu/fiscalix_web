@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 import { useModal } from "@/lib/useModal";
 
 const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
@@ -123,6 +124,13 @@ export function LoginForm({
         <div className="form-options"><label><input type="checkbox" /> Recordarme</label><button className="auth-link-button" onClick={openResetModal} type="button">¿Olvidaste tu contraseña?</button></div>
         {error && <p className="form-error" role="alert">{error}</p>}
         <button className="primary-button" disabled={loading}>{loading ? "Iniciando sesión..." : "Iniciar sesión"}</button>
+        <div className="auth-divider"><span>o continúa con</span></div>
+        <GoogleAuthButton
+          disabled={loading}
+          mode="login"
+          onError={setError}
+          onSuspended={() => setShowSuspendedModal(true)}
+        />
       </form>
 
       {showSuspendedModal && (
