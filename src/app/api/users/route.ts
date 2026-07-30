@@ -151,9 +151,10 @@ export async function PATCH(request: Request) {
   const nombre = cleanText(values.nombre);
   const apellido = cleanText(values.apellido);
   const telefono = cleanText(values.telefono);
-  const correo = cleanEmail(values.correo || user.correo);
+  const normalizedCurrentEmail = currentUserEmail.toLowerCase();
+  const correo = cleanEmail(values.correo || normalizedCurrentEmail);
   const currentPassword = typeof values.currentPassword === "string" ? values.currentPassword : "";
-  const emailChanged = correo !== user.correo.toLowerCase();
+  const emailChanged = correo !== normalizedCurrentEmail;
 
   if (!nombre || !apellido) {
     return NextResponse.json({ success: false, message: "Nombre y apellido son obligatorios." }, { status: 400 });
@@ -169,7 +170,7 @@ export async function PATCH(request: Request) {
   }
 
   const auth = getAuth(getFirebaseAdmin());
-  let firebaseEmail = user.correo.toLowerCase();
+  let firebaseEmail = normalizedCurrentEmail;
 
   if (emailChanged) {
     if (!currentPassword) {
@@ -183,7 +184,7 @@ export async function PATCH(request: Request) {
       .from("usuarios")
       .select("id")
       .eq("correo", correo)
-      .neq("id", user.id)
+      .neq("id", currentUserId)
       .maybeSingle();
 
     if (existingProfileError) {
@@ -194,14 +195,14 @@ export async function PATCH(request: Request) {
     }
 
     try {
-      const firebaseUser = await auth.getUser(user.id);
+      const firebaseUser = await auth.getUser(currentUserId);
       firebaseEmail = firebaseUser.email?.toLowerCase() || firebaseEmail;
       const existingFirebaseUser = await auth.getUserByEmail(correo).catch((error: unknown) => {
         if (firebaseErrorCode(error) === "auth/user-not-found") return null;
         throw error;
       });
 
-      if (existingFirebaseUser && existingFirebaseUser.uid !== user.id) {
+      if (existingFirebaseUser && existingFirebaseUser.uid !== currentUserId) {
         return NextResponse.json({ success: false, message: "Ese correo ya existe en Firebase." }, { status: 409 });
       }
     } catch (error) {
@@ -212,7 +213,7 @@ export async function PATCH(request: Request) {
     const passwordCheck = await verifyCurrentPassword({
       email: firebaseEmail,
       password: currentPassword,
-      uid: user.id,
+      uid: currentUserId,
     });
 
     if (!passwordCheck.ok) {
@@ -220,7 +221,7 @@ export async function PATCH(request: Request) {
     }
 
     try {
-      await auth.updateUser(user.id, { email: correo, emailVerified: false });
+      await auth.updateUser(currentUserId, { email: correo, emailVerified: false });
     } catch (error) {
       const code = firebaseErrorCode(error);
       const message = code === "auth/email-already-exists"
@@ -233,14 +234,14 @@ export async function PATCH(request: Request) {
   const { data, error } = await supabase
     .from("usuarios")
     .update({ apellido, correo, nombre, telefono: telefono || null })
-    .eq("id", user.id)
+    .eq("id", currentUserId)
     .select("id,nombre,apellido,correo,telefono,estado")
     .single();
 
   if (error || !data) {
     if (emailChanged) {
       try {
-        await auth.updateUser(user.id, { email: firebaseEmail });
+        await auth.updateUser(currentUserId, { email: firebaseEmail });
       } catch (revertError) {
         console.error("No fue posible revertir el correo en Firebase:", revertError instanceof Error ? revertError.message : revertError);
       }
