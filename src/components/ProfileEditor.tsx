@@ -1,3 +1,4 @@
+//Copyright (c) 2024 Fiscalix, Inc. All rights reserved.
 "use client";
 
 import { FormEvent, useCallback, useRef, useState } from "react";
