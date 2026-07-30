@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, verifyToken } from "@/lib/auth";
 import { getFirebaseAdmin, normalizeEnvValue } from "@/lib/firebaseAdmin";
 import { supabase } from "@/lib/supabase";
 
@@ -76,19 +76,69 @@ async function verifyCurrentPassword({
   return { ok: true, status: 200 };
 }
 
-export async function GET() {
+async function getAuthenticatedUser(request: Request) {
   const user = await getCurrentUser();
+  if (user) {
+    return { id: user.id, correo: user.correo };
+  }
+
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id,correo")
+      .eq("id", decoded.uid)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return { id: data.id as string, correo: data.correo as string };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
+  const user = await getAuthenticatedUser(request);
   if (!user) {
     return NextResponse.json({ success: false, message: "No autorizado", data: null }, { status: 401 });
   }
-  return NextResponse.json({ success: true, message: "Usuario encontrado", data: user });
+
+  const authUser = await getCurrentUser();
+  if (!authUser) {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id,nombre,apellido,correo,telefono,estado")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ success: false, message: "No autorizado", data: null }, { status: 401 });
+    }
+
+    return NextResponse.json({ success: true, message: "Usuario encontrado", data });
+  }
+
+  return NextResponse.json({ success: true, message: "Usuario encontrado", data: authUser });
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const authenticatedUser = await getAuthenticatedUser(request);
+  if (!authenticatedUser) {
     return NextResponse.json({ success: false, message: "No autorizado" }, { status: 401 });
   }
+
+  const user = await getCurrentUser();
+  const currentUserId = user?.id ?? authenticatedUser.id;
+  const currentUserEmail = user?.correo ?? authenticatedUser.correo;
 
   let body: unknown;
   try {

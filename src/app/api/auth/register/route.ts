@@ -42,9 +42,10 @@ export async function POST(request: Request) {
     const correo = typeof body.correo === "string" ? body.correo.trim().toLowerCase() : "";
     const telefono = typeof body.telefono === "string" ? body.telefono.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const firebaseUid = typeof body.firebaseUid === "string" ? body.firebaseUid : "";
 
-    if (!nombre || !apellido || !correo || !telefono) {
-      return failure("Completa todos los campos obligatorios.", 400);
+    if (!nombre || !apellido || !correo) {
+      return failure("Completa los campos obligatorios de nombre, apellido y correo.", 400);
     }
     if (password && password.length < 6) {
       return failure("La contraseña debe tener al menos 6 caracteres.", 400);
@@ -101,7 +102,7 @@ export async function POST(request: Request) {
       nombre,
       apellido,
       correo,
-      telefono,
+      telefono: telefono || null,
       estado: "activo",
     }).select("id,nombre,apellido,correo,telefono,estado").single();
 
