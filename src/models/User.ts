@@ -11,4 +11,5 @@ export interface FiscalixUser {
   rol: UserRole;
   telefono?: string | null;
   estado?: string | null;
+  avatar_url?: string | null;
 }

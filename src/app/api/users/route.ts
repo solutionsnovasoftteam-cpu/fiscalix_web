@@ -116,7 +116,7 @@ export async function GET(request: Request) {
   if (!authUser) {
     const { data, error } = await supabase
       .from("usuarios")
-      .select("id,nombre,apellido,correo,telefono,estado")
+      .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
       .eq("id", user.id)
       .single();
 
@@ -235,7 +235,7 @@ export async function PATCH(request: Request) {
     .from("usuarios")
     .update({ apellido, correo, nombre, telefono: telefono || null })
     .eq("id", currentUserId)
-    .select("id,nombre,apellido,correo,telefono,estado")
+    .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
     .single();
 
   if (error || !data) {

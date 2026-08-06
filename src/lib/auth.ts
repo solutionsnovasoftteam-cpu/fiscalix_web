@@ -30,7 +30,7 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
     const decoded = await auth.verifySessionCookie(session, true);
     const { data, error } = await supabase
       .from("usuarios")
-      .select("id,nombre,apellido,correo,telefono,estado")
+      .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
       .eq("id", decoded.uid)
       .single();
 
