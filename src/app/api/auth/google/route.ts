@@ -7,6 +7,10 @@ import { assignDefaultRoleToUser } from "@/lib/userRoles";
 
 const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
 const SUSPENDED_ACCOUNT_MESSAGE = "Tu cuenta fue suspendida. Contacta a solutionsnovasoftteam@gmail.com para hacer las aclaraciones correspondientes.";
+const GOOGLE_ACCOUNT_EXISTS_CODE = "GOOGLE_ACCOUNT_EXISTS";
+const GOOGLE_ACCOUNT_NOT_FOUND_CODE = "GOOGLE_ACCOUNT_NOT_FOUND";
+
+type GoogleAuthMode = "login" | "register";
 
 function splitDisplayName(displayName: string | undefined, email: string) {
   const parts = (displayName ?? "")
@@ -32,11 +36,16 @@ function failure(message: string, status: number, code?: string) {
 
 export async function POST(request: Request) {
   try {
+    const body = (await request.json().catch(() => ({}))) as { mode?: unknown };
+    const mode: GoogleAuthMode | null = body.mode === "login" || body.mode === "register" ? body.mode : null;
     const authorization = request.headers.get("authorization");
     const idToken = authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
 
     if (!idToken) {
       return failure("No autorizado.", 401);
+    }
+    if (!mode) {
+      return failure("Indica si deseas iniciar sesión o crear una cuenta.", 400);
     }
 
     const decoded = await verifyToken(idToken);
@@ -68,6 +77,13 @@ export async function POST(request: Request) {
       if (profile.estado && profile.estado !== "activo") {
         return failure("Tu cuenta no está activa.", 403);
       }
+      if (mode === "register") {
+        return failure(
+          "Ya existe una cuenta de Fiscalix vinculada a este usuario de Google. Inicia sesión.",
+          409,
+          GOOGLE_ACCOUNT_EXISTS_CODE,
+        );
+      }
 
       const sessionCookie = await createSession(idToken);
       const response = NextResponse.json({ success: true, user: profile });
@@ -79,6 +95,14 @@ export async function POST(request: Request) {
         secure: process.env.NODE_ENV === "production",
       });
       return response;
+    }
+
+    if (mode === "login") {
+      return failure(
+        "Esta cuenta de Google todavía no está registrada en Fiscalix. Crea una cuenta primero.",
+        404,
+        GOOGLE_ACCOUNT_NOT_FOUND_CODE,
+      );
     }
 
     const { data: existingEmailProfile, error: emailProfileError } = await supabase
@@ -104,6 +128,7 @@ export async function POST(request: Request) {
       .from("usuarios")
       .insert({
         apellido,
+        avatar_url: typeof decoded.picture === "string" ? decoded.picture : null,
         correo: email,
         estado: "activo",
         id: decoded.uid,

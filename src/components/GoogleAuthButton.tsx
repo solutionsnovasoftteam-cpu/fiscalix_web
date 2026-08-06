@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { getFirebaseClientAuth } from "@/lib/firebaseClient";
 
 const SUSPENDED_ACCOUNT_CODE = "ACCOUNT_SUSPENDED";
+const GOOGLE_ACCOUNT_EXISTS_CODE = "GOOGLE_ACCOUNT_EXISTS";
+const GOOGLE_ACCOUNT_NOT_FOUND_CODE = "GOOGLE_ACCOUNT_NOT_FOUND";
 
 type GoogleAuthButtonProps = {
   disabled?: boolean;
@@ -60,8 +62,14 @@ export function GoogleAuthButton({ disabled = false, mode, onError, onSuspended 
 
       if (!response.ok || result.success === false) {
         if (result.code === SUSPENDED_ACCOUNT_CODE) {
+          await signOut(auth);
           onSuspended?.();
+          setLoading(false);
           return;
+        }
+
+        if (result.code === GOOGLE_ACCOUNT_EXISTS_CODE || result.code === GOOGLE_ACCOUNT_NOT_FOUND_CODE) {
+          await signOut(auth);
         }
 
         throw new Error(result.message || "No fue posible continuar con Google.");
