@@ -42,8 +42,6 @@ export async function POST(request: Request) {
     const correo = typeof body.correo === "string" ? body.correo.trim().toLowerCase() : "";
     const telefono = typeof body.telefono === "string" ? body.telefono.trim() : "";
     const password = typeof body.password === "string" ? body.password : "";
-    const firebaseUid = typeof body.firebaseUid === "string" ? body.firebaseUid : "";
-
     if (!nombre || !apellido || !correo) {
       return failure("Completa los campos obligatorios de nombre, apellido y correo.", 400);
     }

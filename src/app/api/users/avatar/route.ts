@@ -26,9 +26,9 @@ function extractStoragePath(url: string) {
 
 export async function POST(request: Request) {
   try {
-    let user = await getCurrentUser();
+    let userId = (await getCurrentUser())?.id ?? null;
 
-    if (!user) {
+    if (!userId) {
       const authHeader = request.headers.get("authorization");
       const firebaseToken = authHeader?.startsWith("Bearer ")
         ? authHeader.slice(7).trim()
@@ -51,11 +51,11 @@ export async function POST(request: Request) {
 
         const { data, error } = await supabase
           .from("usuarios")
-          .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
+          .select("id,estado")
           .eq("id", decoded.uid)
           .single();
 
-        if (error || !data) {
+        if (error || !data || data.estado !== "activo") {
           return NextResponse.json(
             {
               success: false,
@@ -67,13 +67,7 @@ export async function POST(request: Request) {
           );
         }
 
-        user = {
-          ...(data as any),
-          emailVerified: Boolean(decoded.email_verified),
-          telefono: data.telefono ?? null,
-          preferences: {},
-          rol: "usuario",
-        };
+        userId = data.id;
       } catch {
         return NextResponse.json(
           {
@@ -85,6 +79,20 @@ export async function POST(request: Request) {
           },
         );
       }
+    }
+
+    const authenticatedUserId = userId;
+
+    if (!authenticatedUserId) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "No autorizado",
+        },
+        {
+          status: 401,
+        },
+      );
     }
 
     const formData = await request.formData();
@@ -151,7 +159,7 @@ export async function POST(request: Request) {
     const { data: currentUser, error: currentError } = await supabase
       .from("usuarios")
       .select("avatar_url")
-      .eq("id", user.id)
+      .eq("id", authenticatedUserId)
       .single();
 
     if (currentError) {
@@ -182,7 +190,7 @@ export async function POST(request: Request) {
       avatar.name.split(".").pop()?.toLowerCase() ?? "jpg";
 
     const fileName =
-      `${user.id}/${randomUUID()}.${extension}`;
+      `${authenticatedUserId}/${randomUUID()}.${extension}`;
 
     const bytes = await avatar.arrayBuffer();
 
@@ -220,7 +228,7 @@ export async function POST(request: Request) {
       .update({
         avatar_url: avatarUrl,
       })
-      .eq("id", user.id);
+      .eq("id", authenticatedUserId);
 
     if (updateError) {
       await supabase.storage.from(BUCKET).remove([fileName]);
