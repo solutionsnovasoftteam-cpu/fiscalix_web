@@ -8,7 +8,15 @@ import { createTranslator } from "@/lib/i18n";
 import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 import { useModal } from "@/lib/useModal";
 
-type Regime = { clave: string; id: string; nombre: string; selectable: boolean };
+type Regime = {
+  clave: string;
+  description: string;
+  id: string;
+  nombre: string;
+  selectable: boolean;
+  validFrom: string;
+  validUntil: string;
+};
 type CompanyEditorData = {
   address: string;
   email: string;
@@ -16,10 +24,20 @@ type CompanyEditorData = {
   legalName: string;
   nombre: string;
   phone: string;
+  fiscalConfigured: boolean;
+  fiscalEndDate: string;
+  fiscalPeriodicity: string;
+  fiscalStartDate: string;
   regimeId: string;
   rfc: string;
 };
-type CompanyDraft = Pick<CompanyEditorData, "nombre" | "regimeId" | "rfc">;
+type CompanyDraft = Pick<CompanyEditorData, "fiscalEndDate" | "fiscalPeriodicity" | "fiscalStartDate" | "nombre" | "regimeId" | "rfc">;
+
+type ApiResult = { error?: { message?: string }; message?: string };
+
+function resultMessage(result: ApiResult, fallback: string) {
+  return result.error?.message ?? result.message ?? fallback;
+}
 
 export function CompanyFiscalEditor({ company, language = "es", regimes }: {
   company: CompanyEditorData | null;
@@ -30,9 +48,13 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
   const t = createTranslator(language);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
   const [draft, setDraft] = useState<CompanyDraft>({
+    fiscalEndDate: company?.fiscalEndDate ?? "",
+    fiscalPeriodicity: company?.fiscalPeriodicity ?? "mensual",
+    fiscalStartDate: company?.fiscalStartDate ?? "",
     nombre: company?.nombre ?? "",
     regimeId: company?.regimeId ?? "",
     rfc: company?.rfc ?? "",
@@ -42,18 +64,54 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
 
   if (!company) return null;
   const companyData = company;
+  const selectedRegime = regimes.find((regime) => regime.id === draft.regimeId);
+  const periodicityKeys = {
+    anual: "company.periodicity.anual",
+    bimestral: "company.periodicity.bimestral",
+    mensual: "company.periodicity.mensual",
+    semestral: "company.periodicity.semestral",
+    trimestral: "company.periodicity.trimestral",
+  } as const;
+  const periodicityKey = periodicityKeys[draft.fiscalPeriodicity as keyof typeof periodicityKeys] ?? periodicityKeys.mensual;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!confirming) {
+      setConfirming(true);
+      setMessage("");
+      return;
+    }
     setBusy(true);
     setMessage("");
     try {
-      const response = await fetch(`/api/companies/${encodeURIComponent(companyData.id)}`, {
-        body: JSON.stringify({ nombreComercial: draft.nombre, regimenId: draft.regimeId, rfc: draft.rfc }),
+      const fiscalChanged = !companyData.fiscalConfigured
+        || draft.regimeId !== companyData.regimeId
+        || draft.fiscalStartDate !== companyData.fiscalStartDate
+        || draft.fiscalEndDate !== companyData.fiscalEndDate
+        || draft.fiscalPeriodicity !== companyData.fiscalPeriodicity;
+
+      if (fiscalChanged) {
+        const profileResponse = await fetch("/api/tax/profile", {
+          body: JSON.stringify({
+            companyId: companyData.id,
+            endDate: draft.fiscalEndDate || null,
+            periodicity: draft.fiscalPeriodicity,
+            regimeId: draft.regimeId,
+            startDate: draft.fiscalStartDate,
+          }),
+          headers: { "Content-Type": "application/json" }, method: "PATCH",
+        });
+        const profileResult = (await profileResponse.json()) as ApiResult;
+        if (!profileResponse.ok) throw new Error(resultMessage(profileResult, t("preferences.saveError")));
+      }
+
+      const companyResponse = await fetch(`/api/companies/${encodeURIComponent(companyData.id)}`, {
+        body: JSON.stringify({ nombreComercial: draft.nombre, rfc: draft.rfc }),
         headers: { "Content-Type": "application/json" }, method: "PATCH",
       });
-      const result = (await response.json()) as { message?: string };
-      if (!response.ok) throw new Error(result.message ?? t("preferences.saveError"));
+      const companyResult = (await companyResponse.json()) as ApiResult;
+      if (!companyResponse.ok) throw new Error(resultMessage(companyResult, t("preferences.saveError")));
+      setConfirming(false);
       setOpen(false);
       router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : t("preferences.saveError")); }
@@ -61,7 +119,15 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
   }
 
   function cancelEdition() {
-    setDraft({ nombre: companyData.nombre, regimeId: companyData.regimeId, rfc: companyData.rfc });
+    setDraft({
+      fiscalEndDate: companyData.fiscalEndDate,
+      fiscalPeriodicity: companyData.fiscalPeriodicity,
+      fiscalStartDate: companyData.fiscalStartDate,
+      nombre: companyData.nombre,
+      regimeId: companyData.regimeId,
+      rfc: companyData.rfc,
+    });
+    setConfirming(false);
     setOpen(false);
     setMessage("");
   }
@@ -95,6 +161,10 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
 
         <form onSubmit={submit}>
           <div className="profile-editor-grid">
+            <div className="company-editor-section wide">
+              <strong>{t("company.generalData")}</strong>
+              <span>{t("company.generalDataHelp")}</span>
+            </div>
             <label className="wide">
               {t("company.commercialName")}
               <input
@@ -122,6 +192,10 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
                 value={draft.rfc}
               />
             </label>
+            <div className="company-editor-section wide">
+              <strong>{t("company.fiscalConfiguration")}</strong>
+              <span>{t("company.fiscalConfigurationHelp")}</span>
+            </div>
             <label>
               {t("profile.fiscalRegime")}
               <select
@@ -138,6 +212,53 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
                 ))}
               </select>
             </label>
+            <label>
+              {t("company.startDate")}
+              <input
+                disabled={busy}
+                onChange={(event) => setDraft((value) => ({ ...value, fiscalStartDate: event.target.value }))}
+                required
+                type="date"
+                value={draft.fiscalStartDate}
+              />
+            </label>
+            <label>
+              {t("company.endDate")}
+              <input
+                disabled={busy}
+                min={draft.fiscalStartDate || undefined}
+                onChange={(event) => setDraft((value) => ({ ...value, fiscalEndDate: event.target.value }))}
+                type="date"
+                value={draft.fiscalEndDate}
+              />
+              <small>{t("company.endDateHelp")}</small>
+            </label>
+            <label className="wide">
+              {t("company.periodicity")}
+              <select
+                disabled={busy}
+                onChange={(event) => setDraft((value) => ({ ...value, fiscalPeriodicity: event.target.value }))}
+                required
+                value={draft.fiscalPeriodicity}
+              >
+                {(["mensual", "bimestral", "trimestral", "semestral", "anual"] as const).map((periodicity) => (
+                  <option key={periodicity} value={periodicity}>{t(`company.periodicity.${periodicity}`)}</option>
+                ))}
+              </select>
+            </label>
+            <div className={`company-editor-guidance wide${companyData.fiscalConfigured ? " configured" : " pending"}`}>
+              <Icon name={companyData.fiscalConfigured ? "verified" : "info"} />
+              <div>
+                <strong>{companyData.fiscalConfigured ? t("company.profileConfigured") : t("company.profilePending")}</strong>
+                <p>{selectedRegime?.description || (selectedRegime ? t("company.configuredGuidance") : t("company.regimeGuidance"))}</p>
+                {selectedRegime && (selectedRegime.validFrom || selectedRegime.validUntil) && (
+                  <small>{t("company.regimeValidity", {
+                    from: selectedRegime.validFrom || t("company.noDateLimit"),
+                    until: selectedRegime.validUntil || t("company.noDateLimit"),
+                  })}</small>
+                )}
+              </div>
+            </div>
             <label className="wide">
               {t("company.fiscalAddress")}
               <input disabled value={companyData.address} />
@@ -152,12 +273,42 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
             </label>
           </div>
 
+          {confirming && (
+            <section className="company-editor-confirmation" aria-live="polite">
+              <div>
+                <Icon name="verified" />
+                <div>
+                  <strong>{t("company.confirmTitle")}</strong>
+                  <p>{t("company.confirmHelp")}</p>
+                </div>
+              </div>
+              <dl>
+                <div><dt>{t("company.commercialName")}</dt><dd>{draft.nombre}</dd></div>
+                <div><dt>RFC</dt><dd>{draft.rfc}</dd></div>
+                <div><dt>{t("profile.fiscalRegime")}</dt><dd>{selectedRegime ? `${selectedRegime.clave} · ${selectedRegime.nombre}` : "—"}</dd></div>
+                <div><dt>{t("company.startDate")}</dt><dd>{draft.fiscalStartDate}</dd></div>
+                <div><dt>{t("company.endDate")}</dt><dd>{draft.fiscalEndDate || t("company.noDateLimit")}</dd></div>
+                <div><dt>{t("company.periodicity")}</dt><dd>{t(periodicityKey)}</dd></div>
+              </dl>
+            </section>
+          )}
+
           {message && <p className="profile-editor-message company-editor-message" role="alert">{message}</p>}
 
           <div className="profile-editor-actions">
-            <button disabled={busy} onClick={cancelEdition} type="button">{t("button.cancel")}</button>
+            <button
+              disabled={busy}
+              onClick={() => confirming ? setConfirming(false) : cancelEdition()}
+              type="button"
+            >
+              {confirming ? t("company.backToEdit") : t("button.cancel")}
+            </button>
             <button className="primary-button" disabled={busy || !regimes.length} type="submit">
-              {busy ? t("common.saving") : t("button.saveChanges")}
+              {busy
+                ? t("common.saving")
+                : confirming
+                  ? t("company.confirmSave")
+                  : t("company.reviewConfiguration")}
             </button>
           </div>
         </form>
@@ -170,7 +321,15 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
       <button
         className="primary-button compact"
         onClick={() => {
-          setDraft({ nombre: companyData.nombre, regimeId: companyData.regimeId, rfc: companyData.rfc });
+          setDraft({
+            fiscalEndDate: companyData.fiscalEndDate,
+            fiscalPeriodicity: companyData.fiscalPeriodicity,
+            fiscalStartDate: companyData.fiscalStartDate,
+            nombre: companyData.nombre,
+            regimeId: companyData.regimeId,
+            rfc: companyData.rfc,
+          });
+          setConfirming(false);
           setMessage("");
           setOpen(true);
         }}

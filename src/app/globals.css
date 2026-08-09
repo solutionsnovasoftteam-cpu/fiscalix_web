@@ -644,6 +644,14 @@ button { cursor:pointer; }
 .company-editor-panel{max-width:720px;margin-bottom:var(--app-gap,17px)}
 .company-editor-actions{display:flex;justify-content:flex-end;gap:12px}
 .company-editor-message{margin:0}
+.company-editor-section{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;padding-top:4px;border-bottom:1px solid #ffffff12;padding-bottom:9px}
+.company-editor-section.wide,.company-editor-guidance.wide{grid-column:1/-1}
+.company-editor-section strong{color:white;font-size:12px}.company-editor-section span{color:#8fa2b9;font-size:9px;text-align:right}
+.company-editor-guidance{display:flex;align-items:flex-start;gap:11px;padding:12px;border:1px solid #01c38d35;border-radius:10px;background:#01c38d0c;color:#a7b3c6}
+.company-editor-guidance>.g-icon{flex:none;color:#42f2bd}.company-editor-guidance strong{display:block;color:white;font-size:11px}.company-editor-guidance p{margin:4px 0;color:#a7b3c6;font-size:10px;line-height:1.5}.company-editor-guidance small{color:#7f91a8;font-size:9px}.company-editor-guidance.pending{border-color:#f5b84b45;background:#f5b84b0b}.company-editor-guidance.pending>.g-icon{color:#f5b84b}
+.company-editor-confirmation{display:grid;gap:14px;margin:0 24px 14px;padding:16px;border:1px solid #01c38d45;border-radius:11px;background:#01c38d0d}.company-editor-confirmation>div:first-child{display:flex;gap:10px;align-items:flex-start}.company-editor-confirmation .g-icon{color:#42f2bd}.company-editor-confirmation strong{color:white;font-size:12px}.company-editor-confirmation p{margin:3px 0 0;color:#a7b3c6;font-size:10px;line-height:1.45}.company-editor-confirmation dl{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0}.company-editor-confirmation dl>div{min-width:0;padding:9px 10px;border-radius:8px;background:#ffffff08}.company-editor-confirmation dt{color:#7f91a8;font-size:9px}.company-editor-confirmation dd{margin:4px 0 0;color:#eef4fb;font-size:10px;font-weight:800;overflow-wrap:anywhere}
+body[data-theme="light"] .company-editor-section{border-color:#132d461c}body[data-theme="light"] .company-editor-section strong,body[data-theme="light"] .company-editor-guidance strong{color:#191e29}body[data-theme="light"] .company-editor-section span,body[data-theme="light"] .company-editor-guidance p,body[data-theme="light"] .company-editor-guidance small{color:#59677b}
+body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;background:#01c38d12}body[data-theme="light"] .company-editor-confirmation strong,body[data-theme="light"] .company-editor-confirmation dd{color:#191e29}body[data-theme="light"] .company-editor-confirmation p,body[data-theme="light"] .company-editor-confirmation dt{color:#59677b}body[data-theme="light"] .company-editor-confirmation dl>div{background:#ffffffa8}
 .settings-theme{display:grid;gap:8px;color:#d8dee8;font-size:11px;font-weight:900}
 .settings-security-row,.settings-list-link,.settings-list-select,.settings-destination{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid #ffffff10;border-radius:10px;background:#ffffff07;color:#d8dee8}
 .settings-security-row strong,.settings-list-link span,.settings-list-select span{display:block;color:white;font-size:11px}.settings-security-row small{display:block;margin-top:4px;color:#8fa2b9;font-size:10px}
@@ -2030,4 +2038,88 @@ body[data-theme="light"] .security-ring.pending{
 body[data-theme="light"] .security-list li.is-pending span{
   background:#fff0d8!important;
   color:#b26400!important;
+}
+/* Etapa 4: actividades, compatibilidad y obligaciones fiscales. */
+.fiscal-rules-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 17px;
+  min-height: 72px;
+  padding: 14px 18px;
+}
+
+.fiscal-rules-card > div { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fiscal-rules-card > div > .material-symbols-rounded { flex: 0 0 auto; color: #01c38d; font-size: 24px; }
+.fiscal-rules-card span { display: grid; gap: 3px; min-width: 0; }
+.fiscal-rules-card strong { font-size: 14px; line-height: 1.3; }
+.fiscal-rules-card small { color: var(--theme-text-muted, #9eabc0); font-size: 11px; line-height: 1.4; }
+.fiscal-rules-card > .primary-button.compact { flex: 0 0 auto; min-height: 40px; padding: 0 18px; font-size: 11px; }
+
+.fiscal-rules-modal {
+  width: min(920px, calc(100vw - 32px));
+  height: min(860px, calc(100dvh - 40px));
+  max-height: calc(100dvh - 40px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+.fiscal-rules-body {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 24px 30px;
+  display: grid;
+  gap: 24px;
+  scrollbar-width: thin;
+  scrollbar-color: #01c38d #132d46;
+  scrollbar-gutter: stable;
+}
+.fiscal-rules-body::-webkit-scrollbar { width: 9px; }
+.fiscal-rules-body::-webkit-scrollbar-track {
+  background: #132d46;
+  border-radius: 999px;
+}
+.fiscal-rules-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #01c38d, #087f74);
+  border: 2px solid #132d46;
+  border-radius: 999px;
+}
+.fiscal-rules-body::-webkit-scrollbar-thumb:hover { background: #01c38d; }
+.fiscal-rules-body fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.fiscal-rules-body legend { font: 700 18px var(--font-manrope, sans-serif); }
+.fiscal-rules-body fieldset > p { color: var(--theme-text-muted, #a6b1c3); margin: 0; }
+.fiscal-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fiscal-choice-grid label { display: flex; gap: 12px; padding: 14px; border: 1px solid var(--theme-border, #31445b); border-radius: 12px; background: var(--theme-input-bg, #1d3147); cursor: pointer; }
+.fiscal-choice-grid label:has(input:checked) { border-color: #01c38d; background: color-mix(in srgb, #01c38d 12%, var(--theme-input-bg, #1d3147)); }
+.fiscal-choice-grid .fiscal-regime-choice { border: 1px solid var(--theme-border, #31445b); border-radius: 12px; background: var(--theme-input-bg, #1d3147); overflow: hidden; }
+.fiscal-choice-grid .fiscal-regime-choice.selected { border-color: #01c38d; background: color-mix(in srgb, #01c38d 12%, var(--theme-input-bg, #1d3147)); }
+.fiscal-choice-grid .fiscal-regime-choice.disabled { opacity: .58; }
+.fiscal-choice-grid .fiscal-regime-choice > label { border: 0; border-radius: 0; background: transparent; }
+.fiscal-choice-grid .fiscal-condition-acceptance { align-items: center; border: 0; border-top: 1px solid var(--theme-border, #31445b); border-radius: 0; background: transparent; font-size: 12px; }
+.fiscal-choice-grid input { accent-color: #01c38d; margin-top: 3px; }
+.fiscal-choice-grid span { display: grid; gap: 4px; }
+.fiscal-choice-grid small { color: var(--theme-text-muted, #a6b1c3); }
+.fiscal-choice-grid em { color: #ffbd66; font-size: 12px; font-style: normal; text-transform: capitalize; }
+.fiscal-obligation-list { display: grid; gap: 10px; }
+.fiscal-obligation-list article { display: grid; grid-template-columns: 1fr minmax(150px, 190px); align-items: center; gap: 18px; padding: 14px; border: 1px solid var(--theme-border, #31445b); border-radius: 12px; }
+.fiscal-obligation-list article > div { display: grid; gap: 3px; }
+.fiscal-obligation-list small { color: var(--theme-text-muted, #a6b1c3); }
+.fiscal-obligation-list span { color: #01c38d; font-size: 12px; text-transform: capitalize; }
+.fiscal-obligation-list select { min-height: 44px; }
+.fiscal-rules-notice { padding: 14px; border: 1px solid #01c38d66; border-radius: 12px; background: #01c38d12; }
+.fiscal-rules-notice.warning { border-color: #ffbd6666; background: #ffbd6612; }
+
+@media (max-width: 720px) {
+  .fiscal-rules-card { align-items: stretch; flex-direction: column; gap: 14px; padding: 16px; }
+  .fiscal-rules-card > .primary-button.compact { width: 100%; }
+  .fiscal-rules-modal {
+    width: min(100% - 20px, 920px);
+    height: calc(100dvh - 20px);
+    max-height: calc(100dvh - 20px);
+  }
+  .fiscal-rules-body { padding: 20px; }
+  .fiscal-choice-grid { grid-template-columns: 1fr; }
+  .fiscal-obligation-list article { grid-template-columns: 1fr; }
 }

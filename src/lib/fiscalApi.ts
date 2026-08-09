@@ -34,6 +34,34 @@ export type FiscalProfileContract = {
   regime: FiscalRegimeContract;
 };
 
+export type FiscalCompatibilityStatus =
+  | "compatible"
+  | "condicionado"
+  | "incompatible"
+  | "revision_profesional"
+  | "pendiente";
+
+export type FiscalActivityContract = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  requiresReview: boolean;
+};
+
+export type FiscalObligationSuggestionContract = {
+  id: string;
+  regimeId: string;
+  code: string;
+  name: string;
+  description: string | null;
+  tax: string | null;
+  periodicity: string | null;
+  required: boolean;
+  condition: string | null;
+  decision: "pendiente" | "confirmada" | "rechazada";
+};
+
 export const FISCAL_PERIODICITIES = [
   "mensual",
   "bimestral",

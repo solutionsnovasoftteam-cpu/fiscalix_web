@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
 import { Icon } from "@/components/Icon";
 import { CompanyFiscalEditor } from "@/components/CompanyFiscalEditor";
+import { FiscalRulesEditor } from "@/components/FiscalRulesEditor";
 import { getCurrentUser } from "@/lib/auth";
 import { createTranslator } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
@@ -15,8 +16,12 @@ type Company = {
 };
 
 type FiscalInfo = {
+  activo: boolean | null;
+  fecha_fin: string | null;
+  fecha_inicio: string | null;
   id: string;
   empresa_id: string;
+  periodicidad: string | null;
   rfc: string | null;
   regimen_id: string | null;
   regimenes_fiscales: { clave_sat: string | null; nombre: string | null } | { clave_sat: string | null; nombre: string | null }[] | null;
@@ -31,7 +36,15 @@ type TaxObligation = {
   activa: boolean | null;
 };
 
-type FiscalRegime = { clave_sat: string; id: string; nombre: string; seleccionable_nuevo: boolean };
+type FiscalRegime = {
+  clave_sat: string;
+  descripcion: string | null;
+  id: string;
+  nombre: string;
+  seleccionable_nuevo: boolean;
+  vigencia_desde: string | null;
+  vigencia_hasta: string | null;
+};
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -45,6 +58,17 @@ function regimenLabel(fiscal: FiscalInfo | undefined, fallbackText = "Pendiente 
   const regimen = firstRelation(fiscal?.regimenes_fiscales);
   if (!regimen) return fallbackText;
   return [regimen.clave_sat, regimen.nombre].filter(Boolean).join(" · ") || fallbackText;
+}
+
+function periodicityLabel(value: string | null | undefined, t: ReturnType<typeof createTranslator>, fallbackText: string) {
+  switch (value) {
+    case "mensual": return t("company.periodicity.mensual");
+    case "bimestral": return t("company.periodicity.bimestral");
+    case "trimestral": return t("company.periodicity.trimestral");
+    case "semestral": return t("company.periodicity.semestral");
+    case "anual": return t("company.periodicity.anual");
+    default: return fallbackText;
+  }
 }
 
 export default async function CompaniesPage() {
@@ -65,14 +89,14 @@ export default async function CompaniesPage() {
       ? supabase.from("empresas").select("id,nombre_comercial,rfc,estado").in("id", companyIds).order("nombre_comercial", { ascending: true })
       : Promise.resolve({ data: [] as Company[], error: null }),
     companyIds.length
-      ? supabase.from("empresa_fiscal").select("id,empresa_id,rfc,regimen_id,regimenes_fiscales(clave_sat,nombre)").in("empresa_id", companyIds)
+      ? supabase.from("empresa_fiscal").select("id,empresa_id,rfc,regimen_id,fecha_inicio,fecha_fin,periodicidad,activo,regimenes_fiscales(clave_sat,nombre)").in("empresa_id", companyIds)
       : Promise.resolve({ data: [] as FiscalInfo[], error: null }),
     companyIds.length
       ? supabase.from("obligaciones_fiscales").select("id,empresa_id,nombre,periodicidad,descripcion,activa").in("empresa_id", companyIds)
       : Promise.resolve({ data: [] as TaxObligation[], error: null }),
     supabase
       .from("regimenes_fiscales")
-      .select("id,clave_sat,nombre,seleccionable_nuevo")
+      .select("id,clave_sat,nombre,descripcion,seleccionable_nuevo,vigencia_desde,vigencia_hasta")
       .eq("tipo_persona", "fisica")
       .eq("activo", true)
       .order("clave_sat", { ascending: true }),
@@ -100,6 +124,10 @@ export default async function CompaniesPage() {
             company={selectedCompany ? {
               address: t("profile.pendingRegister"),
               email: fallback(user.correo, t("profile.pendingRegister")),
+              fiscalConfigured: Boolean(selectedFiscal?.regimen_id && selectedFiscal?.fecha_inicio),
+              fiscalEndDate: selectedFiscal?.fecha_fin ?? "",
+              fiscalPeriodicity: selectedFiscal?.periodicidad ?? "mensual",
+              fiscalStartDate: selectedFiscal?.fecha_inicio ?? new Date().toISOString().slice(0, 10),
               id: selectedCompany.id,
               legalName: fallback(selectedCompany.nombre_comercial, t("profile.pendingRegister")),
               nombre: selectedCompany.nombre_comercial ?? "",
@@ -107,13 +135,16 @@ export default async function CompaniesPage() {
               regimeId: selectedFiscal?.regimen_id ?? "",
               rfc: selectedFiscal?.rfc || selectedCompany.rfc || "",
             } : null}
-            key={selectedCompany ? `${selectedCompany.id}-${selectedCompany.nombre_comercial ?? ""}-${selectedFiscal?.rfc ?? selectedCompany.rfc ?? ""}-${selectedFiscal?.regimen_id ?? ""}` : "company-editor-empty"}
+            key={selectedCompany ? `${selectedCompany.id}-${selectedCompany.nombre_comercial ?? ""}-${selectedFiscal?.rfc ?? selectedCompany.rfc ?? ""}-${selectedFiscal?.regimen_id ?? ""}-${selectedFiscal?.fecha_inicio ?? ""}-${selectedFiscal?.fecha_fin ?? ""}-${selectedFiscal?.periodicidad ?? ""}` : "company-editor-empty"}
             language={preferences.language}
             regimes={regimes.map((regime) => ({
               clave: regime.clave_sat,
+              description: regime.descripcion ?? "",
               id: regime.id,
               nombre: regime.nombre,
               selectable: regime.seleccionable_nuevo,
+              validFrom: regime.vigencia_desde ?? "",
+              validUntil: regime.vigencia_hasta ?? "",
             }))}
           />
         </header>
@@ -139,8 +170,8 @@ export default async function CompaniesPage() {
             <strong>{regimenLabel(selectedFiscal, t("profile.pendingRegister"))}</strong>
           </article>
           <article>
-            <small>{t("company.status")}</small>
-            <strong>{fallback(selectedCompany?.estado, t("profile.pendingRegister"))}</strong>
+            <small>{t("company.fiscalProfile")}</small>
+            <strong>{selectedFiscal?.regimen_id && selectedFiscal.fecha_inicio ? t("company.profileConfigured") : t("company.profilePending")}</strong>
           </article>
         </section>
 
@@ -157,6 +188,9 @@ export default async function CompaniesPage() {
                 <div><span>{t("company.companyRfc")}</span><strong>{fallback(selectedCompany.rfc, t("profile.pendingRegister"))}</strong></div>
                 <div><span>{t("company.fiscalRfc")}</span><strong>{fallback(selectedFiscal?.rfc, t("profile.pendingRegister"))}</strong></div>
                 <div><span>{t("profile.fiscalRegime")}</span><strong>{regimenLabel(selectedFiscal, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("company.startDate")}</span><strong>{fallback(selectedFiscal?.fecha_inicio, t("profile.pendingRegister"))}</strong></div>
+                <div><span>{t("company.endDate")}</span><strong>{selectedFiscal?.fecha_fin || t("company.noDateLimit")}</strong></div>
+                <div><span>{t("company.periodicity")}</span><strong>{periodicityLabel(selectedFiscal?.periodicidad, t, t("profile.pendingRegister"))}</strong></div>
               </div>
 
               <div className="company-info-list">
@@ -173,6 +207,17 @@ export default async function CompaniesPage() {
             <strong>{t("company.noLinked")}</strong>
             <small>{t("company.noLinkedHelp")}</small>
           </section>
+        )}
+
+        {selectedCompany && selectedFiscal?.regimen_id && (
+          <FiscalRulesEditor
+            companyId={selectedCompany.id}
+            regimes={regimes.map((regime) => ({
+              id: regime.id,
+              label: `${regime.clave_sat} · ${regime.nombre}`,
+              selectable: regime.seleccionable_nuevo,
+            }))}
+          />
         )}
 
         {activeObligations.length > 0 && (
