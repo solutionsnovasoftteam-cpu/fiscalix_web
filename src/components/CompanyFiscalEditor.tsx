@@ -8,7 +8,7 @@ import { createTranslator } from "@/lib/i18n";
 import type { FiscalixLanguage } from "@/lib/userPreferences.shared";
 import { useModal } from "@/lib/useModal";
 
-type Regime = { clave: string; id: string; nombre: string };
+type Regime = { clave: string; id: string; nombre: string; selectable: boolean };
 type CompanyEditorData = {
   address: string;
   email: string;
@@ -132,7 +132,9 @@ export function CompanyFiscalEditor({ company, language = "es", regimes }: {
               >
                 <option disabled value="">{t("company.selectRegime")}</option>
                 {regimes.map((regime) => (
-                  <option key={regime.id} value={regime.id}>{regime.clave} · {regime.nombre}</option>
+                  <option disabled={!regime.selectable && regime.id !== companyData.regimeId} key={regime.id} value={regime.id}>
+                    {regime.clave} · {regime.nombre}{!regime.selectable ? " · Solo perfiles existentes" : ""}
+                  </option>
                 ))}
               </select>
             </label>

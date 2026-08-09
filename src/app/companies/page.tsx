@@ -31,7 +31,7 @@ type TaxObligation = {
   activa: boolean | null;
 };
 
-type FiscalRegime = { clave_sat: string; id: string; nombre: string };
+type FiscalRegime = { clave_sat: string; id: string; nombre: string; seleccionable_nuevo: boolean };
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
   return Array.isArray(value) ? value[0] ?? null : value ?? null;
@@ -70,7 +70,12 @@ export default async function CompaniesPage() {
     companyIds.length
       ? supabase.from("obligaciones_fiscales").select("id,empresa_id,nombre,periodicidad,descripcion,activa").in("empresa_id", companyIds)
       : Promise.resolve({ data: [] as TaxObligation[], error: null }),
-    supabase.from("regimenes_fiscales").select("id,clave_sat,nombre").order("clave_sat", { ascending: true }),
+    supabase
+      .from("regimenes_fiscales")
+      .select("id,clave_sat,nombre,seleccionable_nuevo")
+      .eq("tipo_persona", "fisica")
+      .eq("activo", true)
+      .order("clave_sat", { ascending: true }),
   ]);
 
   const companies = (companiesResult.data ?? []) as Company[];
@@ -104,7 +109,12 @@ export default async function CompaniesPage() {
             } : null}
             key={selectedCompany ? `${selectedCompany.id}-${selectedCompany.nombre_comercial ?? ""}-${selectedFiscal?.rfc ?? selectedCompany.rfc ?? ""}-${selectedFiscal?.regimen_id ?? ""}` : "company-editor-empty"}
             language={preferences.language}
-            regimes={regimes.map((regime) => ({ clave: regime.clave_sat, id: regime.id, nombre: regime.nombre }))}
+            regimes={regimes.map((regime) => ({
+              clave: regime.clave_sat,
+              id: regime.id,
+              nombre: regime.nombre,
+              selectable: regime.seleccionable_nuevo,
+            }))}
           />
         </header>
 
