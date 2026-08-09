@@ -1895,6 +1895,75 @@ body[data-theme] .login-page :where(select option,select optgroup),
   font-weight:800;
   line-height:1.45;
 }
+
+/* Auth provider controls: keep these rules expanded so CSS optimizers and
+   browsers preserve the complete Google control in login and registration. */
+.login-page .auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  color: #8a96a5;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .9px;
+  text-transform: uppercase;
+}
+
+.login-page .auth-divider::before,
+.login-page .auth-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: #d9e0e8;
+}
+
+.login-page .google-auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 18px;
+  border: 1px solid #d9e0e8;
+  border-radius: 9px;
+  background: #fff;
+  color: #132d46;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 24px #132d460d;
+  appearance: none;
+}
+
+.login-page .google-auth-button:hover:not(:disabled) {
+  border-color: #01c38d66;
+  box-shadow: 0 14px 28px #132d4614;
+  transform: translateY(-1px);
+}
+
+.login-page .google-auth-button:disabled {
+  opacity: .58;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-page .google-auth-icon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.login-page .google-auth-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
 .email-verification-actions small.is-success{
   color:#42f2bd;
 }
