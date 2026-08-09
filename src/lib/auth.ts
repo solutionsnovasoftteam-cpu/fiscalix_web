@@ -21,17 +21,16 @@ export async function createSession(idToken: string) {
   });
 }
 
-export async function getCurrentUser(): Promise<FiscalixUser | null> {
-  const session = (await cookies()).get(SESSION_COOKIE)?.value;
-  if (!session) return null;
-
+async function getUserByFirebaseUid(
+  uid: string,
+  emailVerifiedFallback = false,
+): Promise<FiscalixUser | null> {
   try {
     const auth = getAuth(getFirebaseAdmin());
-    const decoded = await auth.verifySessionCookie(session, true);
     const { data, error } = await supabase
       .from("usuarios")
       .select("id,nombre,apellido,correo,telefono,estado")
-      .eq("id", decoded.uid)
+      .eq("id", uid)
       .single();
 
     if (error || !data) return null;
@@ -39,15 +38,15 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
 
     const [firebaseUser, role, preferences] = await Promise.all([
       auth
-        .getUser(decoded.uid)
+        .getUser(uid)
         .then((userRecord) => ({
           emailVerified: userRecord.emailVerified,
         }))
         .catch(() => ({
-          emailVerified: Boolean(decoded.email_verified),
+          emailVerified: emailVerifiedFallback,
         })),
-      getUserRoleByUserId(decoded.uid),
-      getUserPreferences(decoded.uid),
+      getUserRoleByUserId(uid),
+      getUserPreferences(uid),
     ]);
 
     return {
@@ -57,6 +56,37 @@ export async function getCurrentUser(): Promise<FiscalixUser | null> {
       preferences,
       rol: role,
     };
+  } catch {
+    return null;
+  }
+}
+
+export async function getCurrentUser(): Promise<FiscalixUser | null> {
+  const session = (await cookies()).get(SESSION_COOKIE)?.value;
+  if (!session) return null;
+
+  try {
+    const decoded = await getAuth(getFirebaseAdmin()).verifySessionCookie(session, true);
+    return getUserByFirebaseUid(decoded.uid, Boolean(decoded.email_verified));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Autentica APIs compartidas por Web y Mobile. Web utiliza la cookie de sesión
+ * de Fiscalix; Mobile puede enviar un Firebase ID token como Bearer token.
+ */
+export async function getApiUser(request: Request): Promise<FiscalixUser | null> {
+  const authorization = request.headers.get("authorization")?.trim();
+  if (!authorization) return getCurrentUser();
+
+  const match = /^Bearer\s+(.+)$/i.exec(authorization);
+  if (!match?.[1]) return null;
+
+  try {
+    const decoded = await verifyToken(match[1]);
+    return getUserByFirebaseUid(decoded.uid, Boolean(decoded.email_verified));
   } catch {
     return null;
   }
