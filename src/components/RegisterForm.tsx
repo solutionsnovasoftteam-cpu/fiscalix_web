@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { GoogleAuthButton } from "@/components/GoogleAuthButton";
 
 export function RegisterForm({ initialError = "" }: { initialError?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(initialError);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,9 +64,19 @@ export function RegisterForm({ initialError = "" }: { initialError?: string }) {
         </label>
         <label>Confirmar contraseña<input name="confirmation" type={showPassword ? "text" : "password"} placeholder="Repite tu contraseña" autoComplete="new-password" minLength={6} required /></label>
       </div>
-      <label className="terms-check"><input type="checkbox" required /> <span>Acepto los <Link href="/terms">Términos de servicio</Link> y el <Link href="/privacy">Aviso de privacidad</Link>.</span></label>
+      <label className="terms-check">
+        <input
+          checked={acceptedTerms}
+          onChange={(event) => setAcceptedTerms(event.target.checked)}
+          required
+          type="checkbox"
+        />{" "}
+        <span>Acepto los <Link href="/terms">Términos de servicio</Link> y el <Link href="/privacy">Aviso de privacidad</Link>.</span>
+      </label>
       {error && <p className="form-error" role="alert">{error}</p>}
       <button className="primary-button" disabled={loading}>{loading ? "Creando cuenta..." : "Crear cuenta"}</button>
+      <div className="auth-divider"><span>o regístrate con</span></div>
+      <GoogleAuthButton disabled={loading || !acceptedTerms} mode="register" onError={setError} />
       <p className="register-copy">¿Ya tienes una cuenta? <Link href="/login">Iniciar sesión</Link></p>
     </form>
   );

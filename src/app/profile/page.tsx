@@ -4,6 +4,7 @@ import { AppShell } from "@/components/AppShell";
 import { EmailVerificationCard } from "@/components/EmailVerificationCard";
 import { Icon } from "@/components/Icon";
 import { ProfileEditor } from "@/components/ProfileEditor";
+import { ProfileAvatarUploader } from "@/components/ProfileAvatarUploader";
 import { ProfilePreferences } from "@/components/ProfilePreferences";
 import { getAccessibleCompanyIds } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
@@ -87,10 +88,11 @@ export default async function ProfilePage() {
       <main className="profile-content">
         <section className="profile-hero">
           <div className="profile-identity">
-            <div className="profile-avatar-xl">
-              <span>{initials(user.nombre, user.apellido)}</span>
-              <button aria-label={t("profile.editPhoto")} type="button"><Icon name="edit" /></button>
-            </div>
+            <ProfileAvatarUploader
+              avatarUrl={user.avatar_url}
+              fallback={initials(user.nombre, user.apellido)}
+              language={preferences.language}
+            />
             <div className="profile-copy">
               <span>{t("profile.welcome")}</span>
               <h1>{firstName(user.nombre)} {user.apellido}</h1>

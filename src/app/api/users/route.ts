@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, verifyToken } from "@/lib/auth";
 import { getFirebaseAdmin, normalizeEnvValue } from "@/lib/firebaseAdmin";
 import { supabase } from "@/lib/supabase";
 
@@ -76,19 +76,69 @@ async function verifyCurrentPassword({
   return { ok: true, status: 200 };
 }
 
-export async function GET() {
+async function getAuthenticatedUser(request: Request) {
   const user = await getCurrentUser();
+  if (user) {
+    return { id: user.id, correo: user.correo };
+  }
+
+  const authorization = request.headers.get("authorization");
+  const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
+  if (!token) {
+    return null;
+  }
+
+  try {
+    const decoded = await verifyToken(token);
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id,correo")
+      .eq("id", decoded.uid)
+      .single();
+
+    if (error || !data) {
+      return null;
+    }
+
+    return { id: data.id as string, correo: data.correo as string };
+  } catch {
+    return null;
+  }
+}
+
+export async function GET(request: Request) {
+  const user = await getAuthenticatedUser(request);
   if (!user) {
     return NextResponse.json({ success: false, message: "No autorizado", data: null }, { status: 401 });
   }
-  return NextResponse.json({ success: true, message: "Usuario encontrado", data: user });
+
+  const authUser = await getCurrentUser();
+  if (!authUser) {
+    const { data, error } = await supabase
+      .from("usuarios")
+      .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
+      .eq("id", user.id)
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ success: false, message: "No autorizado", data: null }, { status: 401 });
+    }
+
+    return NextResponse.json({ success: true, message: "Usuario encontrado", data });
+  }
+
+  return NextResponse.json({ success: true, message: "Usuario encontrado", data: authUser });
 }
 
 export async function PATCH(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
+  const authenticatedUser = await getAuthenticatedUser(request);
+  if (!authenticatedUser) {
     return NextResponse.json({ success: false, message: "No autorizado" }, { status: 401 });
   }
+
+  const user = await getCurrentUser();
+  const currentUserId = user?.id ?? authenticatedUser.id;
+  const currentUserEmail = user?.correo ?? authenticatedUser.correo;
 
   let body: unknown;
   try {
@@ -101,9 +151,10 @@ export async function PATCH(request: Request) {
   const nombre = cleanText(values.nombre);
   const apellido = cleanText(values.apellido);
   const telefono = cleanText(values.telefono);
-  const correo = cleanEmail(values.correo || user.correo);
+  const normalizedCurrentEmail = currentUserEmail.toLowerCase();
+  const correo = cleanEmail(values.correo || normalizedCurrentEmail);
   const currentPassword = typeof values.currentPassword === "string" ? values.currentPassword : "";
-  const emailChanged = correo !== user.correo.toLowerCase();
+  const emailChanged = correo !== normalizedCurrentEmail;
 
   if (!nombre || !apellido) {
     return NextResponse.json({ success: false, message: "Nombre y apellido son obligatorios." }, { status: 400 });
@@ -119,7 +170,7 @@ export async function PATCH(request: Request) {
   }
 
   const auth = getAuth(getFirebaseAdmin());
-  let firebaseEmail = user.correo.toLowerCase();
+  let firebaseEmail = normalizedCurrentEmail;
 
   if (emailChanged) {
     if (!currentPassword) {
@@ -133,7 +184,7 @@ export async function PATCH(request: Request) {
       .from("usuarios")
       .select("id")
       .eq("correo", correo)
-      .neq("id", user.id)
+      .neq("id", currentUserId)
       .maybeSingle();
 
     if (existingProfileError) {
@@ -144,14 +195,14 @@ export async function PATCH(request: Request) {
     }
 
     try {
-      const firebaseUser = await auth.getUser(user.id);
+      const firebaseUser = await auth.getUser(currentUserId);
       firebaseEmail = firebaseUser.email?.toLowerCase() || firebaseEmail;
       const existingFirebaseUser = await auth.getUserByEmail(correo).catch((error: unknown) => {
         if (firebaseErrorCode(error) === "auth/user-not-found") return null;
         throw error;
       });
 
-      if (existingFirebaseUser && existingFirebaseUser.uid !== user.id) {
+      if (existingFirebaseUser && existingFirebaseUser.uid !== currentUserId) {
         return NextResponse.json({ success: false, message: "Ese correo ya existe en Firebase." }, { status: 409 });
       }
     } catch (error) {
@@ -162,7 +213,7 @@ export async function PATCH(request: Request) {
     const passwordCheck = await verifyCurrentPassword({
       email: firebaseEmail,
       password: currentPassword,
-      uid: user.id,
+      uid: currentUserId,
     });
 
     if (!passwordCheck.ok) {
@@ -170,7 +221,7 @@ export async function PATCH(request: Request) {
     }
 
     try {
-      await auth.updateUser(user.id, { email: correo, emailVerified: false });
+      await auth.updateUser(currentUserId, { email: correo, emailVerified: false });
     } catch (error) {
       const code = firebaseErrorCode(error);
       const message = code === "auth/email-already-exists"
@@ -183,14 +234,14 @@ export async function PATCH(request: Request) {
   const { data, error } = await supabase
     .from("usuarios")
     .update({ apellido, correo, nombre, telefono: telefono || null })
-    .eq("id", user.id)
-    .select("id,nombre,apellido,correo,telefono,estado")
+    .eq("id", currentUserId)
+    .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
     .single();
 
   if (error || !data) {
     if (emailChanged) {
       try {
-        await auth.updateUser(user.id, { email: firebaseEmail });
+        await auth.updateUser(currentUserId, { email: firebaseEmail });
       } catch (revertError) {
         console.error("No fue posible revertir el correo en Firebase:", revertError instanceof Error ? revertError.message : revertError);
       }

@@ -29,7 +29,7 @@ async function getUserByFirebaseUid(
     const auth = getAuth(getFirebaseAdmin());
     const { data, error } = await supabase
       .from("usuarios")
-      .select("id,nombre,apellido,correo,telefono,estado")
+      .select("id,nombre,apellido,correo,telefono,estado,avatar_url")
       .eq("id", uid)
       .single();
 

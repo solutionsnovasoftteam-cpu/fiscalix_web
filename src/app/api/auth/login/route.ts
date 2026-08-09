@@ -52,6 +52,38 @@ export async function POST(request: Request) {
       return null;
     }
 
+    const authorization = request.headers.get("authorization");
+    const firebaseToken = authorization?.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : null;
+
+    // Mobile clients authenticate with Firebase directly, then prove that
+    // authentication to this API with their Firebase ID token.
+    if (firebaseToken) {
+      try {
+        const decoded = await verifyToken(firebaseToken);
+        const { data: profile, error } = await supabase
+          .from("usuarios")
+          .select("id,nombre,apellido,correo,telefono,estado")
+          .eq("id", decoded.uid)
+          .single();
+
+        if (error || !profile) {
+          return failure("Tu cuenta no tiene un perfil de Fiscalix asociado.", 403);
+        }
+        if (profile.estado === "suspendido") {
+          return failure(SUSPENDED_ACCOUNT_MESSAGE, 403, SUSPENDED_ACCOUNT_CODE);
+        }
+        if (profile.estado && profile.estado !== "activo") {
+          return failure("Tu cuenta no estÃ¡ activa.", 403);
+        }
+
+        return NextResponse.json({ success: true, user: profile });
+      } catch {
+        return failure("No autorizado.", 401);
+      }
+    }
+
     if (!email || !password) {
       return failure("Ingresa tu correo y contraseña.", 400);
     }
