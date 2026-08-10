@@ -2,19 +2,26 @@ import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getCompanyIfAccessible } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  booleanFromFormValue,
+  isMissingMovementNormalizationColumn,
+  normalizeMovementStatus,
+  normalizeTaxRate,
+  taxAmountFromRate,
+} from "@/lib/financialMovements";
 import { createFinancialRecordNotification } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 
 type ExpenseRequestBody = {
   categoriaId?: unknown;
   concepto?: unknown;
+  deducible?: unknown;
   empresaId?: unknown;
-  empresaNombreOtro?: unknown;
+  estado?: unknown;
   fechaGasto?: unknown;
+  ivaTasa?: unknown;
   monto?: unknown;
 };
-
-const OTHER_COMPANY_VALUE = "__other__";
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -41,17 +48,18 @@ export async function POST(request: Request) {
 
   const concepto = readText(body.concepto);
   const empresaId = readText(body.empresaId);
-  const empresaNombreOtro = readText(body.empresaNombreOtro);
   const fechaGasto = readText(body.fechaGasto);
-  const categoriaId = readText(body.categoriaId) || null;
+  const categoriaId = readText(body.categoriaId);
   const monto = typeof body.monto === "number" ? body.monto : Number(readText(body.monto));
-  const isOtherCompany = empresaId === OTHER_COMPANY_VALUE;
+  const deducible = booleanFromFormValue(body.deducible, true);
+  const estado = normalizeMovementStatus(body.estado, "expense");
+  const ivaTasa = normalizeTaxRate(body.ivaTasa);
 
   if (!empresaId || empresaId.length > 80) {
     return NextResponse.json({ success: false, message: "Selecciona una empresa válida." }, { status: 400 });
   }
-  if (isOtherCompany && (!empresaNombreOtro || empresaNombreOtro.length > 120)) {
-    return NextResponse.json({ success: false, message: "Ingresa el nombre de la empresa." }, { status: 400 });
+  if (empresaId === "__other__") {
+    return NextResponse.json({ success: false, message: "Selecciona una empresa registrada para normalizar el gasto." }, { status: 400 });
   }
   if (!concepto || concepto.length > 180) {
     return NextResponse.json({ success: false, message: "Ingresa una descripción válida." }, { status: 400 });
@@ -62,45 +70,54 @@ export async function POST(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fechaGasto)) {
     return NextResponse.json({ success: false, message: "Selecciona una fecha válida." }, { status: 400 });
   }
-
-  if (categoriaId) {
-    const { data: category, error: categoryError } = await supabase
-      .from("categorias_financieras")
-      .select("id,tipo")
-      .eq("id", categoriaId)
-      .maybeSingle();
-
-    if (categoryError || !category) {
-      return NextResponse.json({ success: false, message: "La categoría seleccionada no existe." }, { status: 400 });
-    }
-    if (!isExpenseCategoryType(category.tipo)) {
-      return NextResponse.json({ success: false, message: "Selecciona una categoría de gasto." }, { status: 400 });
-    }
+  if (!categoriaId) {
+    return NextResponse.json({ success: false, message: "Selecciona una categoría para el gasto." }, { status: 400 });
+  }
+  if (!estado) {
+    return NextResponse.json({ success: false, message: "Selecciona un estado válido para el gasto." }, { status: 400 });
+  }
+  if (ivaTasa === null) {
+    return NextResponse.json({ success: false, message: "La tasa de IVA debe estar entre 0% y 100%." }, { status: 400 });
   }
 
-  let selectedCompanyName = empresaNombreOtro || null;
+  const { data: category, error: categoryError } = await supabase
+    .from("categorias_financieras")
+    .select("id,tipo")
+    .eq("id", categoriaId)
+    .maybeSingle();
 
-  if (!isOtherCompany) {
-    const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
-    if (accessError) {
-      return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
-    }
-    if (!company) {
-      return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
-    }
-    selectedCompanyName = company.nombre_comercial || "Sin empresa";
+  if (categoryError || !category) {
+    return NextResponse.json({ success: false, message: "La categoría seleccionada no existe." }, { status: 400 });
+  }
+  if (!isExpenseCategoryType(category.tipo)) {
+    return NextResponse.json({ success: false, message: "Selecciona una categoría de gasto." }, { status: 400 });
   }
 
-  const storedConcept = isOtherCompany ? [empresaNombreOtro, concepto].filter(Boolean).join(" · ") : concepto;
+  const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
+  if (accessError) {
+    return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
+  }
+  if (!company) {
+    return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
+  }
+
+  const baseFiscal = deducible ? monto : 0;
+  const ivaMonto = deducible ? taxAmountFromRate(baseFiscal, ivaTasa) : 0;
 
   const { data, error } = await supabase
     .from("gastos")
     .insert({
+      base_fiscal: baseFiscal,
       categoria_id: categoriaId,
-      concepto: storedConcept,
-      empresa_id: isOtherCompany ? null : empresaId,
+      concepto,
+      deducible,
+      empresa_id: empresaId,
+      estado,
       fecha_gasto: fechaGasto,
       id: randomUUID(),
+      isr_retenido_monto: 0,
+      iva_monto: ivaMonto,
+      iva_tasa: ivaTasa,
       monto,
       usuario_id: user.id,
     })
@@ -108,6 +125,15 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !data) {
+    if (isMissingMovementNormalizationColumn(error)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "Falta normalizar la tabla gastos. Ejecuta el SQL scripts/financial-movements-stage-5.sql en Supabase.",
+        },
+        { status: 500 },
+      );
+    }
     const message = error?.message?.toLowerCase() ?? "";
     const details = error?.details?.toLowerCase() ?? "";
     if (message.includes("usuario_id") || details.includes("usuario_id")) {
@@ -143,8 +169,8 @@ export async function POST(request: Request) {
   await createFinancialRecordNotification({
     actorUserId: user.id,
     amount: monto,
-    companyId: isOtherCompany ? null : empresaId,
-    companyName: selectedCompanyName,
+    companyId: empresaId,
+    companyName: company.nombre_comercial || "Sin empresa",
     concept: concepto,
     kind: "expense",
   });

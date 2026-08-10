@@ -5,6 +5,7 @@ import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
@@ -67,6 +68,7 @@ export default async function TransactionsPage({
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
+  const companyIdSet = new Set(companyIds);
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
 
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
@@ -104,13 +106,19 @@ export default async function TransactionsPage({
   const expensesById = new Map<string, FinanceRow>();
   for (const income of [
     ...((companyIncomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>),
-    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id")
+      ? []
+      : ((userIncomeResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_ingreso: string | null }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     incomesById.set(income.id, { ...income, fecha: income.fecha_ingreso });
   }
   for (const expense of [
     ...((companyExpenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>),
-    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id")
+      ? []
+      : ((userExpenseResult.data ?? []) as Array<Omit<FinanceRow, "fecha"> & { fecha_gasto: string | null }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     expensesById.set(expense.id, { ...expense, fecha: expense.fecha_gasto });
   }

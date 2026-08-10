@@ -6,6 +6,7 @@ import { TableSearch } from "@/components/TableSearch";
 import { IncomeActions } from "@/app/income/income-actions";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
@@ -100,6 +101,7 @@ export default async function IncomePage({
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
+  const companyIdSet = new Set(companyIds);
 
   const [companyIncomeResult, userIncomeResult, categoriesResult] = await Promise.all([
     companyIds.length
@@ -119,7 +121,9 @@ export default async function IncomePage({
     supabase.from("categorias_financieras").select("id,nombre,tipo").order("nombre", { ascending: true }),
   ]);
 
-  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id")
+    ? []
+    : ((userIncomeResult.data ?? []) as IncomeRow[]).filter((income) => isRowInAccessibleCompanyScope(income, companyIdSet));
   const incomesById = new Map<string, IncomeRow>();
   for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) {
     incomesById.set(income.id, income);

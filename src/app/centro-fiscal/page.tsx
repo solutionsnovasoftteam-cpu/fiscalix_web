@@ -3,6 +3,7 @@ import { AppShell } from "@/components/AppShell";
 import { CentroFiscalHub, type CentroFiscalInitialData } from "@/app/centro-fiscal/centro-fiscal-hub";
 import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { supabase } from "@/lib/supabase";
 import { defaultUserPreferences } from "@/lib/userPreferences.shared";
 
@@ -68,6 +69,7 @@ export default async function CentroFiscalPage() {
 
   const now = new Date();
   const { companyIds } = await getAccessibleCompanyIds(user);
+  const companyIdSet = new Set(companyIds);
   const monthStart = dateKey(new Date(now.getFullYear(), now.getMonth(), 1));
 
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationResult] = await Promise.all([
@@ -112,13 +114,17 @@ export default async function CentroFiscalPage() {
   const expensesById = new Map<string, ExpenseRow>();
   for (const income of [
     ...((companyIncomeResult.data ?? []) as IncomeRow[]),
-    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[]),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id")
+      ? []
+      : ((userIncomeResult.data ?? []) as IncomeRow[]).filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     incomesById.set(income.id, income);
   }
   for (const expense of [
     ...((companyExpenseResult.data ?? []) as ExpenseRow[]),
-    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as ExpenseRow[]),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id")
+      ? []
+      : ((userExpenseResult.data ?? []) as ExpenseRow[]).filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     expensesById.set(expense.id, expense);
   }

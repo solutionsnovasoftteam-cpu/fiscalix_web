@@ -1,0 +1,218 @@
+{
+  "version": "stage-6-resico-v1",
+  "regime": {
+    "key": "RESICO_PERSONA_FISICA",
+    "satCode": "626",
+    "name": "Régimen Simplificado de Confianza"
+  },
+  "period": "2026-08",
+  "notes": [
+    "Los importes están en MXN.",
+    "La estimación usa movimientos activos dentro del periodo.",
+    "ISR RESICO no deduce gastos; IVA sí considera IVA acreditable de gastos pagados deducibles."
+  ],
+  "cases": [
+    {
+      "id": "resico_basic_income",
+      "description": "Ingreso cobrado sin gastos ni retenciones.",
+      "input": {
+        "fiscalProfile": { "active": true, "satCode": "626" },
+        "movements": [
+          {
+            "type": "ingreso",
+            "status": "cobrado",
+            "date": "2026-08-10",
+            "amount": 25000,
+            "fiscalBase": 25000,
+            "vatAmount": 4000,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": true
+          }
+        ]
+      },
+      "expected": {
+        "incomes": 25000,
+        "expenses": 0,
+        "base": 25000,
+        "isrRate": 0.01,
+        "isrDetermined": 250,
+        "isrEstimated": 250,
+        "vatEstimated": 4000,
+        "taxEstimated": 4250,
+        "estimationAvailable": true
+      }
+    },
+    {
+      "id": "resico_with_withholding_and_creditable_vat",
+      "description": "Ingreso con ISR retenido y gasto deducible con IVA acreditable.",
+      "input": {
+        "fiscalProfile": { "active": true, "satCode": "626" },
+        "movements": [
+          {
+            "type": "ingreso",
+            "status": "cobrado",
+            "date": "2026-08-10",
+            "amount": 50000,
+            "fiscalBase": 50000,
+            "vatAmount": 8000,
+            "isrWithheld": 625,
+            "deductible": false,
+            "fiscalActive": true
+          },
+          {
+            "type": "gasto",
+            "status": "pagado",
+            "date": "2026-08-11",
+            "amount": 10000,
+            "fiscalBase": 10000,
+            "vatAmount": 1600,
+            "isrWithheld": 0,
+            "deductible": true,
+            "fiscalActive": true
+          }
+        ]
+      },
+      "expected": {
+        "incomes": 50000,
+        "expenses": 10000,
+        "deductibleExpenses": 10000,
+        "base": 50000,
+        "isrRate": 0.011,
+        "isrDetermined": 550,
+        "isrWithheld": 625,
+        "isrEstimated": 0,
+        "vatTransferred": 8000,
+        "vatCreditable": 1600,
+        "vatEstimated": 6400,
+        "taxEstimated": 6400,
+        "estimationAvailable": true
+      }
+    },
+    {
+      "id": "pending_and_canceled_excluded",
+      "description": "Pendientes y cancelados no entran a la estimación.",
+      "input": {
+        "fiscalProfile": { "active": true, "satCode": "626" },
+        "movements": [
+          {
+            "type": "ingreso",
+            "status": "pendiente",
+            "date": "2026-08-10",
+            "amount": 12000,
+            "fiscalBase": 12000,
+            "vatAmount": 1920,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": true
+          },
+          {
+            "type": "ingreso",
+            "status": "cancelado",
+            "date": "2026-08-12",
+            "amount": 8000,
+            "fiscalBase": 8000,
+            "vatAmount": 1280,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": false
+          },
+          {
+            "type": "gasto",
+            "status": "pagado",
+            "date": "2026-08-13",
+            "amount": 3000,
+            "fiscalBase": 3000,
+            "vatAmount": 480,
+            "isrWithheld": 0,
+            "deductible": true,
+            "fiscalActive": true
+          }
+        ]
+      },
+      "expected": {
+        "incomes": 0,
+        "expenses": 3000,
+        "base": 0,
+        "isrEstimated": 0,
+        "vatEstimated": 0,
+        "taxEstimated": 0,
+        "excludedMovementCount": 2,
+        "estimationAvailable": true
+      }
+    },
+    {
+      "id": "non_deductible_expense_keeps_vat_out",
+      "description": "Gasto no deducible se muestra como gasto pagado, pero no acredita IVA.",
+      "input": {
+        "fiscalProfile": { "active": true, "satCode": "626" },
+        "movements": [
+          {
+            "type": "ingreso",
+            "status": "cobrado",
+            "date": "2026-08-10",
+            "amount": 100000,
+            "fiscalBase": 100000,
+            "vatAmount": 16000,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": true
+          },
+          {
+            "type": "gasto",
+            "status": "pagado",
+            "date": "2026-08-14",
+            "amount": 6000,
+            "fiscalBase": 0,
+            "vatAmount": 0,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": true
+          }
+        ]
+      },
+      "expected": {
+        "incomes": 100000,
+        "expenses": 6000,
+        "deductibleExpenses": 0,
+        "base": 100000,
+        "isrRate": 0.02,
+        "isrDetermined": 2000,
+        "isrEstimated": 2000,
+        "vatCreditable": 0,
+        "vatEstimated": 16000,
+        "taxEstimated": 18000,
+        "estimationAvailable": true
+      }
+    },
+    {
+      "id": "unsupported_regime_has_no_estimate",
+      "description": "Empresas fuera de RESICO muestran datos, pero no calculan impuesto en esta etapa.",
+      "input": {
+        "fiscalProfile": { "active": true, "satCode": "612" },
+        "movements": [
+          {
+            "type": "ingreso",
+            "status": "cobrado",
+            "date": "2026-08-10",
+            "amount": 30000,
+            "fiscalBase": 30000,
+            "vatAmount": 4800,
+            "isrWithheld": 0,
+            "deductible": false,
+            "fiscalActive": true
+          }
+        ]
+      },
+      "expected": {
+        "incomes": 30000,
+        "base": 30000,
+        "estimationAvailable": false,
+        "isrEstimated": null,
+        "vatEstimated": null,
+        "taxEstimated": null,
+        "warnings": ["UNSUPPORTED_REGIME"]
+      }
+    }
+  ]
+}

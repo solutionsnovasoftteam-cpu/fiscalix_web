@@ -6,6 +6,7 @@ import { TableSearch } from "@/components/TableSearch";
 import { ExpenseActions } from "@/app/expenses/expense-actions";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
@@ -100,6 +101,7 @@ export default async function ExpensesPage({
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
+  const companyIdSet = new Set(companyIds);
 
   const [companyExpensesResult, userExpensesResult, categoriesResult] = await Promise.all([
     companyIds.length
@@ -119,7 +121,9 @@ export default async function ExpensesPage({
     supabase.from("categorias_financieras").select("id,nombre,tipo").order("nombre", { ascending: true }),
   ]);
 
-  const userExpenses = isMissingColumnError(userExpensesResult.error, "usuario_id") ? [] : (userExpensesResult.data ?? []) as ExpenseRow[];
+  const userExpenses = isMissingColumnError(userExpensesResult.error, "usuario_id")
+    ? []
+    : ((userExpensesResult.data ?? []) as ExpenseRow[]).filter((expense) => isRowInAccessibleCompanyScope(expense, companyIdSet));
   const expensesById = new Map<string, ExpenseRow>();
   for (const expense of [...((companyExpensesResult.data ?? []) as ExpenseRow[]), ...userExpenses]) {
     expensesById.set(expense.id, expense);

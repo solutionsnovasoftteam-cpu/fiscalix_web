@@ -45,8 +45,6 @@ type ExportDateRange = {
   to: string;
 };
 
-const OTHER_COMPANY_VALUE = "__other__";
-
 const C = {
   deep: [19, 45, 70] as [number, number, number],
   green: [1, 195, 141] as [number, number, number],
@@ -338,9 +336,11 @@ export function IncomeActions({
         body: JSON.stringify({
           categoriaId: formData.get("categoriaId"),
           concepto: formData.get("concepto"),
+          estado: formData.get("estado"),
           empresaId: formData.get("empresaId"),
-          empresaNombreOtro: formData.get("empresaNombreOtro"),
           fechaIngreso: formData.get("fechaIngreso"),
+          isrRetenido: convertPreferenceCurrencyToMxn(Number(formData.get("isrRetenido") || 0), preferences),
+          ivaTasa: Number(formData.get("ivaTasa") || 16) / 100,
           monto: convertPreferenceCurrencyToMxn(Number(formData.get("monto")), preferences),
         }),
         headers: { "Content-Type": "application/json" },
@@ -405,17 +405,9 @@ export function IncomeActions({
                 {companies.map((company) => (
                   <option key={company.id} value={company.id}>{company.nombre}</option>
                 ))}
-                <option value={OTHER_COMPANY_VALUE}>{t("expenses.other")}</option>
               </select>
             )}
           </label>
-
-          {selectedCompany === OTHER_COMPANY_VALUE && (
-            <label>
-              {t("expenses.otherCompanyName")}
-              <input maxLength={120} name="empresaNombreOtro" placeholder={t("income.otherCompanyPlaceholder")} required type="text" />
-            </label>
-          )}
 
           <label>
             {t("table.description")}
@@ -435,12 +427,32 @@ export function IncomeActions({
 
           <label>
             {t("table.category")}
-            <select defaultValue="" name="categoriaId">
-              <option value="">{t("common.noCategory")}</option>
+            <select defaultValue="" name="categoriaId" required>
+              <option disabled value="">{t("movements.selectCategory")}</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>{category.nombre}</option>
               ))}
             </select>
+          </label>
+
+          <div className="expenses-form-grid">
+            <label>
+              {t("movements.status")}
+              <select defaultValue="cobrado" name="estado" required>
+                <option value="cobrado">{t("movements.status.cobrado")}</option>
+                <option value="pendiente">{t("movements.status.pendiente")}</option>
+                <option value="cancelado">{t("movements.status.cancelado")}</option>
+              </select>
+            </label>
+            <label>
+              {t("movements.ivaRate")}
+              <input defaultValue="16" max="100" min="0" name="ivaTasa" required step="0.01" type="number" />
+            </label>
+          </div>
+
+          <label>
+            {t("movements.isrWithheld", { currency: preferences.currency })}
+            <input defaultValue="0" min="0" name="isrRetenido" required step="0.01" type="number" />
           </label>
 
           <footer>

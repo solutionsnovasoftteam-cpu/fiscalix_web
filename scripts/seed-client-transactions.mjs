@@ -97,6 +97,16 @@ const today = new Date();
 const summary = [];
 
 for (const [companyIndex, company] of (companies ?? []).entries()) {
+  const { data: membership, error: membershipError } = await supabase
+    .from("empresa_usuario")
+    .select("usuario_id")
+    .eq("empresa_id", company.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) throw new Error(`No se pudo consultar usuario de ${company.nombre_comercial}: ${membershipError.message}`);
+  if (!membership?.usuario_id) throw new Error(`La empresa ${company.nombre_comercial} no tiene usuario asociado para normalizar movimientos.`);
+
   const { count: existingDemoIncome, error: incomeCountError } = await supabase
     .from("ingresos")
     .select("*", { count: "exact", head: true })
@@ -119,13 +129,23 @@ for (const [companyIndex, company] of (companies ?? []).entries()) {
   const baseExpense = 2600 + (companyIndex * 215);
 
   if (!existingDemoIncome) {
-    const ingresos = incomeTemplates.map((template, templateIndex) => ({
-      categoria_id: categoriesByKey.get(`ingreso:${template.category}`)?.id ?? null,
-      concepto: `${DEMO_PREFIX} ${template.concept}`,
-      empresa_id: company.id,
-      fecha_ingreso: addDays(today, -(template.daysAgo + (companyIndex % 4))),
-      monto: money(baseIncome, templateIndex, template.multiplier),
-    }));
+    const ingresos = incomeTemplates.map((template, templateIndex) => {
+      const monto = money(baseIncome, templateIndex, template.multiplier);
+      return {
+        base_fiscal: monto,
+        categoria_id: categoriesByKey.get(`ingreso:${template.category}`)?.id ?? null,
+        concepto: `${DEMO_PREFIX} ${template.concept}`,
+        deducible: false,
+        empresa_id: company.id,
+        estado: "cobrado",
+        fecha_ingreso: addDays(today, -(template.daysAgo + (companyIndex % 4))),
+        isr_retenido_monto: 0,
+        iva_monto: Math.round(monto * 0.16 * 100) / 100,
+        iva_tasa: 0.16,
+        monto,
+        usuario_id: membership.usuario_id,
+      };
+    });
 
     const { error } = await supabase.from("ingresos").insert(ingresos);
     if (error) throw new Error(`No se pudieron insertar ingresos de ${company.nombre_comercial}: ${error.message}`);
@@ -133,13 +153,23 @@ for (const [companyIndex, company] of (companies ?? []).entries()) {
   }
 
   if (!existingDemoExpenses) {
-    const gastos = expenseTemplates.map((template, templateIndex) => ({
-      categoria_id: categoriesByKey.get(`gasto:${template.category}`)?.id ?? null,
-      concepto: `${DEMO_PREFIX} ${template.concept}`,
-      empresa_id: company.id,
-      fecha_gasto: addDays(today, -(template.daysAgo + (companyIndex % 5))),
-      monto: money(baseExpense, templateIndex, template.multiplier),
-    }));
+    const gastos = expenseTemplates.map((template, templateIndex) => {
+      const monto = money(baseExpense, templateIndex, template.multiplier);
+      return {
+        base_fiscal: monto,
+        categoria_id: categoriesByKey.get(`gasto:${template.category}`)?.id ?? null,
+        concepto: `${DEMO_PREFIX} ${template.concept}`,
+        deducible: true,
+        empresa_id: company.id,
+        estado: "pagado",
+        fecha_gasto: addDays(today, -(template.daysAgo + (companyIndex % 5))),
+        isr_retenido_monto: 0,
+        iva_monto: Math.round(monto * 0.16 * 100) / 100,
+        iva_tasa: 0.16,
+        monto,
+        usuario_id: membership.usuario_id,
+      };
+    });
 
     const { error } = await supabase.from("gastos").insert(gastos);
     if (error) throw new Error(`No se pudieron insertar gastos de ${company.nombre_comercial}: ${error.message}`);

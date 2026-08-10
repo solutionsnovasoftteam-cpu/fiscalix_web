@@ -6,6 +6,7 @@ import { TableSearch } from "@/components/TableSearch";
 import { ReceiptsTableActions } from "@/app/receipts/receipts-table-actions";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
@@ -60,6 +61,7 @@ export default async function ReceiptsPage({
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
 
   const companyIds = [...new Set(companies.map((company) => company.id))];
+  const companyIdSet = new Set(companyIds);
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
     companyIds.length
@@ -89,13 +91,19 @@ export default async function ReceiptsPage({
   const expensesById = new Map<string, Receipt>();
   for (const record of [
     ...((companyIncomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>),
-    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id")
+      ? []
+      : ((userIncomeResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_ingreso: string | null }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     incomesById.set(record.id, receiptFrom({ ...record, fecha: record.fecha_ingreso }, "Ingreso"));
   }
   for (const record of [
     ...((companyExpenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>),
-    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id")
+      ? []
+      : ((userExpenseResult.data ?? []) as Array<Omit<FinancialRecord, "fecha"> & { fecha_gasto: string | null }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ]) {
     expensesById.set(record.id, receiptFrom({ ...record, fecha: record.fecha_gasto }, "Gasto"));
   }

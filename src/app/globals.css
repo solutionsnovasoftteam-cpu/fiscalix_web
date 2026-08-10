@@ -732,6 +732,29 @@ body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;bac
 .table-card-actions{display:flex;align-items:center;justify-content:flex-end;gap:12px;min-width:min(520px,100%)}
 .table-card-actions>span{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;background:#01c38d17;color:var(--blue);font-size:10px;font-weight:900;white-space:nowrap}
 @media (max-width:760px){.table-card-actions,.cf-table-tools{width:100%;align-items:stretch;flex-direction:column}.table-card-actions .table-search,.cf-table-tools .table-search{width:100%}.table-card-actions>span{justify-content:center}}
+.tax-estimation-header{display:flex;align-items:flex-end;justify-content:space-between;gap:22px}
+.tax-estimation-header>div{min-width:0}
+.tax-estimation-form{display:flex;align-items:flex-end;justify-content:flex-end;gap:11px;flex-wrap:wrap}
+.tax-estimation-form label{display:grid;gap:7px;color:#d8dee8;font-size:10px;font-weight:900;text-transform:uppercase}
+.tax-estimation-form input,.tax-estimation-form select{height:42px;min-width:150px;padding:0 12px;border:1px solid #ffffff18;border-radius:9px;background:#ffffff09;color:white;font-size:11px;font-weight:900;outline:0}
+.tax-estimation-form select{min-width:210px}
+.tax-estimation-form input:focus,.tax-estimation-form select:focus{border-color:#01c38d88;box-shadow:0 0 0 3px #01c38d1c}
+.tax-estimation-notice{display:flex;align-items:center;gap:12px;margin-bottom:17px;padding:13px 15px;border:1px solid #01c38d3d;border-radius:12px;background:linear-gradient(135deg,#01c38d17,#ffffff07);color:#dff9f1}
+.tax-estimation-notice>span{display:grid;place-items:center;flex:none;width:34px;height:34px;border-radius:10px;background:#01c38d1f;color:#42f2bd}
+.tax-estimation-notice strong,.tax-estimation-notice small{display:block}
+.tax-estimation-notice strong{font-size:12px}.tax-estimation-notice small{margin-top:3px;color:#a7b3c6;font-size:10px;font-weight:700;line-height:1.45}
+.tax-formula-card{margin-bottom:17px}
+.tax-formula-list{display:grid;gap:0;padding:5px 22px 18px}
+.tax-formula-list p{display:grid;grid-template-columns:minmax(120px,170px) 1fr;gap:16px;margin:0;padding:13px 0;border-bottom:1px solid #ffffff0b}
+.tax-formula-list p:last-child{border-bottom:0}
+.tax-formula-list strong{color:white;font-size:11px}.tax-formula-list span{color:#a7b3c6;font-size:11px;line-height:1.5}
+.tax-estimation-table{min-width:1040px}
+body[data-theme="light"] .tax-estimation-form label{color:var(--light-text)!important}
+body[data-theme="light"] .tax-estimation-form input,body[data-theme="light"] .tax-estimation-form select{border-color:#d8e3ef;background:#ffffff;color:#132d46}
+body[data-theme="light"] .tax-estimation-notice{border-color:#a9ead7;background:linear-gradient(135deg,#e7fbf5,#ffffff);color:#132d46}
+body[data-theme="light"] .tax-estimation-notice small,body[data-theme="light"] .tax-formula-list span{color:var(--theme-muted,#6f7f92)}
+@media (max-width:900px){.tax-estimation-header{align-items:stretch;flex-direction:column}.tax-estimation-form{justify-content:stretch}.tax-estimation-form label,.tax-estimation-form button{flex:1 1 180px}.tax-estimation-form input,.tax-estimation-form select{width:100%;min-width:0}}
+@media (max-width:560px){.tax-estimation-form{display:grid;grid-template-columns:1fr}.tax-formula-list p{grid-template-columns:1fr;gap:5px}.tax-estimation-notice{align-items:flex-start}}
 @media (max-width:560px){.settings-feedback,.payroll-feedback{left:16px!important;right:16px;width:auto;max-width:none;justify-content:center;border-radius:12px!important}}
 
 /* Excepción para modales: siempre deben flotar sobre la pantalla completa */
@@ -916,6 +939,21 @@ body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;bac
 .expenses-form-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:13px!important}
 .expenses-form label{display:grid!important;gap:7px!important;margin:0!important;color:#d8dee8!important;font-size:11px!important;font-weight:900!important}
 .expenses-form input,.expenses-form select{display:block!important;width:100%!important;height:46px!important;padding:0 13px!important;border:1px solid #ffffff16!important;border-radius:10px!important;outline:0!important;background:#ffffff08!important;color:white!important;font:inherit!important;font-size:12px!important;font-weight:800!important;transition:border-color .2s ease,box-shadow .2s ease,background .2s ease!important}
+.expenses-form .expenses-checkbox-field{position:relative!important;display:flex!important;grid-template-columns:none!important;align-items:center!important;justify-content:space-between!important;gap:14px!important;min-height:58px!important;padding:12px 13px!important;border:1px solid #01c38d33!important;border-radius:12px!important;background:linear-gradient(135deg,#01c38d13,#ffffff08)!important;cursor:pointer!important;user-select:none!important;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease!important}
+.expenses-form .expenses-checkbox-field:hover{border-color:#01c38d66!important;background:linear-gradient(135deg,#01c38d1f,#ffffff0b)!important;box-shadow:0 12px 28px #0000001f!important}
+.expenses-form .expenses-checkbox-label{min-width:0!important;color:#e7ebef!important;font-size:12px!important;font-weight:900!important;line-height:1.25!important}
+.expenses-form .expenses-checkbox-field input[type="checkbox"]{position:absolute!important;width:1px!important;height:1px!important;min-width:0!important;margin:0!important;padding:0!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;clip-path:inset(50%)!important;border:0!important;background:transparent!important;opacity:0!important;appearance:none!important;pointer-events:none!important}
+.expenses-form .expenses-checkbox-control{position:relative!important;display:flex!important;align-items:center!important;flex:0 0 auto!important;width:48px!important;height:28px!important;padding:3px!important;border:1px solid #ffffff18!important;border-radius:999px!important;background:#ffffff10!important;box-shadow:inset 0 0 0 1px #00000018!important;transition:border-color .2s ease,background .2s ease,box-shadow .2s ease!important}
+.expenses-form .expenses-checkbox-knob{display:grid!important;place-items:center!important;width:22px!important;height:22px!important;border-radius:50%!important;background:#9aa8ba!important;color:#132d46!important;box-shadow:0 6px 16px #0000002e!important;transition:transform .2s ease,background .2s ease,color .2s ease!important}
+.expenses-form .expenses-checkbox-knob .g-icon{width:14px!important;height:14px!important;opacity:0!important;transition:opacity .2s ease!important}
+.expenses-form .expenses-checkbox-field input[type="checkbox"]:checked + .expenses-checkbox-control{border-color:#01c38d88!important;background:linear-gradient(135deg,#01c38d,#00a979)!important;box-shadow:0 0 0 3px #01c38d1a!important}
+.expenses-form .expenses-checkbox-field input[type="checkbox"]:checked + .expenses-checkbox-control .expenses-checkbox-knob{transform:translateX(20px)!important;background:#eafff8!important;color:#007f63!important}
+.expenses-form .expenses-checkbox-field input[type="checkbox"]:checked + .expenses-checkbox-control .g-icon{opacity:1!important}
+.expenses-form .expenses-checkbox-field input[type="checkbox"]:focus-visible + .expenses-checkbox-control{outline:2px solid #42f2bd!important;outline-offset:3px!important}
+body[data-theme="light"] .expenses-form .expenses-checkbox-field{border-color:#c9d8e7!important;background:linear-gradient(135deg,#e7fbf5,#ffffff)!important}
+body[data-theme="light"] .expenses-form .expenses-checkbox-field:hover{border-color:#01a77a66!important;background:linear-gradient(135deg,#dff8f0,#ffffff)!important}
+body[data-theme="light"] .expenses-form .expenses-checkbox-label{color:#132d46!important}
+body[data-theme="light"] .expenses-form .expenses-checkbox-control{border-color:#c3d1df!important;background:#e8eef5!important}
 .expenses-static-field{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;min-height:46px!important;padding:0 13px!important;border:1px solid #01c38d55!important;border-radius:10px!important;background:linear-gradient(135deg,#01c38d1d,#ffffff08)!important;color:white!important;box-shadow:0 0 0 3px #01c38d0b!important}
 .expenses-static-field strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:900}
 .expenses-static-field span{flex:none;color:#42f2bd;font-size:9px;font-weight:900;letter-spacing:1.1px;text-transform:uppercase}

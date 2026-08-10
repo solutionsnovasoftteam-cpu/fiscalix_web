@@ -45,8 +45,6 @@ type ExportDateRange = {
   to: string;
 };
 
-const OTHER_COMPANY_VALUE = "__other__";
-
 const C = {
   deep: [19, 45, 70] as [number, number, number],
   green: [1, 195, 141] as [number, number, number],
@@ -340,9 +338,11 @@ export function ExpenseActions({
         body: JSON.stringify({
           categoriaId: formData.get("categoriaId"),
           concepto,
+          deducible: formData.get("deducible") === "on",
+          estado: formData.get("estado"),
           empresaId: formData.get("empresaId"),
-          empresaNombreOtro: formData.get("empresaNombreOtro"),
           fechaGasto: formData.get("fechaGasto"),
+          ivaTasa: Number(formData.get("ivaTasa") || 16) / 100,
           monto: convertPreferenceCurrencyToMxn(Number(formData.get("monto")), preferences),
         }),
         headers: { "Content-Type": "application/json" },
@@ -407,17 +407,9 @@ export function ExpenseActions({
                   {companies.map((company) => (
                     <option key={company.id} value={company.id}>{company.nombre}</option>
                   ))}
-                  <option value={OTHER_COMPANY_VALUE}>{t("expenses.other")}</option>
                 </select>
               )}
             </label>
-
-            {selectedCompany === OTHER_COMPANY_VALUE && (
-              <label>
-                {t("expenses.otherCompanyName")}
-                <input maxLength={120} name="empresaNombreOtro" placeholder={t("expenses.otherCompanyPlaceholder")} required type="text" />
-              </label>
-            )}
 
             <label>
               {t("table.description")}
@@ -437,12 +429,37 @@ export function ExpenseActions({
 
             <label>
               {t("table.category")}
-              <select defaultValue="" name="categoriaId">
-                <option value="">{t("common.noCategory")}</option>
+              <select defaultValue="" name="categoriaId" required>
+                <option disabled value="">{t("movements.selectCategory")}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>{category.nombre}</option>
                 ))}
               </select>
+            </label>
+
+            <div className="expenses-form-grid">
+              <label>
+                {t("movements.status")}
+                <select defaultValue="pagado" name="estado" required>
+                  <option value="pagado">{t("movements.status.pagado")}</option>
+                  <option value="pendiente">{t("movements.status.pendiente")}</option>
+                  <option value="cancelado">{t("movements.status.cancelado")}</option>
+                </select>
+              </label>
+              <label>
+                {t("movements.ivaRate")}
+                <input defaultValue="16" max="100" min="0" name="ivaTasa" required step="0.01" type="number" />
+              </label>
+            </div>
+
+            <label className="expenses-checkbox-field">
+              <span className="expenses-checkbox-label">{t("movements.deductible")}</span>
+              <input defaultChecked name="deducible" type="checkbox" />
+              <span aria-hidden="true" className="expenses-checkbox-control">
+                <span className="expenses-checkbox-knob">
+                  <Icon name="check" />
+                </span>
+              </span>
             </label>
 
             <footer>

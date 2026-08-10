@@ -3,6 +3,7 @@ import { DashboardExportButton } from "@/app/dashboard/dashboard-export-button";
 import { Icon } from "@/components/Icon";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import {
@@ -205,6 +206,7 @@ export default async function DashboardPage() {
 
   const { companies, error: companiesError } = await getAccessibleCompanies(user);
   const companyIds = companies.map((company) => company.id);
+  const companyIdSet = new Set(companyIds);
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
 
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationsResult, subscriptionsResult] = await Promise.all([
@@ -251,8 +253,12 @@ export default async function DashboardPage() {
       : Promise.resolve({ data: [] as SubscriptionRow[], error: null }),
   ]);
 
-  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as IncomeRow[];
-  const userExpenses = isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as ExpenseRow[];
+  const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id")
+    ? []
+    : ((userIncomeResult.data ?? []) as IncomeRow[]).filter((income) => isRowInAccessibleCompanyScope(income, companyIdSet));
+  const userExpenses = isMissingColumnError(userExpenseResult.error, "usuario_id")
+    ? []
+    : ((userExpenseResult.data ?? []) as ExpenseRow[]).filter((expense) => isRowInAccessibleCompanyScope(expense, companyIdSet));
   const incomesById = new Map<string, IncomeRow>();
   const expensesById = new Map<string, ExpenseRow>();
   for (const income of [...((companyIncomeResult.data ?? []) as IncomeRow[]), ...userIncomes]) incomesById.set(income.id, income);

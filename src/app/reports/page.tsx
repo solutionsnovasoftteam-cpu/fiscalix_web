@@ -5,6 +5,7 @@ import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { getAccessibleCompanyIds, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
+import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { supabase } from "@/lib/supabase";
@@ -47,6 +48,7 @@ export default async function ReportsPage({
   const query = searchParamText(resolvedSearchParams, "q");
 
   const { companyIds, error: scopeError } = await getAccessibleCompanyIds(user);
+  const companyIdSet = new Set(companyIds);
 
   const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult] = await Promise.all([
     companyIds.length
@@ -61,11 +63,17 @@ export default async function ReportsPage({
 
   const incomeRows = [
     ...((companyIncomeResult.data ?? []) as Array<{ empresa_id: string | null; fecha_ingreso: string; id: string; monto: number | string }>),
-    ...(isMissingColumnError(userIncomeResult.error, "usuario_id") ? [] : (userIncomeResult.data ?? []) as Array<{ empresa_id: string | null; fecha_ingreso: string; id: string; monto: number | string }>),
+    ...(isMissingColumnError(userIncomeResult.error, "usuario_id")
+      ? []
+      : ((userIncomeResult.data ?? []) as Array<{ empresa_id: string | null; fecha_ingreso: string; id: string; monto: number | string }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ];
   const expenseRows = [
     ...((companyExpenseResult.data ?? []) as Array<{ empresa_id: string | null; fecha_gasto: string; id: string; monto: number | string }>),
-    ...(isMissingColumnError(userExpenseResult.error, "usuario_id") ? [] : (userExpenseResult.data ?? []) as Array<{ empresa_id: string | null; fecha_gasto: string; id: string; monto: number | string }>),
+    ...(isMissingColumnError(userExpenseResult.error, "usuario_id")
+      ? []
+      : ((userExpenseResult.data ?? []) as Array<{ empresa_id: string | null; fecha_gasto: string; id: string; monto: number | string }>)
+        .filter((row) => isRowInAccessibleCompanyScope(row, companyIdSet))),
   ];
   const incomesById = new Map<string, FinanceRow>();
   const expensesById = new Map<string, FinanceRow>();

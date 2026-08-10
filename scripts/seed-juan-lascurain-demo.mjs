@@ -50,6 +50,19 @@ function isMissingColumnError(error, columnName) {
   return text.includes("pgrst204") || text.includes("42703") || text.includes(columnName.toLowerCase());
 }
 
+function isMissingMovementColumnError(error) {
+  return ["usuario_id", "estado", "deducible", "base_fiscal", "iva_tasa", "iva_monto", "isr_retenido_monto"]
+    .some((column) => isMissingColumnError(error, column));
+}
+
+function withoutStage5MovementColumns(payload) {
+  const fallbackPayload = { ...payload };
+  for (const column of ["usuario_id", "estado", "deducible", "base_fiscal", "iva_tasa", "iva_monto", "isr_retenido_monto"]) {
+    delete fallbackPayload[column];
+  }
+  return fallbackPayload;
+}
+
 async function ensureNoError(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`);
   return result.data;
@@ -291,10 +304,16 @@ async function ensureFinancialRows(user, company) {
     );
 
     const payload = {
+      base_fiscal: monto,
       categoria_id: categoryByKey.get(`ingreso:${categoryName}`) ?? null,
       concepto,
+      deducible: false,
       empresa_id: company.id,
+      estado: "cobrado",
       fecha_ingreso: fechaIngreso,
+      isr_retenido_monto: 0,
+      iva_monto: Math.round(monto * 0.16 * 100) / 100,
+      iva_tasa: 0.16,
       monto,
       usuario_id: user.id,
     };
@@ -303,9 +322,8 @@ async function ensureFinancialRows(user, company) {
       ? await supabase.from("ingresos").update(payload).eq("id", existing.id)
       : await supabase.from("ingresos").insert({ id: randomUUID(), ...payload });
 
-    if (isMissingColumnError(result.error, "usuario_id")) {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.usuario_id;
+    if (isMissingMovementColumnError(result.error)) {
+      const fallbackPayload = withoutStage5MovementColumns(payload);
       await ensureNoError(
         existing
           ? await supabase.from("ingresos").update(fallbackPayload).eq("id", existing.id)
@@ -325,10 +343,16 @@ async function ensureFinancialRows(user, company) {
     );
 
     const payload = {
+      base_fiscal: monto,
       categoria_id: categoryByKey.get(`gasto:${categoryName}`) ?? null,
       concepto,
+      deducible: true,
       empresa_id: company.id,
+      estado: "pagado",
       fecha_gasto: fechaGasto,
+      isr_retenido_monto: 0,
+      iva_monto: Math.round(monto * 0.16 * 100) / 100,
+      iva_tasa: 0.16,
       monto,
       usuario_id: user.id,
     };
@@ -337,9 +361,8 @@ async function ensureFinancialRows(user, company) {
       ? await supabase.from("gastos").update(payload).eq("id", existing.id)
       : await supabase.from("gastos").insert({ id: randomUUID(), ...payload });
 
-    if (isMissingColumnError(result.error, "usuario_id")) {
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.usuario_id;
+    if (isMissingMovementColumnError(result.error)) {
+      const fallbackPayload = withoutStage5MovementColumns(payload);
       await ensureNoError(
         existing
           ? await supabase.from("gastos").update(fallbackPayload).eq("id", existing.id)

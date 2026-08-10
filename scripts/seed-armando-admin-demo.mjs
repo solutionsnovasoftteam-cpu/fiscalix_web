@@ -252,7 +252,7 @@ async function categoryId(tipo, fallbackName) {
   return any?.id ?? null;
 }
 
-async function ensureFinancialRows(company) {
+async function ensureFinancialRows(company, user) {
   const incomeCategory = await categoryId("ingreso", "%servicio%");
   const expenseCategory = await categoryId("gasto", "%servicio%");
 
@@ -282,11 +282,18 @@ async function ensureFinancialRows(company) {
     );
 
     const payload = {
+      base_fiscal: monto,
       categoria_id: incomeCategory,
       concepto,
+      deducible: false,
       empresa_id: company.id,
+      estado: "cobrado",
       fecha_ingreso,
+      isr_retenido_monto: 0,
+      iva_monto: Math.round(monto * 0.16 * 100) / 100,
+      iva_tasa: 0.16,
       monto,
+      usuario_id: user.id,
     };
 
     if (existing) {
@@ -304,11 +311,18 @@ async function ensureFinancialRows(company) {
     );
 
     const payload = {
+      base_fiscal: monto,
       categoria_id: expenseCategory,
       concepto,
+      deducible: true,
       empresa_id: company.id,
+      estado: "pagado",
       fecha_gasto,
+      isr_retenido_monto: 0,
+      iva_monto: Math.round(monto * 0.16 * 100) / 100,
+      iva_tasa: 0.16,
       monto,
+      usuario_id: user.id,
     };
 
     if (existing) {
@@ -476,7 +490,7 @@ async function ensurePayrollIfTablesExist(company) {
 const armando = await ensureArmando();
 const company = await ensureDemoCompany(armando);
 await ensureObligations(company);
-await ensureFinancialRows(company);
+await ensureFinancialRows(company, armando);
 await ensureSubscription(company);
 await ensureIntegrations();
 await ensurePayrollIfTablesExist(company);
