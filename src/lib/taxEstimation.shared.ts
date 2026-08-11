@@ -4,6 +4,12 @@ export const TAX_ESTIMATION_PRIORITY_REGIME = {
   satCode: "626",
 } as const;
 
+export const TAX_ESTIMATION_RULE_VERSION = {
+  code: "RESICO_MX_PF_MONTHLY_V1",
+  description: "ISR RESICO mensual + IVA trasladado menos acreditable sobre movimientos normalizados.",
+  version: "1.0.0",
+} as const;
+
 export const RESICO_MONTHLY_ISR_RATES = [
   { maxIncome: 25000, rate: 0.01 },
   { maxIncome: 50000, rate: 0.011 },
@@ -45,10 +51,27 @@ export type TaxEstimationMovement = {
   deductible: boolean | null;
   fiscalActive: boolean | null;
   fiscalBase: number | string | null;
+  id: string;
   isrWithheld: number | string | null;
   status: string | null;
   type: "ingreso" | "gasto" | string;
   vatAmount: number | string | null;
+};
+
+export type TaxEstimationMovementDecision = {
+  amount: number;
+  companyId: string | null;
+  considered: boolean;
+  date: string | null;
+  decision: "considered" | "excluded";
+  deductible: boolean | null;
+  exclusionReason: string | null;
+  fiscalBase: number;
+  id: string;
+  isrWithheld: number;
+  status: string | null;
+  type: string;
+  vatAmount: number;
 };
 
 export type TaxEstimationCompanyResult = {
@@ -91,8 +114,10 @@ export type TaxEstimationTotals = {
 export type TaxEstimationResponse = {
   companies: TaxEstimationCompanyResult[];
   generatedAt: string;
+  movementTrace: TaxEstimationMovementDecision[];
   period: TaxEstimationPeriod;
   regime: typeof TAX_ESTIMATION_PRIORITY_REGIME;
+  ruleVersion: typeof TAX_ESTIMATION_RULE_VERSION;
   source: "movimientos_fiscales_normalizados";
   totals: TaxEstimationTotals;
 };
@@ -152,6 +177,82 @@ export function resicoMonthlyRateForIncome(income: number) {
 function isMovementInPeriod(movement: TaxEstimationMovement, period: TaxEstimationPeriod) {
   const date = movementDateKey(movement.date);
   return date >= period.start && date <= period.end;
+}
+
+function isMovementInCompanies(movement: TaxEstimationMovement, companyIds: ReadonlySet<string>) {
+  return Boolean(movement.companyId && companyIds.has(movement.companyId));
+}
+
+export function taxEstimationFormulaSnapshot() {
+  return {
+    code: TAX_ESTIMATION_RULE_VERSION.code,
+    description: TAX_ESTIMATION_RULE_VERSION.description,
+    formulas: {
+      baseResico: "sum(ingresos.cobrados.base_fiscal)",
+      isrDetermined: "baseResico * tasaResicoMensual",
+      isrEstimated: "max(0, isrDetermined - isrRetenido)",
+      vatEstimated: "max(0, ivaTrasladado - ivaAcreditable)",
+      taxEstimated: "isrEstimated + vatEstimated",
+    },
+    regime: TAX_ESTIMATION_PRIORITY_REGIME,
+    resicoMonthlyRates: RESICO_MONTHLY_ISR_RATES,
+    source: "movimientos_fiscales_normalizados",
+    version: TAX_ESTIMATION_RULE_VERSION.version,
+  };
+}
+
+export function buildTaxEstimationMovementTrace({
+  companies,
+  companyResults,
+  movements,
+  period,
+}: {
+  companies: TaxEstimationCompany[];
+  companyResults: TaxEstimationCompanyResult[];
+  movements: TaxEstimationMovement[];
+  period: TaxEstimationPeriod;
+}): TaxEstimationMovementDecision[] {
+  const companyIds = new Set(companies.map((company) => company.id));
+  const resultByCompanyId = new Map(companyResults.map((company) => [company.companyId, company]));
+
+  return movements
+    .filter((movement) => isMovementInCompanies(movement, companyIds) && isMovementInPeriod(movement, period))
+    .map((movement): TaxEstimationMovementDecision => {
+      const companyResult = movement.companyId ? resultByCompanyId.get(movement.companyId) : null;
+      const status = normalizedText(movement.status);
+      let considered = false;
+      let exclusionReason: string | null = null;
+
+      if (!companyResult?.estimationAvailable) {
+        exclusionReason = companyResult?.warnings[0] ?? "UNSUPPORTED_REGIME";
+      } else if (movement.fiscalActive === false || status === "cancelado") {
+        exclusionReason = "MOVIMIENTO_CANCELADO_O_INACTIVO";
+      } else if (movement.type === "ingreso") {
+        if (status === "cobrado") considered = true;
+        else exclusionReason = "INGRESO_NO_COBRADO";
+      } else if (movement.type === "gasto") {
+        if (status === "pagado") considered = true;
+        else exclusionReason = "GASTO_NO_PAGADO";
+      } else {
+        exclusionReason = "TIPO_NO_SOPORTADO";
+      }
+
+      return {
+        amount: asNumber(movement.amount),
+        companyId: movement.companyId,
+        considered,
+        date: movement.date,
+        decision: considered ? "considered" : "excluded",
+        deductible: movement.deductible,
+        exclusionReason,
+        fiscalBase: asNumber(movement.fiscalBase),
+        id: movement.id,
+        isrWithheld: asNumber(movement.isrWithheld),
+        status: movement.status,
+        type: movement.type,
+        vatAmount: asNumber(movement.vatAmount),
+      };
+    });
 }
 
 export function estimateResicoCompanyTax({
@@ -305,8 +406,10 @@ export function calculateTaxEstimations({
   return {
     companies: companyResults,
     generatedAt,
+    movementTrace: buildTaxEstimationMovementTrace({ companies, companyResults, movements, period }),
     period,
     regime: TAX_ESTIMATION_PRIORITY_REGIME,
+    ruleVersion: TAX_ESTIMATION_RULE_VERSION,
     source: "movimientos_fiscales_normalizados",
     totals,
   };

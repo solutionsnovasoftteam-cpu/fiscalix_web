@@ -7,7 +7,12 @@ import { getCurrentUser } from "@/lib/auth";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { pageFromParam, pageHref, paginateItems, type PageSearchParams } from "@/lib/pagination";
 import { matchesSearch, searchParamText } from "@/lib/tableSearch";
-import { loadTaxEstimationsForUser } from "@/lib/taxEstimation";
+import {
+  loadTaxEstimationHistoryForUser,
+  loadTaxEstimationsForUser,
+  type TaxEstimationExecutionChannel,
+  type TaxEstimationHistoryItem,
+} from "@/lib/taxEstimation";
 import type { TaxEstimationCompanyResult, TaxEstimationWarningCode } from "@/lib/taxEstimation.shared";
 import {
   defaultUserPreferences,
@@ -25,6 +30,15 @@ function rateLabel(value: number | null) {
 }
 
 type Translator = ReturnType<typeof createTranslator>;
+
+function channelLabel(channel: TaxEstimationExecutionChannel | string, t: Translator) {
+  if (channel === "api") return t("taxes.channelApi");
+  return t("taxes.channelWeb");
+}
+
+function executionShortId(id: string | null | undefined) {
+  return id ? id.slice(0, 8) : "—";
+}
 
 function warningLabel(code: TaxEstimationWarningCode | undefined, t: Translator) {
   if (code === "MISSING_FISCAL_PROFILE") return t("taxes.profileMissing");
@@ -74,10 +88,13 @@ export default async function TaxesPage({
   const requestedPeriod = searchParamText(resolvedSearchParams, "period") || null;
 
   const estimationResult = await loadTaxEstimationsForUser(user, {
+    channel: "web",
     companyId: requestedCompanyId,
     period: requestedPeriod,
   });
+  const historyResult = await loadTaxEstimationHistoryForUser(user, { limit: 8 });
   const estimation = estimationResult.data;
+  const historyRows: TaxEstimationHistoryItem[] = Array.isArray(historyResult.data) ? historyResult.data : [];
   const period = estimation?.period ?? estimationResult.period;
   const rows = estimation?.companies ?? [];
   const totals = estimation?.totals ?? {
@@ -129,6 +146,13 @@ export default async function TaxesPage({
           </section>
         )}
 
+        {estimationResult.traceError && (
+          <section className="dashboard-alert" role="status">
+            <strong>{t("taxes.tracePendingTitle")}</strong>
+            <span>{estimationResult.traceError}</span>
+          </section>
+        )}
+
         <section className="tax-estimation-notice">
           <span><Icon name="info" /></span>
           <div>
@@ -155,6 +179,11 @@ export default async function TaxesPage({
           <div className="tax-formula-list">
             <p><strong>{t("taxes.isrFormula")}</strong><span>{t("taxes.isrFormulaHelp")}</span></p>
             <p><strong>{t("taxes.ivaFormula")}</strong><span>{t("taxes.ivaFormulaHelp")}</span></p>
+            <p><strong>{t("taxes.ruleVersion")}</strong><span>{estimation?.ruleVersion.code ?? "—"} · v{estimation?.ruleVersion.version ?? "—"}</span></p>
+            <p>
+              <strong>{t("taxes.traceExecution")}</strong>
+              <span>{estimationResult.traceId ? t("taxes.traceSaved", { id: executionShortId(estimationResult.traceId) }) : t("taxes.tracePending")}</span>
+            </p>
             <p><strong>{t("taxes.generatedAt")}</strong><span>{formatPreferenceDateTime(estimation?.generatedAt, preferences, t("common.pending"))}</span></p>
           </div>
         </section>
@@ -249,6 +278,66 @@ export default async function TaxesPage({
               <span><Icon name="calculate" /></span>
               <strong>{query ? t("taxes.noEstimatesSearch") : t("taxes.noEstimates")}</strong>
               <small>{query ? t("common.tryAnotherSearch") : t("taxes.noEstimatesHelp")}</small>
+            </div>
+          )}
+        </section>
+
+        <section className="reports-card tax-history-card">
+          <div className="reports-card-heading">
+            <div>
+              <h2>{t("taxes.historyTitle")}</h2>
+              <p>{t("taxes.historyHelp")}</p>
+            </div>
+            <span>{resultCount(historyRows.length, preferences.language)}</span>
+          </div>
+
+          {historyResult.error ? (
+            <div className="reports-empty">
+              <span><Icon name="info" /></span>
+              <strong>{t("taxes.historyUnavailable")}</strong>
+              <small>{historyResult.error}</small>
+            </div>
+          ) : historyRows.length ? (
+            <div className="reports-table-scroll">
+              <table className="reports-table tax-history-table">
+                <thead>
+                  <tr>
+                    <th>{t("taxes.execution")}</th>
+                    <th>{t("taxes.period")}</th>
+                    <th>{t("taxes.incomeCollected")}</th>
+                    <th>{t("taxes.resicoBase")}</th>
+                    <th>{t("taxes.estimatedIvaPayable")}</th>
+                    <th>{t("taxes.estimatedIsrPayable")}</th>
+                    <th>{t("taxes.estimatedAmount")}</th>
+                    <th>{t("taxes.movementsAudited")}</th>
+                    <th>{t("taxes.channel")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {historyRows.map((row) => (
+                    <tr key={row.id}>
+                      <td>
+                        <strong>{formatPreferenceDateTime(row.createdAt, preferences, t("common.pending"))}</strong>
+                        <small>{executionShortId(row.id)}</small>
+                      </td>
+                      <td>{row.periodKey}</td>
+                      <td>{money(row.income)}</td>
+                      <td>{money(row.base)}</td>
+                      <td>{money(row.vatEstimated)}</td>
+                      <td>{money(row.isrEstimated)}</td>
+                      <td><strong>{money(row.taxEstimated)}</strong></td>
+                      <td>{row.movementCount}</td>
+                      <td><span className="admin-status">{channelLabel(row.channel, t)}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="reports-empty">
+              <span><Icon name="event_note" /></span>
+              <strong>{t("taxes.noHistory")}</strong>
+              <small>{t("taxes.noHistoryHelp")}</small>
             </div>
           )}
         </section>

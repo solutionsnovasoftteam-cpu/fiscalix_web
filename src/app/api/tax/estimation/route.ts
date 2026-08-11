@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     return fiscalFailure("INVALID_REQUEST", "period debe usar el formato YYYY-MM.", 400);
   }
 
-  const result = await loadTaxEstimationsForUser(user, { companyId, period });
+  const result = await loadTaxEstimationsForUser(user, { channel: "api", companyId, period });
   if (result.error) {
     if (result.errorCode === "ACCESS_DENIED") {
       return fiscalFailure("ACCESS_DENIED", result.error, 403);
@@ -32,5 +32,7 @@ export async function GET(request: Request) {
     availableCompanies: result.companies,
     selectedCompanyId: result.selectedCompanyId,
     estimation: result.data,
+    traceError: result.traceError,
+    traceId: result.traceId,
   });
 }

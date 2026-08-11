@@ -749,6 +749,8 @@ body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;bac
 .tax-formula-list p:last-child{border-bottom:0}
 .tax-formula-list strong{color:white;font-size:11px}.tax-formula-list span{color:#a7b3c6;font-size:11px;line-height:1.5}
 .tax-estimation-table{min-width:1040px}
+.tax-history-card{margin-top:28px}
+.tax-history-table{min-width:1040px}
 body[data-theme="light"] .tax-estimation-form label{color:var(--light-text)!important}
 body[data-theme="light"] .tax-estimation-form input,body[data-theme="light"] .tax-estimation-form select{border-color:#d8e3ef;background:#ffffff;color:#132d46}
 body[data-theme="light"] .tax-estimation-notice{border-color:#a9ead7;background:linear-gradient(135deg,#e7fbf5,#ffffff);color:#132d46}
