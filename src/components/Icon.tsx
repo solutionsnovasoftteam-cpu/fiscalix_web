@@ -215,6 +215,13 @@ const icons: Record<string, ReactNode> = {
       <path d="m5 7 7 6 7-6" />
     </>
   ),
+  menu: (
+    <>
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </>
+  ),
   manage_accounts: (
     <>
       <circle cx="9" cy="8" r="3" />

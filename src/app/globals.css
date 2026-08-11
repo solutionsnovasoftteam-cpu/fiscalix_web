@@ -2183,3 +2183,113 @@ body[data-theme="light"] .security-list li.is-pending span{
   .fiscal-choice-grid { grid-template-columns: 1fr; }
   .fiscal-obligation-list article { grid-template-columns: 1fr; }
 }
+
+/* Etapa 9: resumen, filtros y trazabilidad fiscal compartida. */
+.dashboard-tax-summary { margin-bottom: var(--app-gap); }
+.dashboard-tax-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--app-divider); }
+.dashboard-tax-kpis > div { display: grid; gap: 7px; min-width: 0; padding: 16px 22px; }
+.dashboard-tax-kpis > div + div { border-left: 1px solid var(--app-divider); }
+.dashboard-tax-kpis span { color: var(--app-muted); font-size: 10px; font-weight: 700; line-height: 1.35; }
+.dashboard-tax-kpis strong { color: white; font-size: 17px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.dashboard-tax-table { min-width: 1040px; }
+.dashboard-tax-empty { display: grid; gap: 6px; padding: 24px 22px; color: var(--app-muted); }
+.dashboard-tax-empty strong { color: white; font-size: 13px; }
+
+.fiscal-report-card { margin-bottom: var(--app-gap); }
+.fiscal-report-table-stack { display: grid; gap: var(--app-gap-lg); margin-top: var(--app-gap-lg); }
+.fiscal-report-table-card { margin: 0; }
+.fiscal-report-table-stack + .reports-card { margin-top: var(--app-gap-lg); }
+.tax-report-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; gap: 16px; padding: 20px 22px; border-bottom: 1px solid var(--app-divider); background: #ffffff03; }
+.tax-report-filters label { display: grid; min-width: 0; gap: 7px; color: var(--app-soft); font-size: 10px; font-weight: 800; }
+.tax-report-filters input,.tax-report-filters select { width: 100%; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid #ffffff18; border-radius: 8px; outline: 0; background: #ffffff09; color: white; font: inherit; font-size: 11px; }
+.tax-report-filters select option { color: var(--navy); }
+.tax-report-filters input:focus,.tax-report-filters select:focus { border-color: #01c38d88; box-shadow: 0 0 0 3px #01c38d18; }
+.tax-report-filters .primary-button { width: 100%; min-width: 0; height: 42px; }
+.fiscal-report-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--app-divider); }
+.fiscal-report-kpis > div { display: grid; gap: 7px; min-width: 0; padding: 17px 22px; }
+.fiscal-report-kpis > div + div { border-left: 1px solid var(--app-divider); }
+.fiscal-report-kpis span { color: var(--app-muted); font-size: 10px; font-weight: 700; }
+.fiscal-report-kpis strong { color: white; font-size: 16px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fiscal-report-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 72px; padding: 18px 22px; border-bottom: 1px solid var(--app-divider); background: #ffffff05; }
+.fiscal-report-section-heading h2 { margin: 0; color: white; font-size: 15px; }
+.fiscal-report-results-heading { min-height: 82px; padding: 22px 26px; background: linear-gradient(90deg, #01c38d12, #ffffff04 42%, #ffffff03); }
+.fiscal-report-results-heading h2 { font-size: 18px; line-height: 1.2; }
+.fiscal-report-section-heading span { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; background: #01c38d17; color: var(--blue); font-size: 10px; font-weight: 900; }
+.fiscal-report-table { min-width: 1120px; }
+.fiscal-report-table td:last-child { max-width: 250px; white-space: normal; }
+.fiscal-report-table-card .reports-table th,.fiscal-report-table-card .reports-table td { padding-top: 14px; padding-bottom: 14px; }
+.fiscal-report-table-card .table-pagination { border-radius: 0 0 var(--app-radius) var(--app-radius); }
+.fiscal-history-warning { margin: 0 22px 14px; padding: 10px 12px; border: 1px solid #ffbd6655; border-radius: 8px; background: #ffbd6611; color: #ffd99f; font-size: 11px; line-height: 1.45; }
+.fiscal-report-empty { min-height: 124px; }
+.fiscal-status { display: inline-flex; align-items: center; min-height: 26px; padding: 4px 9px; border-radius: 999px; font-size: 10px; font-weight: 900; line-height: 1.1; white-space: nowrap; }
+.fiscal-status-estimated { background: #01c38d1d; color: #42f2bd; }
+.fiscal-status-limited { background: #ffbd661d; color: #ffd99f; }
+.fiscal-status-review { background: #ff81811d; color: #ffb2b2; }
+
+body[data-theme="light"] .dashboard-tax-kpis,body[data-theme="light"] .tax-report-filters,body[data-theme="light"] .fiscal-report-kpis { background: #f6f9fc; }
+body[data-theme="light"] .dashboard-tax-kpis strong,body[data-theme="light"] .dashboard-tax-empty strong,body[data-theme="light"] .fiscal-report-kpis strong,body[data-theme="light"] .fiscal-report-section-heading h3 { color: #132d46; }
+body[data-theme="light"] .tax-report-filters label { color: #38526b; }
+body[data-theme="light"] .tax-report-filters input,body[data-theme="light"] .tax-report-filters select { border-color: #cbd8e5; background: #fff; color: #132d46; }
+
+@media (max-width: 1250px) {
+  .tax-report-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tax-report-filters .primary-button { width: 100%; }
+}
+@media (max-width: 760px) {
+  .dashboard-tax-kpis,.fiscal-report-kpis { grid-template-columns: 1fr; }
+  .dashboard-tax-kpis > div + div,.fiscal-report-kpis > div + div { border-top: 1px solid var(--app-divider); border-left: 0; }
+  .tax-report-filters { grid-template-columns: 1fr; padding: 16px; }
+  .fiscal-report-section-heading { min-height: 64px; padding: 16px; }
+  .fiscal-report-results-heading { min-height: 72px; padding: 18px 16px; }
+  .fiscal-history-warning { margin-right: 16px; margin-left: 16px; }
+}
+@media (max-width: 520px) {
+  .dashboard-tax-kpis > div,.fiscal-report-kpis > div { padding-right: 16px; padding-left: 16px; }
+}
+
+.topbar-start { display:flex; align-items:center; min-width:0; }
+.mobile-navigation { display:none; }
+
+@media (max-width:760px) {
+  .sidebar { display:none; }
+  .topbar { justify-content:flex-start; gap:12px; padding:0 14px; }
+  .topbar-start { flex:1; gap:10px; min-width:0; }
+  .mobile-navigation { display:block; flex:none; }
+  .mobile-nav-trigger,.mobile-nav-close {
+    display:grid; place-items:center; width:36px; height:36px; padding:0; border:1px solid #ffffff22;
+    border-radius:8px; background:#1b3047; color:#dff8ef; cursor:pointer;
+  }
+  .mobile-nav-trigger:focus-visible,.mobile-nav-close:focus-visible,.mobile-nav-link:focus-visible {
+    outline:2px solid #01c38d; outline-offset:2px;
+  }
+  .mobile-nav-backdrop {
+    position:fixed; z-index:110; inset:0; width:100%; height:100%; padding:0; border:0;
+    background:#07111ec2; cursor:pointer;
+  }
+  .mobile-nav-panel {
+    position:fixed; z-index:111; top:0; bottom:0; left:0; display:flex; flex-direction:column;
+    width:min(320px,calc(100vw - 48px)); border-right:1px solid #ffffff1c; background:#111b2b;
+    box-shadow:18px 0 45px #00000055;
+  }
+  .mobile-nav-header {
+    display:flex; align-items:center; justify-content:space-between; min-height:70px; padding:0 16px;
+    border-bottom:1px solid #ffffff14;
+  }
+  .mobile-nav-header .brand-logo { max-width:142px; height:auto; }
+  .mobile-nav-links { display:grid; gap:5px; overflow-y:auto; padding:14px 12px 28px; }
+  .mobile-nav-link {
+    display:flex; align-items:center; gap:12px; min-height:44px; padding:0 12px; border-radius:7px;
+    color:#bac7d8; font-size:14px; font-weight:700; text-decoration:none;
+  }
+  .mobile-nav-link > span { display:grid; place-items:center; color:#aebcd0; }
+  .mobile-nav-link:hover { background:#ffffff0d; color:#eef5fb; }
+  .mobile-nav-link.active { background:#01c38d22; color:#45e6bd; box-shadow:inset 0 0 0 1px #01c38d55; }
+  .mobile-nav-link.active > span { color:#45e6bd; }
+  .search { flex:1; min-width:0; }
+  .search input { width:100%; min-width:0; }
+}
+
+body[data-theme] .mobile-nav-panel { background:var(--theme-shell-bg)!important; border-color:var(--theme-border)!important; }
+body[data-theme] .mobile-nav-header { border-color:var(--theme-border)!important; }
+body[data-theme] .mobile-nav-link { color:var(--theme-text)!important; }
+body[data-theme] .mobile-nav-link.active { color:#ffffff!important; }

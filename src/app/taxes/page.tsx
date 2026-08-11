@@ -36,6 +36,7 @@ function rateLabel(value: number | null) {
 type Translator = ReturnType<typeof createTranslator>;
 
 function channelLabel(channel: TaxEstimationExecutionChannel | string, t: Translator) {
+  if (channel === "mobile") return t("taxes.channelMobile");
   if (channel === "api") return t("taxes.channelApi");
   return t("taxes.channelWeb");
 }

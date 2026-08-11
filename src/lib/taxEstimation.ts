@@ -8,7 +8,9 @@ import {
   parseTaxEstimationPeriod,
   taxEstimationFormulaSnapshot,
   type TaxEstimationCompany,
+  type TaxEstimationCompanyResult,
   type TaxEstimationFiscalProfile,
+  type TaxEstimationMovementDecision,
   type TaxEstimationMovement,
   type TaxEstimationPeriod,
   type TaxEstimationResponse,
@@ -55,7 +57,7 @@ export type TaxEstimationLoadResult = {
   traceId: string | null;
 };
 
-export type TaxEstimationExecutionChannel = "api" | "web";
+export type TaxEstimationExecutionChannel = "api" | "mobile" | "web";
 
 export type TaxEstimationHistoryItem = {
   base: number;
@@ -67,6 +69,9 @@ export type TaxEstimationHistoryItem = {
   isrEstimated: number;
   movementCount: number;
   periodKey: string;
+  regimeSatCode: string | null;
+  ruleCode: string | null;
+  ruleVersion: string | null;
   taxEstimated: number;
   userId: string;
   vatEstimated: number;
@@ -90,9 +95,43 @@ export type TaxEstimationHistoryDetail = TaxEstimationHistoryItem & {
   movements: TaxEstimationHistoryMovement[];
   parameters: unknown;
   result: unknown;
-  ruleCode: string | null;
-  ruleVersion: string | null;
   variables: unknown;
+};
+
+export type TaxEstimationReportStatus = "all" | "estimated" | "limited" | "review";
+export type TaxEstimationMovementFilter = "all" | "considered" | "excluded";
+export type TaxEstimationHistoryScope = "all" | "period";
+
+export type TaxEstimationReportData = {
+  companies: TaxEstimationCompany[];
+  filters: {
+    companyId: string | null;
+    historyScope: TaxEstimationHistoryScope;
+    movementFilter: TaxEstimationMovementFilter;
+    period: string;
+    regimeSatCode: string | null;
+    status: TaxEstimationReportStatus;
+  };
+  history: TaxEstimationHistoryItem[];
+  movementTrace: TaxEstimationMovementDecision[];
+  rows: TaxEstimationCompanyResult[];
+  source: "movimientos_fiscales_normalizados";
+  totals: {
+    base: number;
+    companies: number;
+    estimatedCompanies: number;
+    incomes: number;
+    isrEstimated: number;
+    taxEstimated: number;
+    vatEstimated: number;
+  };
+};
+
+export type TaxEstimationReportLoadResult = {
+  data: TaxEstimationReportData | null;
+  error: string | null;
+  errorCode: TaxEstimationErrorCode | null;
+  historyError: string | null;
 };
 
 function companyName(value: string | null | undefined) {
@@ -182,6 +221,9 @@ function historyItemFromRow(row: Record<string, unknown>): TaxEstimationHistoryI
     isrEstimated: numberValue(row.isr_estimado),
     movementCount: numberValue(row.movimientos_total),
     periodKey: String(row.periodo_clave ?? ""),
+    regimeSatCode: typeof row.regimen_clave_sat === "string" ? row.regimen_clave_sat : null,
+    ruleCode: typeof row.regla_clave === "string" ? row.regla_clave : null,
+    ruleVersion: typeof row.regla_version === "string" ? row.regla_version : null,
     taxEstimated: numberValue(row.impuesto_estimado),
     userId: String(row.usuario_id ?? ""),
     vatEstimated: numberValue(row.iva_estimado),
@@ -588,7 +630,7 @@ export async function loadTaxEstimationHistoryForUser(
 
   const { data, error } = await supabase
     .from("estimaciones_fiscales_ejecuciones")
-    .select("id,usuario_id,empresa_id,periodo_clave,canal,total_ingresos,base_fiscal,iva_estimado,isr_estimado,impuesto_estimado,movimientos_total,created_at")
+    .select("id,usuario_id,empresa_id,periodo_clave,canal,regimen_clave_sat,regla_clave,regla_version,total_ingresos,base_fiscal,iva_estimado,isr_estimado,impuesto_estimado,movimientos_total,created_at")
     .eq("usuario_id", user.id)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -605,5 +647,107 @@ export async function loadTaxEstimationHistoryForUser(
   return {
     data: ((data ?? []) as Record<string, unknown>[]).map(historyItemFromRow),
     error: null,
+  };
+}
+
+function reportStatusForRow(row: TaxEstimationCompanyResult): Exclude<TaxEstimationReportStatus, "all"> {
+  if (!row.estimationAvailable) return "review";
+  return row.validationMessages.length > 0 ? "limited" : "estimated";
+}
+
+function sumReportRows(rows: TaxEstimationCompanyResult[]) {
+  return rows.reduce(
+    (totals, row) => ({
+      base: totals.base + row.base,
+      companies: totals.companies + 1,
+      estimatedCompanies: totals.estimatedCompanies + (row.estimationAvailable ? 1 : 0),
+      incomes: totals.incomes + row.incomes,
+      isrEstimated: totals.isrEstimated + (row.isrEstimated ?? 0),
+      taxEstimated: totals.taxEstimated + (row.taxEstimated ?? 0),
+      vatEstimated: totals.vatEstimated + (row.vatEstimated ?? 0),
+    }),
+    { base: 0, companies: 0, estimatedCompanies: 0, incomes: 0, isrEstimated: 0, taxEstimated: 0, vatEstimated: 0 },
+  );
+}
+
+export async function loadTaxEstimationReportForUser(
+  user: Pick<FiscalixUser, "id" | "rol">,
+  options: {
+    companyId?: string | null;
+    historyLimit?: number;
+    historyScope?: TaxEstimationHistoryScope;
+    movementFilter?: TaxEstimationMovementFilter;
+    period?: string | null;
+    regimeSatCode?: string | null;
+    status?: TaxEstimationReportStatus;
+  } = {},
+): Promise<TaxEstimationReportLoadResult> {
+  const estimationResult = await loadTaxEstimationsForUser(user, {
+    companyId: options.companyId,
+    period: options.period,
+    persist: false,
+  });
+
+  if (estimationResult.error || !estimationResult.data) {
+    return {
+      data: null,
+      error: estimationResult.error ?? "No fue posible preparar el reporte fiscal.",
+      errorCode: estimationResult.errorCode,
+      historyError: null,
+    };
+  }
+
+  const historyScope = options.historyScope === "all" ? "all" : "period";
+  const movementFilter = options.movementFilter === "considered" || options.movementFilter === "excluded"
+    ? options.movementFilter
+    : "all";
+  const status = options.status === "estimated" || options.status === "limited" || options.status === "review"
+    ? options.status
+    : "all";
+  const regimeSatCode = options.regimeSatCode?.trim() || null;
+  const estimation = estimationResult.data;
+  const rows = estimation.companies.filter((row) => {
+    if (regimeSatCode && row.regimeSatCode !== regimeSatCode) return false;
+    return status === "all" || reportStatusForRow(row) === status;
+  });
+  const movementTrace = estimation.movementTrace.filter((movement) => {
+    if (regimeSatCode) {
+      const company = estimation.companies.find((row) => row.companyId === movement.companyId);
+      if (company?.regimeSatCode !== regimeSatCode) return false;
+    }
+    if (movementFilter === "considered") return movement.considered;
+    if (movementFilter === "excluded") return !movement.considered;
+    return true;
+  });
+  const historyResult = await loadTaxEstimationHistoryForUser(user, {
+    limit: options.historyLimit ?? 25,
+  });
+  const history = (Array.isArray(historyResult.data) ? historyResult.data : []).filter((item) => {
+    if (historyScope === "period" && item.periodKey !== estimation.period.key) return false;
+    if (regimeSatCode && item.regimeSatCode !== regimeSatCode) return false;
+    if (options.companyId && item.companyId && item.companyId !== options.companyId) return false;
+    return true;
+  });
+
+  return {
+    data: {
+      companies: estimationResult.companies,
+      filters: {
+        companyId: estimationResult.selectedCompanyId,
+        historyScope,
+        movementFilter,
+        period: estimation.period.key,
+        regimeSatCode,
+        status,
+      },
+      history,
+      movementTrace,
+      rows,
+      source: estimation.source,
+      totals: sumReportRows(rows),
+    },
+    error: null,
+    errorCode: null,
+    historyError: historyResult.error,
   };
 }
