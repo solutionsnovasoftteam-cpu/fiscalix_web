@@ -215,23 +215,67 @@ async function saveTaxEstimationExecution({
   user: Pick<FiscalixUser, "id">;
 }) {
   const formula = taxEstimationFormulaSnapshot();
-  const { data: ruleVersion, error: ruleError } = await supabase
-    .from("reglas_fiscales_versiones")
-    .upsert({
+  const ruleRows: Array<{
+    activo: boolean;
+    clave: string;
+    descripcion: string;
+    formula: unknown;
+    fuente: string;
+    nombre: string;
+    regimen_clave_sat: string;
+    variables: unknown;
+    version: string;
+  }> = data.regimeCatalog.map((rule) => ({
+    activo: rule.enabled,
+    clave: rule.ruleVersion.code,
+    descripcion: rule.ruleVersion.description,
+    formula: rule.formulas,
+    fuente: "Fiscalix Etapa 8",
+    nombre: rule.name,
+    regimen_clave_sat: rule.satCodes.join(","),
+    variables: {
+      requiredData: rule.requiredData,
+      status: rule.status,
+      testCaseFile: rule.testCaseFile,
+      validations: rule.validations,
+    },
+    version: rule.ruleVersion.version,
+  }));
+  if (!ruleRows.some((rule) => rule.clave === data.ruleVersion.code)) {
+    ruleRows.push({
       activo: true,
       clave: data.ruleVersion.code,
       descripcion: data.ruleVersion.description,
       formula,
-      fuente: "Fiscalix Etapa 6/7",
+      fuente: "Fiscalix Etapa 8",
       nombre: data.regime.name,
       regimen_clave_sat: data.regime.satCode,
       variables: {
-        period: data.period,
-        rates: formula.resicoMonthlyRates,
+        requiredData: ["movimientos_fiscales_normalizados", "catálogo de reglas fiscales habilitadas"],
+        status: "enabled",
+        testCaseFile: "docs/tax-estimation-stage-8-cases.json",
+        validations: ["orquestación de múltiples regímenes fiscales"],
       },
       version: data.ruleVersion.version,
-    }, { onConflict: "clave" })
+    });
+  }
+  const { error: rulesError } = await supabase
+    .from("reglas_fiscales_versiones")
+    .upsert(ruleRows, { onConflict: "clave" });
+
+  if (rulesError) {
+    return {
+      error: isMissingTraceTable(rulesError)
+        ? "Ejecuta scripts/tax-estimation-stage-7.sql y scripts/tax-estimation-stage-8.sql para activar la trazabilidad."
+        : "No fue posible registrar el catálogo de reglas fiscales.",
+      id: null,
+    };
+  }
+
+  const { data: ruleVersion, error: ruleError } = await supabase
+    .from("reglas_fiscales_versiones")
     .select("id")
+    .eq("clave", data.ruleVersion.code)
     .single();
 
   if (ruleError) {
@@ -249,6 +293,7 @@ async function saveTaxEstimationExecution({
     companies: data.companies,
     period: data.period,
     regime: data.regime,
+    regimeCatalog: data.regimeCatalog,
     ruleVersion: data.ruleVersion,
     source: data.source,
     totals: data.totals,
@@ -263,6 +308,10 @@ async function saveTaxEstimationExecution({
       isrDetermined: company.isrDetermined,
       isrRate: company.isrRate,
       isrWithheld: company.isrWithheld,
+      regimeKey: company.regimeKey,
+      regimeRuleVersion: company.regimeRuleVersion,
+      regimeStatus: company.regimeStatus,
+      validationMessages: company.validationMessages,
       vatCreditable: company.vatCreditable,
       vatTransferred: company.vatTransferred,
     })),
@@ -355,6 +404,7 @@ export async function loadTaxEstimationsForUser(
   } = {},
 ): Promise<TaxEstimationLoadResult> {
   const period = parseTaxEstimationPeriod(options.period);
+  const fiscalYearStart = `${period.year}-01-01`;
   const { companies: accessibleCompanies, error: companiesError } = await getAccessibleCompanies(user);
   const companies = accessibleCompanies.map((company): TaxEstimationCompany => ({
     id: company.id,
@@ -427,7 +477,7 @@ export async function loadTaxEstimationsForUser(
       .from("movimientos_fiscales_normalizados")
       .select("id,tipo,empresa_id,fecha_movimiento,estado,deducible,monto,base_fiscal,iva_monto,isr_retenido_monto,activo_fiscal")
       .in("empresa_id", companyIds)
-      .gte("fecha_movimiento", period.start)
+      .gte("fecha_movimiento", fiscalYearStart)
       .lte("fecha_movimiento", period.end),
     supabase
       .from("empresa_fiscal")

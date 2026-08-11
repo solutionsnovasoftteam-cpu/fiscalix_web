@@ -13,7 +13,11 @@ import {
   type TaxEstimationExecutionChannel,
   type TaxEstimationHistoryItem,
 } from "@/lib/taxEstimation";
-import type { TaxEstimationCompanyResult, TaxEstimationWarningCode } from "@/lib/taxEstimation.shared";
+import type {
+  TaxEstimationCompanyResult,
+  TaxEstimationWarningCode,
+  TaxRegimeCalculationStatus,
+} from "@/lib/taxEstimation.shared";
 import {
   defaultUserPreferences,
   formatPreferenceDateTime,
@@ -43,9 +47,16 @@ function executionShortId(id: string | null | undefined) {
 function warningLabel(code: TaxEstimationWarningCode | undefined, t: Translator) {
   if (code === "MISSING_FISCAL_PROFILE") return t("taxes.profileMissing");
   if (code === "INACTIVE_FISCAL_PROFILE") return t("taxes.inactiveProfile");
+  if (code === "REGIME_NOT_ENABLED_STAGE_8") return t("taxes.regimeValidationOnly");
   if (code === "UNSUPPORTED_REGIME") return t("taxes.unsupportedRegime");
   if (code === "RESICO_LIMIT_EXCEEDED") return t("taxes.resicoLimitExceeded");
   return t("taxes.estimateUnavailable");
+}
+
+function regimeStatusLabel(status: TaxRegimeCalculationStatus, t: Translator) {
+  if (status === "enabled") return t("taxes.regimeEnabled");
+  if (status === "validation_only") return t("taxes.regimeValidationOnly");
+  return t("taxes.regimePlanned");
 }
 
 function rowSearchFields(
@@ -56,7 +67,10 @@ function rowSearchFields(
   return [
     row.companyName,
     row.regimeSatCode,
+    row.regimeKey,
+    row.regimeStatus,
     row.regimeName,
+    row.validationMessages.join(" "),
     row.incomes,
     row.expenses,
     row.base,
@@ -95,6 +109,7 @@ export default async function TaxesPage({
   const historyResult = await loadTaxEstimationHistoryForUser(user, { limit: 8 });
   const estimation = estimationResult.data;
   const historyRows: TaxEstimationHistoryItem[] = Array.isArray(historyResult.data) ? historyResult.data : [];
+  const regimeCatalog = estimation?.regimeCatalog ?? [];
   const period = estimation?.period ?? estimationResult.period;
   const rows = estimation?.companies ?? [];
   const totals = estimation?.totals ?? {
@@ -188,6 +203,46 @@ export default async function TaxesPage({
           </div>
         </section>
 
+        <section className="reports-card tax-regime-card">
+          <div className="reports-card-heading">
+            <div>
+              <h2>{t("taxes.regimeCoverageTitle")}</h2>
+              <p>{t("taxes.regimeCoverageHelp")}</p>
+            </div>
+            <span>{t("taxes.enabledRegimeCount", { count: regimeCatalog.filter((rule) => rule.enabled).length })}</span>
+          </div>
+          <div className="reports-table-scroll">
+            <table className="reports-table tax-regime-table">
+              <thead>
+                <tr>
+                  <th>{t("taxes.regime")}</th>
+                  <th>{t("taxes.satCodes")}</th>
+                  <th>{t("table.status")}</th>
+                  <th>{t("taxes.requiredData")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {regimeCatalog.map((rule) => (
+                  <tr key={rule.key}>
+                    <td>
+                      <strong>{rule.order}. {rule.name}</strong>
+                      <small>{rule.description}</small>
+                    </td>
+                    <td>{rule.satCodes.join(", ")}</td>
+                    <td>
+                      <span className={rule.enabled ? "admin-status" : "admin-status suspended"}>
+                        {regimeStatusLabel(rule.status, t)}
+                      </span>
+                      <small>{rule.ruleVersion.code}</small>
+                    </td>
+                    <td><small>{rule.requiredData.slice(0, 3).join(" · ")}</small></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section className="reports-card">
           <div className="reports-card-heading">
             <div>
@@ -255,6 +310,9 @@ export default async function TaxesPage({
                           <span className={row.estimationAvailable ? "admin-status" : "admin-status suspended"}>
                             {row.estimationAvailable ? t("taxes.estimateReady") : warningLabel(row.warnings[0], t)}
                           </span>
+                          {row.validationMessages[0] && (
+                            <small>{row.validationMessages[0]}</small>
+                          )}
                           {row.excludedMovementCount > 0 && (
                             <small>{t("taxes.excludedMovements", { count: row.excludedMovementCount })}</small>
                           )}

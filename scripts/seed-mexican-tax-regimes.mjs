@@ -11,6 +11,7 @@ const regimes = [
   ["603", "Personas Morales con Fines no Lucrativos"],
   ["605", "Sueldos y Salarios e Ingresos Asimilados a Salarios"],
   ["606", "Arrendamiento"],
+  ["607", "Régimen de Enajenación o Adquisición de Bienes"],
   ["608", "Demás ingresos"],
   ["610", "Residentes en el Extranjero sin Establecimiento Permanente en México"],
   ["611", "Ingresos por Dividendos (socios y accionistas)"],

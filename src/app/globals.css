@@ -659,8 +659,26 @@ body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;bac
 .settings-list-link{width:100%;border:1px solid #ffffff10;text-align:left}.settings-list-link:hover{border-color:#01c38d55;background:#01c38d12;color:#42f2bd}
 .settings-backup p{margin:0;color:#a7b3c6;font-size:12px}.settings-backup strong,.settings-destination strong{color:white}.settings-destination strong{display:flex;align-items:center;gap:7px}.settings-destination i{display:block;width:8px;height:8px;border-radius:50%;background:#42f2bd;box-shadow:0 0 12px #01c38d}
 .settings-link-btn{border:0;background:transparent;color:var(--blue);font-size:11px;font-weight:900}
-.settings-activity{margin-top:16px}.settings-empty{padding:38px!important;text-align:center;color:#a7b3c6!important}
-.settings-row-menu{position:relative}.settings-menu,.payroll-menu{position:absolute;right:0;top:38px;z-index:20;display:grid;min-width:160px;padding:6px;border:1px solid #ffffff14;border-radius:10px;background:#191e29f5;box-shadow:0 20px 45px #00000055}
+.settings-activity{margin-top:18px;padding:0;overflow:visible}.settings-empty{padding:38px!important;text-align:center;color:#a7b3c6!important}
+.settings-activity .settings-panel-head{margin:0}.settings-activity .receipts-count{display:inline-flex;align-items:center;justify-content:center;min-width:86px;min-height:31px;padding:0 12px;border-radius:999px;background:#01c38d18;color:#42f2bd;font-size:10px;font-weight:900;white-space:nowrap}
+.settings-activity .settings-table-wrap{overflow-x:auto;overflow-y:visible;padding:14px 22px 22px;scrollbar-gutter:stable}
+.settings-activity .settings-table{min-width:980px;border-collapse:separate;border-spacing:0 10px;table-layout:fixed}
+.settings-activity .settings-table th{padding:0 12px 2px;border-bottom:0;color:#8fa2b9;font-size:9px;line-height:1.25}
+.settings-activity .settings-table td{padding:14px 12px;border-bottom:0;vertical-align:middle;line-height:1.45}
+.settings-activity .settings-table tbody tr{position:relative;background:#1028409c;box-shadow:inset 0 0 0 1px #ffffff0c;transition:background .18s ease,box-shadow .18s ease}
+.settings-activity .settings-table tbody tr:hover{background:#12304ccc;box-shadow:inset 0 0 0 1px #01c38d33}
+.settings-activity .settings-table tbody td:first-child{border-radius:10px 0 0 10px}
+.settings-activity .settings-table tbody td:last-child{border-radius:0 10px 10px 0}
+.settings-col-date,.settings-date-cell{width:18%}.settings-col-user{width:13%}.settings-col-action{width:11%}.settings-col-module{width:14%}.settings-col-menu,.settings-row-menu{width:64px}.settings-col-description{width:auto}
+.settings-date-cell span{display:inline-flex;align-items:center;min-height:28px;color:#d8dee8;font-variant-numeric:tabular-nums;white-space:nowrap}
+.settings-user-name{display:block;overflow:hidden;color:white;font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.settings-action-pill,.settings-module-pill{display:inline-flex;align-items:center;max-width:100%;min-height:26px;padding:0 10px;border-radius:999px;font-size:10px;font-weight:900;line-height:1.2;white-space:nowrap}
+.settings-action-pill{border:1px solid #01c38d30;background:#01c38d14;color:#42f2bd}
+.settings-module-pill{border:1px solid #ffffff12;background:#ffffff08;color:#d8dee8}
+.settings-description-cell{color:#d8dee8!important;font-weight:800;overflow-wrap:anywhere}
+.settings-row-menu{position:relative;text-align:right}.settings-row-menu .settings-icon-btn{margin-left:0}.settings-menu,.payroll-menu{position:absolute;right:0;top:38px;z-index:20;display:grid;min-width:160px;padding:6px;border:1px solid #ffffff14;border-radius:10px;background:#191e29f5;box-shadow:0 20px 45px #00000055}
+.settings-activity .settings-menu{right:12px;top:calc(100% + 8px);z-index:80;min-width:190px;padding:8px;border-color:#01c38d2c;border-radius:12px;background:#101827f7;box-shadow:0 24px 60px #00000065,0 0 0 1px #ffffff08;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
+.settings-activity .settings-table tbody tr:last-child .settings-menu{top:auto;bottom:calc(100% + 8px)}
 .settings-menu button,.payroll-menu button{width:100%;padding:10px;border:0;border-radius:8px;background:transparent;color:#d8dee8;font-size:11px;font-weight:800;text-align:left}.settings-menu button:hover,.payroll-menu button:hover{background:#01c38d18;color:#42f2bd}
 .payroll-layout{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(280px,.55fr);gap:16px;margin-bottom:16px}
 .payroll-panel{padding:18px}.payroll-panel-wide{min-width:0}
@@ -748,6 +766,8 @@ body[data-theme="light"] .company-editor-confirmation{border-color:#01a97945;bac
 .tax-formula-list p{display:grid;grid-template-columns:minmax(120px,170px) 1fr;gap:16px;margin:0;padding:13px 0;border-bottom:1px solid #ffffff0b}
 .tax-formula-list p:last-child{border-bottom:0}
 .tax-formula-list strong{color:white;font-size:11px}.tax-formula-list span{color:#a7b3c6;font-size:11px;line-height:1.5}
+.tax-regime-card{margin-bottom:17px}
+.tax-regime-table{min-width:940px}
 .tax-estimation-table{min-width:1040px}
 .tax-history-card{margin-top:28px}
 .tax-history-table{min-width:1040px}

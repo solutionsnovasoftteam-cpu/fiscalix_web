@@ -1,0 +1,196 @@
+{
+  "version": "stage-8-progressive-regimes-v2",
+  "principle": "Cada régimen habilitado debe conservar fórmula centralizada, advertencias de límite y trazabilidad.",
+  "period": "2026-08",
+  "cases": [
+    {
+      "id": "resico_enabled_keeps_stage_6_result",
+      "description": "RESICO continúa habilitado y conserva el resultado aprobado en etapas 6 y 7.",
+      "satCode": "626",
+      "expected": {
+        "enabled": true,
+        "regimeKey": "RESICO_PERSONA_FISICA",
+        "warning": null,
+        "estimationAvailable": true,
+        "ruleVersion": "RESICO_MX_PF_MONTHLY_V1"
+      }
+    },
+    {
+      "id": "business_professional_enabled",
+      "description": "Actividades empresariales y profesionales calcula ISR acumulado e IVA mensual con datos normalizados.",
+      "satCode": "612",
+      "input": {
+        "month": 8,
+        "yearToDateIncome": 150000,
+        "yearToDateDeductibleExpenses": 10000,
+        "periodVatTransferred": 24000,
+        "periodVatCreditable": 1600,
+        "isrWithheld": 0,
+        "previousProvisionalPayments": 0
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "ACTIVIDADES_EMPRESARIALES_PROFESIONALES",
+        "warning": "BUSINESS_PRO_PREVIOUS_PAYMENTS_NOT_TRACKED",
+        "estimationAvailable": true,
+        "base": 140000,
+        "isrRate": 0.1792,
+        "isrDetermined": 14806.56,
+        "isrEstimated": 14806.56,
+        "vatEstimated": 22400,
+        "taxEstimated": 37206.56,
+        "ruleVersion": "ACTIVIDADES_EMP_PROF_MX_PF_MONTHLY_V1"
+      }
+    },
+    {
+      "id": "leasing_enabled_limited",
+      "description": "Arrendamiento calcula con tarifa Art. 106 mensual y deducción opcional 35% si no hay deducciones.",
+      "satCode": "606",
+      "input": {
+        "income": 50000,
+        "registeredDeductibleExpenses": 0,
+        "optionalDeductionRate": 0.35,
+        "vatTransferred": 8000,
+        "vatCreditable": 0,
+        "isrWithheld": 0
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "ARRENDAMIENTO",
+        "warning": "LEASE_OPTIONAL_DEDUCTION_LIMITED",
+        "estimationAvailable": true,
+        "deductibleExpenses": 17500,
+        "base": 32500,
+        "isrRate": 0.2136,
+        "isrDetermined": 5053.65,
+        "isrEstimated": 5053.65,
+        "vatEstimated": 8000,
+        "taxEstimated": 13053.65,
+        "ruleVersion": "ARRENDAMIENTO_MX_PF_MONTHLY_V1"
+      }
+    },
+    {
+      "id": "digital_platforms_enabled_limited",
+      "description": "Plataformas tecnológicas calcula ISR con tasa base 1% y acredita retenciones capturadas.",
+      "satCode": "625",
+      "input": {
+        "income": 50000,
+        "defaultIsrRate": 0.01,
+        "vatTransferred": 8000,
+        "vatCreditable": 0,
+        "isrWithheld": 0
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "PLATAFORMAS_TECNOLOGICAS",
+        "warning": "PLATFORM_SERVICE_TYPE_NOT_CONFIGURED",
+        "estimationAvailable": true,
+        "base": 50000,
+        "isrRate": 0.01,
+        "isrDetermined": 500,
+        "isrEstimated": 500,
+        "vatEstimated": 8000,
+        "taxEstimated": 8500,
+        "ruleVersion": "PLATAFORMAS_TEC_MX_PF_MONTHLY_V1"
+      }
+    },
+    {
+      "id": "wages_enabled_limited",
+      "description": "Sueldos calcula ISR mensual con tarifa, restando retención capturada.",
+      "satCode": "605",
+      "input": {
+        "income": 50000,
+        "isrWithheld": 0
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "SUELDOS_INTERESES_DIVIDENDOS",
+        "warning": "WAGE_WITHHOLDING_ESTIMATE_LIMITED",
+        "estimationAvailable": true,
+        "base": 50000,
+        "isrRate": 0.2352,
+        "isrDetermined": 9107.82,
+        "isrEstimated": 9107.82,
+        "vatEstimated": 0,
+        "taxEstimated": 9107.82,
+        "ruleVersion": "SUELDOS_INTERESES_DIVIDENDOS_MX_PF_V1"
+      }
+    },
+    {
+      "id": "interest_enabled_withholding_only",
+      "description": "Intereses quedan calculados como saldo con base en retención registrada hasta capturar capital/tasa LIF.",
+      "satCode": "614",
+      "input": {
+        "income": 50000,
+        "isrWithheld": 250
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "SUELDOS_INTERESES_DIVIDENDOS",
+        "warning": "INTEREST_WITHHOLDING_ONLY",
+        "estimationAvailable": true,
+        "base": 50000,
+        "isrRate": null,
+        "isrDetermined": 250,
+        "isrEstimated": 0,
+        "vatEstimated": 0,
+        "taxEstimated": 0,
+        "ruleVersion": "SUELDOS_INTERESES_DIVIDENDOS_MX_PF_V1"
+      }
+    },
+    {
+      "id": "dividends_enabled_limited",
+      "description": "Dividendos aplica retención adicional 10% sin acreditar ISR corporativo.",
+      "satCode": "611",
+      "input": {
+        "income": 50000,
+        "additionalIsrRate": 0.1,
+        "isrWithheld": 0
+      },
+      "expected": {
+        "enabled": true,
+        "regimeKey": "SUELDOS_INTERESES_DIVIDENDOS",
+        "warning": "DIVIDEND_CORPORATE_TAX_NOT_TRACKED",
+        "estimationAvailable": true,
+        "base": 50000,
+        "isrRate": 0.1,
+        "isrDetermined": 5000,
+        "isrEstimated": 5000,
+        "vatEstimated": 0,
+        "taxEstimated": 5000,
+        "ruleVersion": "SUELDOS_INTERESES_DIVIDENDOS_MX_PF_V1"
+      }
+    },
+    {
+      "id": "special_events_enabled_limited",
+      "description": "Eventos especiales usa tasa base por subrégimen cuando no hay detalle fiscal adicional.",
+      "satCodes": ["607", "608", "610", "615"],
+      "expected": {
+        "enabled": true,
+        "regimeKey": "EVENTOS_FISCALES_ESPECIALES",
+        "warning": "SPECIAL_EVENT_LIMITED_DATA",
+        "estimationAvailable": true,
+        "ruleVersion": "EVENTOS_FISCALES_ESPECIALES_MX_PF_V1",
+        "examples": {
+          "prize615": {
+            "income": 100000,
+            "isrRate": 0.01,
+            "taxEstimated": 1000
+          },
+          "transfer607": {
+            "income": 100000,
+            "vatTransferred": 16000,
+            "isrRate": 0.2,
+            "taxEstimated": 36000
+          },
+          "foreignResident610": {
+            "income": 100000,
+            "isrWithheld": 3000,
+            "isrRate": null,
+            "taxEstimated": 0
+          }
+        }
+      }
+    }
+  ]
+}
