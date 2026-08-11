@@ -1,5 +1,4 @@
--- Fiscalix - Etapa 7: trazabilidad de estimaciones fiscales.
--- Ejecutar despues de scripts/financial-movements-stage-5.sql.
+
 
 begin;
 
