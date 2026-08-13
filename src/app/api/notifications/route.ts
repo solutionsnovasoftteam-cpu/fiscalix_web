@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 import { syncAutomaticNotificationsForUser } from "@/lib/notifications";
 import { supabase } from "@/lib/supabase";
 
@@ -27,8 +27,8 @@ function normalizeNotification(notification: NotificationRow) {
   };
 }
 
-export async function GET() {
-  const user = await getCurrentUser();
+export async function GET(request: Request) {
+  const user = await getApiUser(request);
   if (!user) {
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }
@@ -69,8 +69,8 @@ export async function GET() {
   }
 }
 
-export async function PATCH() {
-  const user = await getCurrentUser();
+export async function PATCH(request: Request) {
+  const user = await getApiUser(request);
   if (!user) {
     return NextResponse.json({ message: "No autorizado" }, { status: 401 });
   }

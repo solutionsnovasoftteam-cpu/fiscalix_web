@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@/components/Icon";
+import { StripeCheckoutModal } from "@/components/StripeCheckoutModal";
 import { createTranslator } from "@/lib/i18n";
 import { mergePlansWithDbRows, planMonthlyAmount, type FiscalixPlan, type PlanDbRow } from "@/lib/plans";
 import { useModal } from "@/lib/useModal";
@@ -23,6 +24,9 @@ type PlanDraft = {
   status: string;
   userLimitText: string;
 };
+
+type StripeCheckout = { clientSecret: string; sessionId: string };
+type BillingPeriod = "monthly" | "annual";
 
 function toDraft(plan: FiscalixPlan): PlanDraft {
   return {
@@ -74,6 +78,8 @@ export function PlansManager({
   const [activePlanDatabaseId, setActivePlanDatabaseId] = useState(currentPlanDatabaseId ?? null);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [savedMessage, setSavedMessage] = useState(initialStatus);
+  const [billingPeriods, setBillingPeriods] = useState<Record<string, BillingPeriod>>({});
+  const [stripeCheckout, setStripeCheckout] = useState<StripeCheckout | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeEditor = useCallback(() => setDraft(null), [setDraft]);
@@ -85,6 +91,33 @@ export function PlansManager({
   const headerDescription = canManagePlans
     ? t("plans.adminDescription")
     : t("plans.clientDescription");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("stripe_session_id");
+    if (!sessionId || !canSubscribePlans) return;
+    void (async () => {
+      setSavedMessage("Confirmando tu pago…");
+      try {
+        const response = await fetch("/api/stripe/confirm", {
+          body: JSON.stringify({ sessionId }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+          signal: AbortSignal.timeout(20_000),
+        });
+        const result = await response.json() as { message?: string; subscription?: { plan_id?: string | null } };
+        if (!response.ok) throw new Error(result.message ?? "No fue posible confirmar el pago.");
+        window.history.replaceState({}, "", "/plans");
+        setActivePlanDatabaseId(result.subscription?.plan_id ?? null);
+        setSavedMessage(result.message ?? "Pago acreditado exitosamente.");
+      } catch (error) {
+        const message = error instanceof DOMException && error.name === "TimeoutError"
+          ? "La confirmación tardó demasiado. Recarga la página para reintentarla."
+          : error instanceof Error ? error.message : "No fue posible confirmar el pago.";
+        setSavedMessage(message);
+      }
+    })();
+  }, [canSubscribePlans]);
 
   function editPlan(plan: FiscalixPlan) {
     if (!canManagePlans) return;
@@ -158,7 +191,7 @@ export function PlansManager({
     window.location.reload();
   }
 
-  async function subscribeToPlan(plan: FiscalixPlan) {
+  async function subscribeToPlan(plan: FiscalixPlan, billingPeriod: BillingPeriod) {
     if (!canSubscribePlans) return;
     if (!plan.databaseId) {
       setSavedMessage(t("plans.missingDb"));
@@ -169,17 +202,24 @@ export function PlansManager({
     setSavedMessage("");
 
     try {
-      const response = await fetch("/api/subscriptions", {
-        body: JSON.stringify({ planId: plan.databaseId }),
+      const isFreePlan = planMonthlyAmount(plan) === 0;
+      const response = await fetch(isFreePlan ? "/api/subscriptions" : "/api/stripe/checkout", {
+        body: JSON.stringify({ billingPeriod, planId: plan.databaseId }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
       const result = (await response.json()) as {
+        clientSecret?: string;
         message?: string;
+        sessionId?: string;
         subscription?: { plan_id?: string | null };
       };
 
       if (!response.ok) throw new Error(result.message ?? t("plans.subscribeError"));
+      if (!isFreePlan && result.clientSecret && result.sessionId) {
+        setStripeCheckout({ clientSecret: result.clientSecret, sessionId: result.sessionId });
+        return;
+      }
 
       setActivePlanDatabaseId(result.subscription?.plan_id ?? plan.databaseId);
       setSavedMessage(result.message ?? t("plans.subscribed", { plan: plan.name }));
@@ -234,6 +274,9 @@ export function PlansManager({
         {plans.map((plan) => {
           const isCurrentPlan = Boolean(plan.databaseId && plan.databaseId === activePlanDatabaseId);
           const isSubscribing = subscribingPlanId === plan.databaseId;
+          const billingPeriod = billingPeriods[plan.id] ?? "monthly";
+          const hasAnnualPrice = plan.annualAmount !== null && typeof plan.annualAmount !== "undefined";
+          const requiresPayment = planMonthlyAmount(plan) > 0;
 
           return (
             <article className={plan.id === "plus" ? "plan-card featured" : "plan-card"} key={plan.id}>
@@ -251,13 +294,15 @@ export function PlansManager({
                 <b>{plan.userLimit == null ? "—" : t("plans.userCount", { count: plan.userLimit })}</b>
               </div>
               <div className="plan-price">
-                <strong>{plan.monthlyPrice}</strong>
-                <small>{t("plans.monthly")}</small>
+                <strong>{billingPeriod === "annual" ? plan.annualPrice : plan.monthlyPrice}</strong>
+                <small>{requiresPayment ? (billingPeriod === "annual" ? "Anual" : t("plans.monthly")) : "Sin costo"}</small>
               </div>
-              <div className="plan-annual">
-                <span>{plan.annualPrice}</span>
-                <small>{t("plans.annualSuggested")}</small>
-              </div>
+              {requiresPayment ? (
+                <div className="plan-billing-toggle" role="group" aria-label="Periodicidad de pago">
+                  <button className={billingPeriod === "monthly" ? "active" : ""} type="button" onClick={() => setBillingPeriods((current) => ({ ...current, [plan.id]: "monthly" }))}>Mensual</button>
+                  <button className={billingPeriod === "annual" ? "active" : ""} disabled={!hasAnnualPrice} type="button" onClick={() => setBillingPeriods((current) => ({ ...current, [plan.id]: "annual" }))}>Anual</button>
+                </div>
+              ) : null}
               <div className="plan-section">
                 <h3>{t("plans.includes")}</h3>
                 <ul>
@@ -271,7 +316,7 @@ export function PlansManager({
                 <button
                   className={isCurrentPlan ? "plan-subscribe-button current" : "plan-subscribe-button"}
                   disabled={isSubscribing || isCurrentPlan || !plan.databaseId}
-                  onClick={() => subscribeToPlan(plan)}
+                  onClick={() => subscribeToPlan(plan, billingPeriod)}
                   type="button"
                 >
                   <Icon name={isCurrentPlan ? "check_circle" : "payments"} />
@@ -282,6 +327,15 @@ export function PlansManager({
           );
         })}
       </section>
+
+      {stripeCheckout ? (
+        <StripeCheckoutModal
+          clientSecret={stripeCheckout.clientSecret}
+          sessionId={stripeCheckout.sessionId}
+          onCancel={() => { setStripeCheckout(null); setSavedMessage("El pago fue cancelado."); }}
+          onConfirmed={({ message, planId }) => { setStripeCheckout(null); setActivePlanDatabaseId(planId); setSavedMessage(message); }}
+        />
+      ) : null}
 
       {draft && (
         <section className="plans-editor" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !isSaving) closeEditor(); }}>

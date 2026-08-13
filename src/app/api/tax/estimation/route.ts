@@ -1,6 +1,6 @@
 import { getApiUser } from "@/lib/auth";
 import { fiscalFailure, fiscalSuccess, isUuid } from "@/lib/fiscalApi";
-import { loadTaxEstimationsForUser } from "@/lib/taxEstimation";
+import { loadTaxEstimationsForUser, type TaxEstimationExecutionChannel } from "@/lib/taxEstimation";
 import { isTaxPeriodKey } from "@/lib/taxEstimation.shared";
 
 export async function GET(request: Request) {
@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const searchParams = new URL(request.url).searchParams;
   const companyId = searchParams.get("companyId")?.trim() || null;
   const period = searchParams.get("period")?.trim() || null;
+  const requestedChannel = searchParams.get("channel")?.trim().toLowerCase();
+  const persist = searchParams.get("persist") !== "false";
 
   if (companyId && !isUuid(companyId)) {
     return fiscalFailure("INVALID_REQUEST", "companyId debe ser un UUID válido.", 400);
@@ -19,7 +21,8 @@ export async function GET(request: Request) {
     return fiscalFailure("INVALID_REQUEST", "period debe usar el formato YYYY-MM.", 400);
   }
 
-  const result = await loadTaxEstimationsForUser(user, { channel: "api", companyId, period });
+  const channel: TaxEstimationExecutionChannel = requestedChannel === "mobile" ? "mobile" : "api";
+  const result = await loadTaxEstimationsForUser(user, { channel, companyId, period, persist });
   if (result.error) {
     if (result.errorCode === "ACCESS_DENIED") {
       return fiscalFailure("ACCESS_DENIED", result.error, 403);

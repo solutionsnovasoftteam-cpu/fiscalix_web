@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { canViewAdminDashboard } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
+import { loadTaxEstimationsForUser } from "@/lib/taxEstimation";
 import type { FiscalixUser } from "@/models/User";
 
 type NotificationType = "danger" | "info" | "success" | "warning";
@@ -81,6 +82,21 @@ function formatDate(value: string | null | undefined) {
   if (!value) return "fecha por confirmar";
   const date = new Date(`${value}T12:00:00`);
   return Number.isNaN(date.getTime()) ? value : dateFormatter.format(date);
+}
+
+function provisionalDueDate(periodKey: string) {
+  const [yearText, monthText] = periodKey.split("-");
+  const year = Number(yearText);
+  const month = Number(monthText);
+
+  if (!Number.isInteger(year) || !Number.isInteger(month)) return null;
+  return new Date(year, month, 17);
+}
+
+function daysBetween(from: Date, to: Date) {
+  const fromStart = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+  const toStart = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+  return Math.round((toStart - fromStart) / 86_400_000);
 }
 
 function firstRelation<T>(value: T | T[] | null | undefined) {
@@ -276,6 +292,85 @@ async function getNotificationCompanyScope(user: FiscalixUser) {
     }));
 }
 
+async function syncFiscalNotificationsForUser(user: FiscalixUser) {
+  const estimationResult = await loadTaxEstimationsForUser(user, { persist: false });
+  if (estimationResult.error || !estimationResult.data) return;
+
+  const estimation = estimationResult.data;
+  const [{ data: executions, error: executionsError }] = await Promise.all([
+    supabase
+      .from("estimaciones_fiscales_ejecuciones")
+      .select("id,created_at")
+      .eq("usuario_id", user.id)
+      .eq("periodo_clave", estimation.period.key)
+      .order("created_at", { ascending: false })
+      .limit(1),
+  ]);
+
+  if (executionsError) {
+    if (!String(executionsError.message ?? "").toLowerCase().includes("estimaciones_fiscales_ejecuciones")) {
+      console.error("Error al consultar ejecuciones fiscales para recordatorios:", executionsError.message);
+    }
+    return;
+  }
+
+  const execution = (executions ?? [])[0] as { created_at?: string | null; id?: string | null } | undefined;
+  if (execution?.id) {
+    await createNotificationOncePerDay({
+      message: `La estimación fiscal de ${estimation.period.key} se generó correctamente y quedó disponible para consulta auditada.`,
+      title: "Estimación fiscal generada",
+      type: "success",
+      url: `/taxes?period=${estimation.period.key}`,
+      userId: user.id,
+    });
+  } else {
+    await createNotificationOncePerDay({
+      message: `Aún no se ha guardado una estimación fiscal para el periodo ${estimation.period.key}. Genera el cálculo antes de preparar la declaración.`,
+      title: "Estimación fiscal pendiente",
+      type: "warning",
+      url: `/taxes?period=${estimation.period.key}`,
+      userId: user.id,
+    });
+  }
+
+  const incompleteCompanies = estimation.companies.filter((company) => !company.estimationAvailable);
+  if (incompleteCompanies.length) {
+    const sample = incompleteCompanies.slice(0, 2).map((company) => company.companyName).join(", ");
+    await createNotificationOncePerDay({
+      message: incompleteCompanies.length === 1
+        ? `${sample} requiere completar o activar su perfil fiscal antes de generar una estimación.`
+        : `${incompleteCompanies.length} empresas requieren completar o activar su perfil fiscal: ${sample}.`,
+      title: "Datos fiscales incompletos",
+      type: "warning",
+      url: "/companies",
+      userId: user.id,
+    });
+  }
+
+  const excludedMovements = estimation.movementTrace.filter((movement) => !movement.considered);
+  if (excludedMovements.length) {
+    await createNotificationOncePerDay({
+      message: `${excludedMovements.length} movimientos del periodo ${estimation.period.key} no participan en la estimación. Revisa su estado y contexto fiscal.`,
+      title: "Movimientos fiscales excluidos",
+      type: "info",
+      url: `/reports?period=${estimation.period.key}&movement=excluded`,
+      userId: user.id,
+    });
+  }
+
+  const dueDate = provisionalDueDate(estimation.period.key);
+  const daysUntilDue = dueDate ? daysBetween(new Date(), dueDate) : null;
+  if (dueDate && daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 7 && estimation.totals.taxEstimated > 0) {
+    await createNotificationOncePerDay({
+      message: `El pago provisional estimado de ${estimation.period.key} vence el ${dateFormatter.format(dueDate)}. Consulta el cálculo y valida la información antes de declarar.`,
+      title: "Pago provisional próximo",
+      type: "warning",
+      url: `/taxes?period=${estimation.period.key}`,
+      userId: user.id,
+    });
+  }
+}
+
 export async function syncAutomaticNotificationsForUser(user: FiscalixUser) {
   try {
     const companies = await getNotificationCompanyScope(user);
@@ -360,6 +455,8 @@ export async function syncAutomaticNotificationsForUser(user: FiscalixUser) {
         userId: user.id,
       });
     }
+
+    await syncFiscalNotificationsForUser(user);
   } catch (error) {
     console.error("Error al sincronizar notificaciones automáticas:", error instanceof Error ? error.message : error);
   }

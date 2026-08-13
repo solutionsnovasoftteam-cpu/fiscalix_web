@@ -35,7 +35,7 @@ alter table public.regimenes_fiscales
 -- Clasificación inicial del catálogo que ya utiliza Fiscalix.
 update public.regimenes_fiscales
 set tipo_persona = case
-    when clave_sat in ('605','606','608','611','612','614','615','616','621','625','626') then 'fisica'
+    when clave_sat in ('605','606','607','608','611','612','614','615','616','621','625','626') then 'fisica'
     when clave_sat in ('601','603','620','622','623','624') then 'moral'
     else 'mixta'
   end,

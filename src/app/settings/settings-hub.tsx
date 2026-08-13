@@ -107,12 +107,12 @@ export function SettingsHub({
           <table className="settings-table">
             <thead>
               <tr>
-                <th>{t("table.date")}</th>
-                <th>{t("settings.user")}</th>
-                <th>{t("settings.action")}</th>
-                <th>{t("settings.module")}</th>
-                <th>{t("table.description")}</th>
-                <th aria-label={t("table.actions")} />
+                <th className="settings-col-date">{t("table.date")}</th>
+                <th className="settings-col-user">{t("settings.user")}</th>
+                <th className="settings-col-action">{t("settings.action")}</th>
+                <th className="settings-col-module">{t("settings.module")}</th>
+                <th className="settings-col-description">{t("table.description")}</th>
+                <th className="settings-col-menu" aria-label={t("table.actions")} />
               </tr>
             </thead>
             <tbody>
@@ -122,15 +122,17 @@ export function SettingsHub({
                 </tr>
               ) : (
                 activityPage.items.map((row) => (
-                  <tr key={row.id}>
-                    <td>{row.date}</td>
-                    <td>{row.user}</td>
-                    <td>{row.action}</td>
-                    <td>{row.module}</td>
-                    <td>{row.description}</td>
+                  <tr className="settings-activity-row" key={row.id}>
+                    <td className="settings-date-cell"><span>{row.date}</span></td>
+                    <td><strong className="settings-user-name">{row.user}</strong></td>
+                    <td><span className="settings-action-pill">{row.action}</span></td>
+                    <td><span className="settings-module-pill">{row.module}</span></td>
+                    <td className="settings-description-cell">{row.description}</td>
                     <td className="settings-row-menu">
                       <button
+                        aria-expanded={menuOpenId === row.id}
                         aria-label={t("settings.optionsFor", { action: row.action })}
+                        aria-haspopup="menu"
                         className="settings-icon-btn"
                         onClick={() => setMenuOpenId((current) => (current === row.id ? null : row.id))}
                         type="button"
@@ -138,11 +140,11 @@ export function SettingsHub({
                         <Icon name="more_horiz" />
                       </button>
                       {menuOpenId === row.id && (
-                        <div className="settings-menu">
-                          <button onClick={() => { setMenuOpenId(null); notify(t("settings.detailRegistered", { action: row.action })); }} type="button">
+                        <div className="settings-menu" role="menu">
+                          <button onClick={() => { setMenuOpenId(null); notify(t("settings.detailRegistered", { action: row.action })); }} role="menuitem" type="button">
                             {t("settings.detail")}
                           </button>
-                          <button onClick={() => { setMenuOpenId(null); notify(t("settings.recordExported")); }} type="button">
+                          <button onClick={() => { setMenuOpenId(null); notify(t("settings.recordExported")); }} role="menuitem" type="button">
                             {t("settings.export")}
                           </button>
                         </div>

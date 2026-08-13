@@ -1,0 +1,55 @@
+{
+  "version": "stage-9-final-integration-v1",
+  "principle": "Las vistas Web y Mobile consultan la misma fuente de movimientos normalizados y respetan el mismo alcance de empresas.",
+  "cases": [
+    {
+      "id": "mobile_audit_channel_migration",
+      "steps": ["Ejecutar scripts/tax-estimation-stage-9.sql", "Solicitar una estimacion autenticada con channel=mobile", "Consultar la ejecucion creada"],
+      "expected": "La solicitud termina sin error de restriccion y la ejecucion persiste con canal=mobile."
+    },
+    {
+      "id": "dashboard_tax_summary_does_not_persist",
+      "steps": ["Abrir /dashboard", "Contar ejecuciones antes y despues"],
+      "expected": "Muestra desglose por empresa/regimen y no incrementa estimaciones_fiscales_ejecuciones."
+    },
+    {
+      "id": "reports_filters_current_data",
+      "request": "/reports?period=2026-08&companyId=<authorized-uuid>&regime=626&status=estimated&movement=considered&history=period",
+      "expected": "Las filas, traza e historial corresponden al periodo, empresa, regimen y estado solicitados."
+    },
+    {
+      "id": "report_api_mobile_contract",
+      "request": "/api/tax/estimation/report?period=2026-08&movement=excluded",
+      "headers": ["Authorization: Bearer <firebase-id-token>"],
+      "expected": "200, ok=true, y report.movementTrace contiene solo movimientos con considered=false."
+    },
+    {
+      "id": "company_scope_denied",
+      "request": "/api/tax/estimation?period=2026-08&companyId=<foreign-uuid>&channel=mobile",
+      "headers": ["Authorization: Bearer <firebase-id-token>"],
+      "expected": "403, ok=false y error.code=ACCESS_DENIED."
+    },
+    {
+      "id": "history_is_user_scoped",
+      "request": "/api/tax/estimation/history?id=<foreign-execution-id>",
+      "headers": ["Authorization: Bearer <firebase-id-token>"],
+      "expected": "No expone una ejecucion de otro usuario."
+    },
+    {
+      "id": "web_mobile_consistency",
+      "steps": ["Consultar Web /taxes con empresa y periodo", "Consultar API con los mismos parametros y channel=mobile"],
+      "expected": "income, base, vatEstimated, isrEstimated, taxEstimated y decisiones de movimientos son iguales."
+    },
+    {
+      "id": "mobile_trace_channel",
+      "request": "/api/tax/estimation?period=2026-08&channel=mobile",
+      "headers": ["Authorization: Bearer <firebase-id-token>"],
+      "expected": "La ejecucion creada incluye canal=mobile y aparece en /api/tax/estimation/history."
+    },
+    {
+      "id": "notification_scope_and_deduplication",
+      "steps": ["Llamar GET /api/notifications dos veces el mismo dia", "Revisar notificaciones del usuario"],
+      "expected": "Se devuelven solo avisos propios y no se duplica el mismo recordatorio fiscal durante el dia."
+    }
+  ]
+}

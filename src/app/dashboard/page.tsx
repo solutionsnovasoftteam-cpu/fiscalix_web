@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { DashboardExportButton } from "@/app/dashboard/dashboard-export-button";
 import { Icon } from "@/components/Icon";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
@@ -6,6 +7,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
 import { createTranslator } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
+import { loadTaxEstimationsForUser } from "@/lib/taxEstimation";
 import {
   defaultUserPreferences,
   formatPreferenceDate,
@@ -209,7 +211,7 @@ export default async function DashboardPage() {
   const companyIdSet = new Set(companyIds);
   const companyNameById = new Map(companies.map((company) => [company.id, company.nombre_comercial || t("common.noCompany")]));
 
-  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationsResult, subscriptionsResult] = await Promise.all([
+  const [companyIncomeResult, userIncomeResult, companyExpenseResult, userExpenseResult, obligationsResult, subscriptionsResult, fiscalEstimationResult] = await Promise.all([
     companyIds.length
       ? supabase
           .from("ingresos")
@@ -251,6 +253,7 @@ export default async function DashboardPage() {
           .select("id,empresa_id,estado_pago,fecha_proxima_facturacion,planes(nombre)")
           .in("empresa_id", companyIds)
       : Promise.resolve({ data: [] as SubscriptionRow[], error: null }),
+    loadTaxEstimationsForUser(user, { persist: false }),
   ]);
 
   const userIncomes = isMissingColumnError(userIncomeResult.error, "usuario_id")
@@ -274,6 +277,10 @@ export default async function DashboardPage() {
     || (!isMissingColumnError(userExpenseResult.error, "usuario_id") && userExpenseResult.error)
     || obligationsResult.error
     || subscriptionsResult.error;
+  const fiscalEstimation = fiscalEstimationResult.data;
+  const fiscalRows = fiscalEstimation?.companies ?? [];
+  const fiscalPeriod = fiscalEstimation?.period.key ?? currentMonthStart.slice(0, 7);
+  const fiscalTotals = fiscalEstimation?.totals;
 
   const monthIncomes = incomes.filter((income) => income.fecha_ingreso && income.fecha_ingreso >= currentMonthStart && income.fecha_ingreso < nextMonthStart);
   const monthExpenses = expenses.filter((expense) => expense.fecha_gasto && expense.fecha_gasto >= currentMonthStart && expense.fecha_gasto < nextMonthStart);
@@ -414,6 +421,81 @@ export default async function DashboardPage() {
             <span><Icon name={stat.icon} /></span>
           </article>
         ))}
+      </section>
+
+      <section className="panel dashboard-tax-summary">
+        <div className="panel-heading">
+          <div>
+            <h2>{t("dashboard.taxSummary")}</h2>
+            <p>{t("dashboard.taxSummaryHelp")}</p>
+          </div>
+          <Link href={`/taxes?period=${fiscalPeriod}`}>{t("dashboard.viewTaxes")}</Link>
+        </div>
+
+        {fiscalEstimationResult.error ? (
+          <div className="dashboard-tax-empty">
+            <strong>{t("dashboard.taxNoEstimate")}</strong>
+            <span>{fiscalEstimationResult.error}</span>
+          </div>
+        ) : fiscalRows.length ? (
+          <>
+            <div className="dashboard-tax-kpis">
+              <div>
+                <span>{t("dashboard.taxPeriod", { period: formatMonthPeriod(fiscalPeriod, preferences) })}</span>
+                <strong>{fiscalPeriod}</strong>
+              </div>
+              <div>
+                <span>{t("dashboard.taxAvailable", { count: fiscalTotals?.companiesWithEstimate ?? 0 })}</span>
+                <strong>{fiscalTotals?.companiesWithEstimate ?? 0}</strong>
+              </div>
+              <div>
+                <span>{t("taxes.estimatedTaxTotal")}</span>
+                <strong>{money(fiscalTotals?.taxEstimated ?? 0)}</strong>
+              </div>
+            </div>
+            <div className="reports-table-scroll">
+              <table className="reports-table dashboard-tax-table">
+                <thead>
+                  <tr>
+                    <th>{t("taxes.companyFilter")}</th>
+                    <th>{t("taxes.regime")}</th>
+                    <th>{t("taxes.resicoBase")}</th>
+                    <th>{t("taxes.estimatedIvaPayable")}</th>
+                    <th>{t("taxes.estimatedIsrPayable")}</th>
+                    <th>{t("taxes.estimatedTaxTotal")}</th>
+                    <th>{t("reports.status")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fiscalRows.map((row) => {
+                    const status = !row.estimationAvailable
+                      ? t("dashboard.taxReview")
+                      : row.validationMessages.length
+                        ? t("reports.statusLimited")
+                        : t("reports.statusEstimated");
+
+                    return (
+                      <tr key={row.companyId}>
+                        <td><strong>{row.companyName}</strong><small>{t("taxes.movementCounts", { expenses: row.expenseCount, incomes: row.incomeCount })}</small></td>
+                        <td><strong>{row.regimeSatCode || "-"}</strong><small>{row.regimeName}</small></td>
+                        <td>{money(row.base)}</td>
+                        <td>{money(row.vatEstimated ?? 0)}</td>
+                        <td>{money(row.isrEstimated ?? 0)}</td>
+                        <td>{money(row.taxEstimated ?? 0)}</td>
+                        <td><span className={`fiscal-status fiscal-status-${row.estimationAvailable ? (row.validationMessages.length ? "limited" : "estimated") : "review"}`}>{status}</span></td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="dashboard-tax-empty">
+            <strong>{t("dashboard.taxNoEstimate")}</strong>
+            <span>{t("taxes.noEstimatesHelp")}</span>
+          </div>
+        )}
       </section>
 
       <section className="dashboard-grid">
