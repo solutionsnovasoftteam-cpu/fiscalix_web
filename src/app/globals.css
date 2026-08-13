@@ -1352,6 +1352,9 @@ body[data-theme] :is(.topbar,.sidebar,.sidebar-brand,.main-nav){
 body[data-theme="light"] :is(.topbar,.sidebar,.sidebar-brand,.main-nav){
   background:#ffffff!important;
 }
+body[data-theme="light"] .sidebar-brand .brand-logo{
+  filter:none!important;
+}
 body[data-theme] :is(.search,.search input,.nav-link,.main-nav p){
   color:var(--theme-muted)!important;
 }
@@ -2232,6 +2235,18 @@ body[data-theme="light"] .dashboard-tax-kpis,body[data-theme="light"] .tax-repor
 body[data-theme="light"] .dashboard-tax-kpis strong,body[data-theme="light"] .dashboard-tax-empty strong,body[data-theme="light"] .fiscal-report-kpis strong,body[data-theme="light"] .fiscal-report-section-heading h3 { color: #132d46; }
 body[data-theme="light"] .tax-report-filters label { color: #38526b; }
 body[data-theme="light"] .tax-report-filters input,body[data-theme="light"] .tax-report-filters select { border-color: #cbd8e5; background: #fff; color: #132d46; }
+body[data-theme="light"] .fiscal-status-estimated{
+  background:#008d67!important;
+  color:#ffffff!important;
+}
+body[data-theme="light"] .fiscal-status-limited{
+  background:#d97706!important;
+  color:#ffffff!important;
+}
+body[data-theme="light"] .fiscal-status-review{
+  background:#c24141!important;
+  color:#ffffff!important;
+}
 
 @media (max-width: 1250px) {
   .tax-report-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
