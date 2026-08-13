@@ -234,7 +234,6 @@ export default async function TaxesPage({
                       <span className={rule.enabled ? "admin-status" : "admin-status suspended"}>
                         {regimeStatusLabel(rule.status, t)}
                       </span>
-                      <small>{rule.ruleVersion.code}</small>
                     </td>
                     <td><small>{rule.requiredData.slice(0, 3).join(" · ")}</small></td>
                   </tr>
@@ -377,7 +376,6 @@ export default async function TaxesPage({
                     <tr key={row.id}>
                       <td>
                         <strong>{formatPreferenceDateTime(row.createdAt, preferences, t("common.pending"))}</strong>
-                        <small>{executionShortId(row.id)}</small>
                       </td>
                       <td>{row.periodKey}</td>
                       <td>{money(row.income)}</td>
