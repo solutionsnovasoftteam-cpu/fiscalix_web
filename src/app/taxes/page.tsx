@@ -10,7 +10,6 @@ import { matchesSearch, searchParamText } from "@/lib/tableSearch";
 import {
   loadTaxEstimationHistoryForUser,
   loadTaxEstimationsForUser,
-  type TaxEstimationExecutionChannel,
   type TaxEstimationHistoryItem,
 } from "@/lib/taxEstimation";
 import type {
@@ -34,12 +33,6 @@ function rateLabel(value: number | null) {
 }
 
 type Translator = ReturnType<typeof createTranslator>;
-
-function channelLabel(channel: TaxEstimationExecutionChannel | string, t: Translator) {
-  if (channel === "mobile") return t("taxes.channelMobile");
-  if (channel === "api") return t("taxes.channelApi");
-  return t("taxes.channelWeb");
-}
 
 function executionShortId(id: string | null | undefined) {
   return id ? id.slice(0, 8) : "—";
@@ -368,7 +361,6 @@ export default async function TaxesPage({
                     <th>{t("taxes.estimatedIsrPayable")}</th>
                     <th>{t("taxes.estimatedAmount")}</th>
                     <th>{t("taxes.movementsAudited")}</th>
-                    <th>{t("taxes.channel")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -384,7 +376,6 @@ export default async function TaxesPage({
                       <td>{money(row.isrEstimated)}</td>
                       <td><strong>{money(row.taxEstimated)}</strong></td>
                       <td>{row.movementCount}</td>
-                      <td><span className="admin-status">{channelLabel(row.channel, t)}</span></td>
                     </tr>
                   ))}
                 </tbody>
