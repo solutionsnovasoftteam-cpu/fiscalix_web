@@ -41,7 +41,8 @@ function number(value: number | string) {
 }
 
 function formatMonth(key: string, preferences: UserPreferences) {
-  const date = new Date(`${key}-01T00:00:00`);
+  // Use midday UTC so a YYYY-MM period keeps its calendar month in time zones west of UTC.
+  const date = new Date(`${key}-01T12:00:00Z`);
   return Number.isNaN(date.getTime()) ? key : formatPreferenceMonth(date, preferences, true);
 }
 
