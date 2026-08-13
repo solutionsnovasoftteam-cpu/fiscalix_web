@@ -143,6 +143,7 @@ button { cursor:pointer; }
 .plans-editor { z-index:80; }
 .plans-editor-heading button:disabled,.plans-editor-actions button:disabled { opacity:.55; cursor:wait; }
 .stripe-checkout-modal{width:min(640px,100%);border-color:#20e4b16b;background:linear-gradient(150deg,#0c2436,#102c3d);box-shadow:0 30px 80px #00000085,0 0 0 1px #20e4b11c;overflow:auto}.stripe-checkout-heading{padding:18px 20px;border-bottom-color:#20e4b13d;background:linear-gradient(105deg,#102e40,#153f4a)}.stripe-checkout-heading p{color:#38efc2}.stripe-checkout-heading h2{font-size:20px}.stripe-checkout-heading button{border-color:#42eac64d;background:#28d6b51c;color:#dffff7}.stripe-checkout-heading button:hover{background:#28d6b538}.stripe-checkout-frame{padding:12px 18px 22px;background:radial-gradient(circle at 50% 0,#1de1af12,transparent 45%)}.stripe-checkout-frame>iframe{border-radius:10px}@media(max-width:560px){.stripe-checkout-modal{width:100%}.stripe-checkout-frame{padding:8px 8px 14px}.stripe-checkout-heading{padding:16px}.stripe-checkout-heading h2{font-size:18px}}
+.admin-actions button.role-revoke{border-color:#ffcf7055;background:#ffcf7014;color:#ffcf70}
 @media (max-width:560px) {
   .auth-modal-backdrop,.profile-editor-backdrop,.plans-editor { padding:14px; }
   .auth-modal,.profile-editor,.plans-editor-card { max-height:calc(100dvh - 28px); }

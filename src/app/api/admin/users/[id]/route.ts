@@ -3,13 +3,11 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getFirebaseAdmin } from "@/lib/firebaseAdmin";
 import { createAccountStatusNotifications } from "@/lib/notifications";
-import { canManageAdminUsers, canSuspendUserAccounts, canTargetUserRole } from "@/lib/roles";
+import { canManageAdminUsers, canSuspendUserAccounts, canTargetUserRole, USER_ROLES, type UserRole } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
-import { getUserRoleByUserId } from "@/lib/userRoles";
+import { getRoleIdByName, getUserRoleByUserId } from "@/lib/userRoles";
 
-type UserAction = {
-  action?: "activate" | "suspend";
-};
+type UserAction = { action?: "activate" | "assign_admin" | "revoke_admin" | "suspend" };
 
 async function getTargetUser(targetId: string) {
   const { data, error } = await supabase
@@ -40,7 +38,7 @@ async function deleteFirebaseUser(uid: string) {
   }
 }
 
-async function authorizeTarget(targetId: string, action: "delete" | "suspend") {
+async function authorizeTarget(targetId: string, action: "delete" | "role" | "suspend") {
   const actor = await getCurrentUser();
   if (!actor) return { error: NextResponse.json({ message: "No autorizado" }, { status: 401 }) };
   if (action === "delete" && !canManageAdminUsers(actor)) {
@@ -48,6 +46,9 @@ async function authorizeTarget(targetId: string, action: "delete" | "suspend") {
   }
   if (action === "suspend" && !canSuspendUserAccounts(actor)) {
     return { error: NextResponse.json({ message: "No tienes permisos para administrar usuarios." }, { status: 403 }) };
+  }
+  if (action === "role" && !canManageAdminUsers(actor)) {
+    return { error: NextResponse.json({ message: "Solo el superadministrador puede asignar administradores." }, { status: 403 }) };
   }
   if (actor.id === targetId) {
     return { error: NextResponse.json({ message: "No puedes modificar tu propia cuenta desde este panel." }, { status: 400 }) };
@@ -64,13 +65,21 @@ async function authorizeTarget(targetId: string, action: "delete" | "suspend") {
   return { actor, target, targetRole };
 }
 
+async function replaceUserRole(userId: string, role: UserRole) {
+  const roleId = await getRoleIdByName(role);
+  if (!roleId) throw new Error("El rol seleccionado no está configurado.");
+
+  const { error: clearError } = await supabase.from("usuario_rol").delete().eq("usuario_id", userId);
+  if (clearError) throw new Error(clearError.message);
+
+  const { error: assignError } = await supabase.from("usuario_rol").insert({ rol_id: roleId, usuario_id: userId });
+  if (assignError) throw new Error(assignError.message);
+}
+
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
   try {
-    const authorization = await authorizeTarget(id, "suspend");
-    if (authorization.error) return authorization.error;
-
     let body: UserAction;
     try {
       body = (await request.json()) as UserAction;
@@ -78,6 +87,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({ message: "Solicitud inválida." }, { status: 400 });
     }
 
+    if (body.action === "assign_admin" || body.action === "revoke_admin") {
+      const authorization = await authorizeTarget(id, "role");
+      if (authorization.error) return authorization.error;
+
+      const nextRole = body.action === "assign_admin" ? USER_ROLES.ADMIN : USER_ROLES.CLIENT;
+      if (body.action === "assign_admin" && authorization.targetRole !== USER_ROLES.CLIENT) {
+        return NextResponse.json({ message: "Solo puedes designar como administrador a un cliente." }, { status: 400 });
+      }
+      if (body.action === "revoke_admin" && authorization.targetRole !== USER_ROLES.ADMIN) {
+        return NextResponse.json({ message: "Solo puedes revocar el rol de un administrador." }, { status: 400 });
+      }
+
+      await replaceUserRole(id, nextRole);
+      return NextResponse.json({ message: body.action === "assign_admin" ? "Administrador designado correctamente." : "Rol de administrador revocado correctamente." });
+    }
+
+    const authorization = await authorizeTarget(id, "suspend");
+    if (authorization.error) return authorization.error;
     const nextStatus = body.action === "activate" ? "activo" : body.action === "suspend" ? "suspendido" : null;
 
     if (!nextStatus) {

@@ -5,7 +5,7 @@ import { Icon } from "@/components/Icon";
 import { type AdminDashboardUser } from "@/lib/adminUsers";
 import { createTranslator, resultCount } from "@/lib/i18n";
 import { paginateItems, paginationRangeLabel, TABLE_PAGE_SIZE } from "@/lib/pagination";
-import { canManageAdminUsers, canSuspendUserAccounts } from "@/lib/roles";
+import { canManageAdminUsers, canSuspendUserAccounts, USER_ROLES } from "@/lib/roles";
 import { matchesSearch } from "@/lib/tableSearch";
 import type { FiscalixUser } from "@/models/User";
 
@@ -90,11 +90,12 @@ export function AdminUsersDashboard({
     return { active, activeSubscriptions, billingAttention, clients, paidThisMonth, suspended, total: users.length };
   }, [users]);
 
-  async function mutateUser(user: AdminDashboardUser, action: "activate" | "delete" | "suspend") {
+  async function mutateUser(user: AdminDashboardUser, action: "activate" | "assign_admin" | "delete" | "revoke_admin" | "suspend") {
     if (action === "delete" && !canDelete) return;
     if (action !== "delete" && !canSuspend) return;
+    if ((action === "assign_admin" || action === "revoke_admin") && !canDelete) return;
 
-    const actionLabel = action === "delete" ? t("admin.deleteAction") : action === "suspend" ? t("admin.suspendAction") : t("admin.activateAction");
+    const actionLabel = action === "delete" ? t("admin.deleteAction") : action === "suspend" ? t("admin.suspendAction") : action === "activate" ? t("admin.activateAction") : action === "assign_admin" ? "designar como administrador" : "revocar el rol de administrador";
     const confirmation = action === "delete"
       ? t("admin.confirmDelete", { name: fullName(user) })
       : t("admin.confirmAction", { action: actionLabel, name: fullName(user) });
@@ -208,6 +209,7 @@ export function AdminUsersDashboard({
               {filteredUsers.length ? usersPage.items.map((user) => {
                 const isSuspended = user.estado === "suspendido";
                 const isBusy = busyUserId === user.id;
+                const canChangeRole = canDelete && (user.rol === USER_ROLES.CLIENT || user.rol === USER_ROLES.ADMIN);
 
                 return (
                   <tr key={user.id}>
@@ -233,6 +235,16 @@ export function AdminUsersDashboard({
                     {canShowActions && (
                       <td>
                         <div className="admin-actions">
+                          {canChangeRole && (
+                            <button
+                              className={user.rol === USER_ROLES.ADMIN ? "role-revoke" : ""}
+                              disabled={isBusy}
+                              onClick={() => mutateUser(user, user.rol === USER_ROLES.ADMIN ? "revoke_admin" : "assign_admin")}
+                              type="button"
+                            >
+                              {user.rol === USER_ROLES.ADMIN ? "Revocar admin" : "Designar admin"}
+                            </button>
+                          )}
                           {canSuspend && (
                             <button
                               type="button"
