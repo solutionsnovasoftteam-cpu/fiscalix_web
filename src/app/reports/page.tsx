@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/AppShell";
+import { AutoSubmitForm } from "@/components/AutoSubmitForm";
 import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
@@ -185,7 +186,7 @@ export default async function ReportsPage({
             <div><h2>{t("reports.fiscalTitle")}</h2><p>{t("reports.fiscalHelp")}</p></div>
             <span>{t("dashboard.taxPeriod", { period: formatMonth(fiscalPeriod, preferences) })}</span>
           </div>
-          <form action="/reports" className="tax-report-filters" method="get">
+          <AutoSubmitForm action="/reports" className="tax-report-filters" method="get">
             <label>
               <span>{t("reports.period")}</span>
               <input defaultValue={fiscalPeriod} name="period" type="month" />
@@ -229,7 +230,7 @@ export default async function ReportsPage({
               </select>
             </label>
             <button className="primary-button compact" type="submit">{t("reports.applyFilters")}</button>
-          </form>
+          </AutoSubmitForm>
 
           {fiscalReportResult.error ? (
             <div className="reports-empty fiscal-report-empty"><span><Icon name="error" /></span><strong>{t("reports.noFiscalResults")}</strong><small>{fiscalReportResult.error}</small></div>
