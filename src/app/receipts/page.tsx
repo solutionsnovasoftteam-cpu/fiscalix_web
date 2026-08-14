@@ -4,6 +4,7 @@ import { Icon } from "@/components/Icon";
 import { TablePagination } from "@/components/TablePagination";
 import { TableSearch } from "@/components/TableSearch";
 import { ReceiptsTableActions } from "@/app/receipts/receipts-table-actions";
+import { ReceiptsExportButton } from "@/app/receipts/receipts-export-button";
 import { getAccessibleCompanies, isMissingColumnError } from "@/lib/access-control";
 import { getCurrentUser } from "@/lib/auth";
 import { isRowInAccessibleCompanyScope } from "@/lib/financialMovements";
@@ -128,7 +129,7 @@ export default async function ReceiptsPage({
             <span className="receipts-title-icon"><Icon name="receipt_long" /></span>
             <div><p>{t("receipts.eyebrow")}</p><h1>{t("receipts.title")}</h1><span>{t("receipts.description")}</span></div>
           </div>
-          <button className="receipts-new" type="button"><Icon name="add" /> {t("receipts.new")}</button>
+          <ReceiptsExportButton preferences={preferences} receipts={allReceipts} />
         </section>
 
         <section className="receipts-summary" aria-label={t("receipts.summary")}>

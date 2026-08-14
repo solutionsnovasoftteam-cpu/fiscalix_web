@@ -121,6 +121,13 @@ const icons: Record<string, ReactNode> = {
       <path d="M8 8h2M8 12h2M8 16h2M17 13h.01M17 17h.01" />
     </>
   ),
+  download: (
+    <>
+      <path d="M12 3v11" />
+      <path d="m7.5 10.5 4.5 4.5 4.5-4.5" />
+      <path d="M5 20h14" />
+    </>
+  ),
   edit: (
     <>
       <path d="M4 20h4.5L19.2 9.3a2.1 2.1 0 0 0 0-3l-1.5-1.5a2.1 2.1 0 0 0-3 0L4 15.5V20Z" />

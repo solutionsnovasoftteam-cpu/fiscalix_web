@@ -29,6 +29,11 @@ const documentLabels = {
     title: "PDF de nómina descargado",
     url: "/payroll",
   },
+  receipt: {
+    label: "comprobante",
+    title: "PDF de comprobante descargado",
+    url: "/receipts",
+  },
 } as const;
 
 type PdfDocumentType = keyof typeof documentLabels;

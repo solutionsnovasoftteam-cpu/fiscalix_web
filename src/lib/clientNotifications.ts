@@ -1,6 +1,6 @@
 "use client";
 
-type PdfDocumentType = "dashboard" | "expenses" | "income" | "payroll";
+type PdfDocumentType = "dashboard" | "expenses" | "income" | "payroll" | "receipt";
 
 type PdfNotificationOptions = {
   folio?: string;
