@@ -98,7 +98,7 @@ export default async function ProfilePage() {
               <h1>{firstName(user.nombre)} {user.apellido}</h1>
               <p>{t("profile.description")}</p>
               <ul>
-                <li><Icon name="mail" />{user.correo}</li>
+                <li className="profile-email"><Icon name="mail" /><span title={user.correo}>{user.correo}</span></li>
                 <li><Icon name="call" />{phone}</li>
                 <li><Icon name="location_on" />{t("profile.country")}</li>
               </ul>
@@ -121,7 +121,7 @@ export default async function ProfilePage() {
                 <div className="info-row" key={label}>
                   <span aria-hidden="true"><Icon name={icon} /></span>
                   <small>{label}</small>
-                  <strong>{value}</strong>
+                  <strong className={icon === "mail" ? "profile-email-value" : undefined} title={icon === "mail" ? value : undefined}>{value}</strong>
                 </div>
               ))}
             </div>
