@@ -104,7 +104,7 @@ async function loadConfiguration(companyId: string) {
 
   const additional = (additionalResult.data ?? []) as AdditionalRegimeRow[];
   const additionalCatalog = (additionalCatalogResult.data ?? []) as AdditionalRegimeCatalogRow[];
-  const selectedAdditionalIds = new Set(additional.map((item) => item.regimen_id));
+  const additionalByRegimeId = new Map(additional.map((item) => [item.regimen_id, item]));
   const regimeIds = [profile?.regimen_id, ...additional.map((item) => item.regimen_id)].filter(Boolean) as string[];
   const [suggestionsResult, compatibilityResult] = await Promise.all([
     regimeIds.length
@@ -164,7 +164,9 @@ async function loadConfiguration(companyId: string) {
           name: item.nombre,
           code: item.clave_sat,
           description: item.descripcion,
-          selected: selectedAdditionalIds.has(item.id),
+          selected: additionalByRegimeId.has(item.id),
+          reviewStatus: additionalByRegimeId.get(item.id)?.estado_revision ?? null,
+          conditionAccepted: additionalByRegimeId.get(item.id)?.condicion_aceptada ?? false,
         })),
       compatibilityRules: (compatibilityResult.data ?? []) as CompatibilityRow[],
       obligationSuggestions: Array.from(uniqueSuggestions.values()).map((item): FiscalObligationSuggestionContract => ({

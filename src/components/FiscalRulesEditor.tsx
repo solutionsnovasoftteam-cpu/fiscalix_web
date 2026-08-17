@@ -7,7 +7,12 @@ import { Icon } from "@/components/Icon";
 
 type Regime = { id: string; label: string; selectable: boolean };
 type Activity = { id: string; name: string; description: string | null; requiresReview: boolean };
-type Additional = { regimen_id: string; estado_revision: string; condicion_aceptada: boolean };
+type Additional = {
+  id: string;
+  selected: boolean;
+  reviewStatus: string | null;
+  conditionAccepted: boolean;
+};
 type Rule = { regimen_origen_id: string; regimen_destino_id: string; resultado: string; condicion: string | null };
 type Suggestion = {
   id: string;
@@ -55,8 +60,8 @@ export function FiscalRulesEditor({ companyId, regimes }: { companyId: string; r
       const data = result.data as Configuration;
       setConfiguration(data);
       setActivities(data.selectedActivities.map((item) => item.actividad_id));
-      setAdditionalRegimes(data.additionalRegimes.map((item) => item.regimen_id));
-      setAcceptedConditions(data.additionalRegimes.filter((item) => item.condicion_aceptada).map((item) => item.regimen_id));
+      setAdditionalRegimes(data.additionalRegimes.filter((item) => item.selected).map((item) => item.id));
+      setAcceptedConditions(data.additionalRegimes.filter((item) => item.conditionAccepted).map((item) => item.id));
       setDecisions(Object.fromEntries(data.obligationSuggestions.map((item) => [item.id, item.decision])));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "No fue posible cargar la configuración.");
@@ -67,7 +72,9 @@ export function FiscalRulesEditor({ companyId, regimes }: { companyId: string; r
 
   const availableRegimes = regimes.filter((regime) => regime.selectable && regime.id !== configuration?.primaryRegimeId);
   const statusByRegime = useMemo(() => new Map(
-    (configuration?.additionalRegimes ?? []).map((item) => [item.regimen_id, item.estado_revision]),
+    (configuration?.additionalRegimes ?? [])
+      .filter((item) => item.selected && item.reviewStatus)
+      .map((item) => [item.id, item.reviewStatus]),
   ), [configuration]);
 
   const ruleByRegime = useMemo(() => {
