@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getApiUser, getCurrentUser } from "@/lib/auth";
 import { createNotification } from "@/lib/notifications";
 import { USER_ROLES } from "@/lib/roles";
 import { supabase } from "@/lib/supabase";
@@ -45,6 +45,43 @@ function addMonths(date: Date, months: number) {
 function isMissingBillingColumnError(error: { code?: string; details?: string; message?: string } | null) {
   const text = `${error?.code ?? ""} ${error?.message ?? ""} ${error?.details ?? ""}`.toLowerCase();
   return text.includes("pgrst204") || text.includes("schema cache") || text.includes("estado_pago") || text.includes("monto_mensual");
+}
+
+export async function GET(request: Request) {
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ message: "No autorizado." }, { status: 401 });
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("empresa_usuario")
+    .select("empresa_id")
+    .eq("usuario_id", user.id)
+    .limit(1)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("Error al consultar empresa del usuario:", membershipError.message);
+    return NextResponse.json({ message: "No fue posible consultar tu empresa." }, { status: 500 });
+  }
+
+  const empresaId = membership?.empresa_id as string | null | undefined;
+  if (!empresaId) {
+    return NextResponse.json({ subscription: null });
+  }
+
+  const { data: subscription, error: subscriptionError } = await supabase
+    .from("suscripciones")
+    .select("id,plan_id")
+    .eq("empresa_id", empresaId)
+    .maybeSingle();
+
+  if (subscriptionError) {
+    console.error("Error al consultar suscripción actual:", subscriptionError.message);
+    return NextResponse.json({ message: "No fue posible consultar tu suscripción actual." }, { status: 500 });
+  }
+
+  return NextResponse.json({ subscription: subscription ?? null });
 }
 
 export async function POST(request: Request) {
