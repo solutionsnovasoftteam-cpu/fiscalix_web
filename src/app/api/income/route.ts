@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getCompanyIfAccessible, isMissingColumnError } from "@/lib/access-control";
-import { getCurrentUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 import {
   isMissingMovementNormalizationColumn,
   normalizeMoney,
@@ -33,8 +33,71 @@ function isIncomeCategoryType(value: string | null | undefined) {
   return ["ingreso", "ingresos", "income", "incomes", "revenue", "venta", "ventas"].includes(normalized);
 }
 
+function readLimit(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return 50;
+  return Math.min(parsed, 100);
+}
+
+function categoryName(value: unknown) {
+  const category = Array.isArray(value) ? value[0] : value;
+  return category && typeof category === "object" && "nombre" in category
+    ? String(category.nombre ?? "")
+    : "";
+}
+
+export async function GET(request: Request) {
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const empresaId = readText(url.searchParams.get("companyId"));
+  if (!empresaId) {
+    return NextResponse.json({ success: false, message: "Selecciona una empresa válida." }, { status: 400 });
+  }
+
+  const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
+  if (accessError) {
+    return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
+  }
+  if (!company) {
+    return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
+  }
+
+  const { data, error } = await supabase
+    .from("ingresos")
+    .select("id,concepto,monto,fecha_ingreso,estado,deducible,empresa_id,categoria_id,categorias_financieras(nombre)")
+    .eq("empresa_id", empresaId)
+    .order("fecha_ingreso", { ascending: false })
+    .limit(readLimit(url.searchParams.get("limit")));
+
+  if (error) {
+    return NextResponse.json({ success: false, message: "No fue posible consultar los ingresos." }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      incomes: (data ?? []).map((income) => ({
+        id: income.id,
+        companyId: income.empresa_id,
+        type: "income",
+        amount: Number(income.monto) || 0,
+        date: income.fecha_ingreso,
+        category: categoryName(income.categorias_financieras),
+        categoryId: income.categoria_id,
+        description: income.concepto,
+        status: income.estado,
+        deductible: Boolean(income.deducible),
+      })),
+    },
+  });
+}
+
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await getApiUser(request);
   if (!user) {
     return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
   }

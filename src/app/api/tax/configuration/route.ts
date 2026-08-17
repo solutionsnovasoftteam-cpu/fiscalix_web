@@ -26,6 +26,13 @@ type AdditionalRegimeRow = {
   condicion_aceptada: boolean;
 };
 
+type AdditionalRegimeCatalogRow = {
+  id: string;
+  clave_sat: string;
+  nombre: string;
+  descripcion: string | null;
+};
+
 type CompatibilityRow = {
   regimen_origen_id: string;
   regimen_destino_id: string;
@@ -62,7 +69,7 @@ async function loadConfiguration(companyId: string) {
     .maybeSingle();
   if (profileError) return { error: profileError.message, data: null };
 
-  const [catalogResult, selectedResult, additionalResult, decisionsResult] = await Promise.all([
+  const [catalogResult, selectedResult, additionalResult, decisionsResult, additionalCatalogResult] = await Promise.all([
     supabase
       .from("actividades_economicas")
       .select("id,clave,nombre,descripcion,requiere_revision")
@@ -83,12 +90,21 @@ async function loadConfiguration(companyId: string) {
       .from("empresa_obligacion_confirmacion")
       .select("sugerencia_id,estado")
       .eq("empresa_id", companyId),
+    supabase
+      .from("regimenes_fiscales")
+      .select("id,clave_sat,nombre,descripcion")
+      .eq("tipo_persona", "fisica")
+      .eq("activo", true)
+      .eq("seleccionable_nuevo", true)
+      .order("nombre"),
   ]);
 
-  const firstError = catalogResult.error || selectedResult.error || additionalResult.error || decisionsResult.error;
+  const firstError = catalogResult.error || selectedResult.error || additionalResult.error || decisionsResult.error || additionalCatalogResult.error;
   if (firstError) return { error: firstError.message, data: null };
 
   const additional = (additionalResult.data ?? []) as AdditionalRegimeRow[];
+  const additionalCatalog = (additionalCatalogResult.data ?? []) as AdditionalRegimeCatalogRow[];
+  const selectedAdditionalIds = new Set(additional.map((item) => item.regimen_id));
   const regimeIds = [profile?.regimen_id, ...additional.map((item) => item.regimen_id)].filter(Boolean) as string[];
   const [suggestionsResult, compatibilityResult] = await Promise.all([
     regimeIds.length
@@ -116,6 +132,17 @@ async function loadConfiguration(companyId: string) {
   );
   const activities = (catalogResult.data ?? []) as ActivityRow[];
   const suggestions = (suggestionsResult.data ?? []) as SuggestionRow[];
+  const uniqueSuggestions = new Map<string, SuggestionRow>();
+
+  for (const suggestion of [...suggestions].sort((left, right) => {
+    const leftIsPrimary = left.regimen_id === profile?.regimen_id;
+    const rightIsPrimary = right.regimen_id === profile?.regimen_id;
+    return Number(rightIsPrimary) - Number(leftIsPrimary);
+  })) {
+    if (!uniqueSuggestions.has(suggestion.clave)) {
+      uniqueSuggestions.set(suggestion.clave, suggestion);
+    }
+  }
 
   return {
     error: null,
@@ -130,9 +157,17 @@ async function loadConfiguration(companyId: string) {
         requiresReview: item.requiere_revision,
       })),
       selectedActivities: selectedResult.data ?? [],
-      additionalRegimes: additional,
+      additionalRegimes: additionalCatalog
+        .filter((item) => item.id !== profile?.regimen_id)
+        .map((item) => ({
+          id: item.id,
+          name: item.nombre,
+          code: item.clave_sat,
+          description: item.descripcion,
+          selected: selectedAdditionalIds.has(item.id),
+        })),
       compatibilityRules: (compatibilityResult.data ?? []) as CompatibilityRow[],
-      obligationSuggestions: suggestions.map((item): FiscalObligationSuggestionContract => ({
+      obligationSuggestions: Array.from(uniqueSuggestions.values()).map((item): FiscalObligationSuggestionContract => ({
         id: item.id,
         regimeId: item.regimen_id,
         code: item.clave,

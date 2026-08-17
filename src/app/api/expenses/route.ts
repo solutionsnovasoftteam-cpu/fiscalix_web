@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { getCompanyIfAccessible } from "@/lib/access-control";
-import { getCurrentUser } from "@/lib/auth";
+import { getApiUser } from "@/lib/auth";
 import {
   booleanFromFormValue,
   isMissingMovementNormalizationColumn,
@@ -33,8 +33,71 @@ function isExpenseCategoryType(value: string | null | undefined) {
   return ["gasto", "gastos", "egreso", "egresos", "expense", "expenses"].includes(normalized);
 }
 
+function readLimit(value: string | null) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) return 50;
+  return Math.min(parsed, 100);
+}
+
+function categoryName(value: unknown) {
+  const category = Array.isArray(value) ? value[0] : value;
+  return category && typeof category === "object" && "nombre" in category
+    ? String(category.nombre ?? "")
+    : "";
+}
+
+export async function GET(request: Request) {
+  const user = await getApiUser(request);
+  if (!user) {
+    return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
+  }
+
+  const url = new URL(request.url);
+  const empresaId = readText(url.searchParams.get("companyId"));
+  if (!empresaId) {
+    return NextResponse.json({ success: false, message: "Selecciona una empresa válida." }, { status: 400 });
+  }
+
+  const { company, error: accessError } = await getCompanyIfAccessible(user, empresaId);
+  if (accessError) {
+    return NextResponse.json({ success: false, message: "No fue posible validar la empresa seleccionada." }, { status: 500 });
+  }
+  if (!company) {
+    return NextResponse.json({ success: false, message: "No tienes acceso a la empresa seleccionada." }, { status: 403 });
+  }
+
+  const { data, error } = await supabase
+    .from("gastos")
+    .select("id,concepto,monto,fecha_gasto,estado,deducible,empresa_id,categoria_id,categorias_financieras(nombre)")
+    .eq("empresa_id", empresaId)
+    .order("fecha_gasto", { ascending: false })
+    .limit(readLimit(url.searchParams.get("limit")));
+
+  if (error) {
+    return NextResponse.json({ success: false, message: "No fue posible consultar los gastos." }, { status: 500 });
+  }
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      expenses: (data ?? []).map((expense) => ({
+        id: expense.id,
+        companyId: expense.empresa_id,
+        type: "expense",
+        amount: Number(expense.monto) || 0,
+        date: expense.fecha_gasto,
+        category: categoryName(expense.categorias_financieras),
+        categoryId: expense.categoria_id,
+        description: expense.concepto,
+        status: expense.estado,
+        deductible: Boolean(expense.deducible),
+      })),
+    },
+  });
+}
+
 export async function POST(request: Request) {
-  const user = await getCurrentUser();
+  const user = await getApiUser(request);
   if (!user) {
     return NextResponse.json({ success: false, message: "No autorizado." }, { status: 401 });
   }

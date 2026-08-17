@@ -29,7 +29,15 @@ type SubscriptionNotificationRow = {
 };
 
 type ObligationNotificationRow = {
-  empresa_id: string | null;
+  empresa_id: string;
+  estado: "completada" | "pendiente";
+  fecha_vencimiento: string;
+  id: string;
+  periodo_clave: string;
+  sugerencia_id: string;
+};
+
+type ObligationSuggestionRow = {
   id: string;
   nombre: string | null;
 };
@@ -383,18 +391,18 @@ export async function syncAutomaticNotificationsForUser(user: FiscalixUser) {
     const reminderLimitKey = dateKey(addDays(today, 7));
     const notificationUrl = canViewAdminDashboard(user) ? "/admin" : "/plans";
 
-    const [{ data: subscriptions, error: subscriptionsError }, { count: obligationCount, data: obligations, error: obligationsError }] = await Promise.all([
+    const [{ data: subscriptions, error: subscriptionsError }, { data: obligations, error: obligationsError }] = await Promise.all([
       supabase
         .from("suscripciones")
         .select("id,empresa_id,estado_pago,fecha_proxima_facturacion")
         .in("empresa_id", companyIds)
         .limit(80),
       supabase
-        .from("obligaciones_fiscales")
-        .select("id,empresa_id,nombre", { count: "exact" })
+        .from("empresa_obligacion_periodo")
+        .select("id,empresa_id,sugerencia_id,periodo_clave,fecha_vencimiento,estado")
         .in("empresa_id", companyIds)
-        .eq("activa", true)
-        .limit(3),
+        .order("fecha_vencimiento", { ascending: true })
+        .limit(80),
     ]);
 
     if (subscriptionsError) console.error("Error al sincronizar alertas de pagos:", subscriptionsError.message);
@@ -440,20 +448,55 @@ export async function syncAutomaticNotificationsForUser(user: FiscalixUser) {
       }
     }
 
-    if (!obligationsError && (obligationCount ?? 0) > 0) {
-      const sampleObligation = ((obligations ?? []) as ObligationNotificationRow[])[0];
-      const title = "Obligaciones fiscales activas";
-      const message = obligationCount === 1
-        ? `Tienes 1 obligación fiscal activa por revisar: ${sampleObligation?.nombre ?? "obligación fiscal"}.`
-        : `Tienes ${obligationCount} obligaciones fiscales activas por revisar.`;
+    if (!obligationsError) {
+      const obligationRows = (obligations ?? []) as ObligationNotificationRow[];
+      const suggestionIds = [...new Set(obligationRows.map((obligation) => obligation.sugerencia_id))];
+      const { data: suggestions, error: suggestionsError } = suggestionIds.length
+        ? await supabase.from("regimen_obligacion_sugerida").select("id,nombre").in("id", suggestionIds)
+        : { data: [], error: null };
+      if (suggestionsError) {
+        console.error("Error al cargar nombres de obligaciones fiscales:", suggestionsError.message);
+      } else {
+        const suggestionNames = new Map(
+          ((suggestions ?? []) as ObligationSuggestionRow[]).map((suggestion) => [suggestion.id, suggestion.nombre ?? "Obligación fiscal"]),
+        );
+        for (const obligation of obligationRows) {
+          const title = suggestionNames.get(obligation.sugerencia_id) ?? "Obligación fiscal";
+          const dueDate = new Date(`${obligation.fecha_vencimiento}T12:00:00`);
+          const daysUntilDue = daysBetween(today, dueDate);
+          const url = `/tax/obligations?id=${obligation.id}`;
+          const companyName = companyNameById.get(obligation.empresa_id) ?? "tu empresa";
 
-      await createNotificationOncePerDay({
-        message,
-        title,
-        type: "info",
-        url: "/taxes",
-        userId: user.id,
-      });
+          if (obligation.estado === "completada") {
+            continue;
+          }
+          if (daysUntilDue < 0) {
+            await createNotificationOncePerDay({
+              message: `${title} de ${companyName} venció el ${formatDate(obligation.fecha_vencimiento)}. Marca la obligación cuando esté resuelta.`,
+              title: "Obligación fiscal vencida",
+              type: "danger",
+              url,
+              userId: user.id,
+            });
+          } else if (daysUntilDue <= 7) {
+            await createNotificationOncePerDay({
+              message: `${title} de ${companyName} vence el ${formatDate(obligation.fecha_vencimiento)}.`,
+              title: "Obligación fiscal por vencer",
+              type: "warning",
+              url,
+              userId: user.id,
+            });
+          } else if (daysUntilDue <= 30) {
+            await createNotificationOncePerDay({
+              message: `${title} de ${companyName} está programada para el ${formatDate(obligation.fecha_vencimiento)}.`,
+              title: "Próxima obligación fiscal",
+              type: "info",
+              url,
+              userId: user.id,
+            });
+          }
+        }
+      }
     }
 
     await syncFiscalNotificationsForUser(user);

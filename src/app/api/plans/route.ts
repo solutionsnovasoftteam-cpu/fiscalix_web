@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth";
+import { getApiUser, getCurrentUser } from "@/lib/auth";
 import { createPlanSavedNotification } from "@/lib/notifications";
 import { basicPlanSelect, extendedPlanSelect, isMissingPlanColumnError, type PlanDbRow } from "@/lib/plans";
 import { canManagePlans } from "@/lib/roles";
@@ -26,6 +26,11 @@ type PlanMutationResult = {
   error: { code?: string; details?: string; message: string } | null;
 };
 
+type PlanListResult = {
+  data: PlanDbRow[] | null;
+  error: { code?: string; details?: string; message: string } | null;
+};
+
 function cleanLimit(value: unknown) {
   if (value === null || value === "" || typeof value === "undefined") return null;
   const parsed = Number(value);
@@ -47,6 +52,36 @@ function cleanText(value: unknown) {
 function cleanTextArray(value: unknown) {
   if (!Array.isArray(value)) return [];
   return value.map((item) => String(item).trim()).filter(Boolean);
+}
+
+export async function GET(request: Request) {
+  const user = await getApiUser(request);
+  if (!user) return NextResponse.json({ message: "No autorizado." }, { status: 401 });
+
+  const extendedResult = await supabase
+    .from("planes")
+    .select(extendedPlanSelect)
+    .eq("estado", "activo")
+    .order("orden", { ascending: true }) as unknown as PlanListResult;
+
+  let { data: plans, error } = extendedResult;
+
+  if (error && isMissingPlanColumnError(error)) {
+    const fallbackResult = await supabase
+      .from("planes")
+      .select(basicPlanSelect)
+      .eq("estado", "activo")
+      .order("nombre", { ascending: true }) as unknown as PlanListResult;
+    plans = fallbackResult.data;
+    error = fallbackResult.error;
+  }
+
+  if (error) {
+    console.error("Error al consultar planes:", error.message);
+    return NextResponse.json({ message: "No fue posible obtener los planes." }, { status: 500 });
+  }
+
+  return NextResponse.json({ plans: plans ?? [] });
 }
 
 export async function POST(request: Request) {
