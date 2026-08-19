@@ -207,15 +207,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "El análisis con IA no está configurado en el servidor." }, { status: 503 });
   }
 
-  // Lista en cascada de modelos a intentar en orden de preferencia
-  const preferredModel = process.env.GEMINI_MODEL?.trim();
-  const fallbackModels = [
-    ...(preferredModel ? [preferredModel] : []),
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-flash",
-    "gemini-1.5-pro",
-  ];
-  const candidateModels = Array.from(new Set(fallbackModels));
+  // Cascada de modelos candidatos según preferencia e historial de estabilidad
+  const envModel = process.env.GEMINI_MODEL?.trim();
+  const candidateModels = Array.from(
+    new Set([
+      ...(envModel ? [envModel] : []),
+      "gemini-2.5-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash-latest",
+      "gemini-1.5-flash",
+      "gemini-1.5-pro",
+    ]),
+  );
 
   const context = {
     companyName: company.nombre_comercial || "Empresa",
@@ -245,13 +248,12 @@ export async function POST(request: Request) {
   };
 
   let geminiResponse: Response | null = null;
-  let lastUsedModel = candidateModels[0];
+  let lastAttemptedModel = candidateModels[0];
 
-  // Recorre la lista de modelos candidatos
+  // Recorrer modelos uno por uno en caso de error
   for (const model of candidateModels) {
-    lastUsedModel = model;
+    lastAttemptedModel = model;
 
-    // Intenta hasta 2 veces por modelo en caso de errores temporales de red/servidor
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         geminiResponse = await fetchWithTimeout(
@@ -266,21 +268,19 @@ export async function POST(request: Request) {
           },
         );
 
-        // Si es exitoso, salimos inmediatamente
         if (geminiResponse.ok) {
           break;
         }
 
-        // Si el modelo no existe o no está disponible para tu clave (404/400), pasa al siguiente candidato inmediatamente
+        // Si el modelo no existe o no aplica a la clave (404/400), pasar al siguiente modelo
         if (geminiResponse.status === 404 || geminiResponse.status === 400) {
-          console.warn(`Modelo ${model} no disponible (${geminiResponse.status}). Probando siguiente opción...`);
+          console.warn(`El modelo ${model} no está disponible para tu API key (Status ${geminiResponse.status}). Probando siguiente opción...`);
           break;
         }
       } catch (error) {
-        console.warn(`Error de red con el modelo ${model} (intento ${attempt + 1}):`, error);
+        console.warn(`Error al intentar conectar con el modelo ${model}:`, error);
       }
 
-      // Esperar 1 segundo si fue saturación o caída temporal (503 / 429) antes del reintento
       if (attempt < 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
@@ -302,14 +302,14 @@ export async function POST(request: Request) {
       : null;
     console.error("Error de Gemini al generar análisis:", {
       message: typeof providerMessage === "string" ? providerMessage : "Sin detalle del proveedor.",
-      model: lastUsedModel,
+      model: lastAttemptedModel,
       status: geminiResponse.status,
     });
 
     const message = geminiResponse.status === 401 || geminiResponse.status === 403
       ? "Gemini rechazó la clave de API configurada en el servidor."
       : geminiResponse.status === 404
-        ? `El modelo Gemini configurado (${lastUsedModel}) no está disponible para esta clave.`
+        ? `El modelo Gemini configurado (${lastAttemptedModel}) no está disponible para esta clave.`
         : geminiResponse.status === 429
           ? "Gemini alcanzó el límite de cuota. Intenta de nuevo más tarde."
           : geminiResponse.status === 503
