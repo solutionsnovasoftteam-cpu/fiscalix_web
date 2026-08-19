@@ -206,7 +206,16 @@ export async function POST(request: Request) {
   if (!apiKey) {
     return NextResponse.json({ message: "El análisis con IA no está configurado en el servidor." }, { status: 503 });
   }
-  const geminiModel = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+
+  // Lista en cascada de modelos a intentar en orden de preferencia
+  const preferredModel = process.env.GEMINI_MODEL?.trim();
+  const fallbackModels = [
+    ...(preferredModel ? [preferredModel] : []),
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+  ];
+  const candidateModels = Array.from(new Set(fallbackModels));
 
   const context = {
     companyName: company.nombre_comercial || "Empresa",
@@ -236,36 +245,54 @@ export async function POST(request: Request) {
   };
 
   let geminiResponse: Response | null = null;
-  const maxRetries = 2;
+  let lastUsedModel = candidateModels[0];
 
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      geminiResponse = await fetchWithTimeout(
-        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent?key=${encodeURIComponent(apiKey)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
-          }),
-        },
-      );
+  // Recorre la lista de modelos candidatos
+  for (const model of candidateModels) {
+    lastUsedModel = model;
 
-      if (geminiResponse.ok || (geminiResponse.status !== 503 && geminiResponse.status !== 429)) {
-        break;
+    // Intenta hasta 2 veces por modelo en caso de errores temporales de red/servidor
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        geminiResponse = await fetchWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+            }),
+          },
+        );
+
+        // Si es exitoso, salimos inmediatamente
+        if (geminiResponse.ok) {
+          break;
+        }
+
+        // Si el modelo no existe o no está disponible para tu clave (404/400), pasa al siguiente candidato inmediatamente
+        if (geminiResponse.status === 404 || geminiResponse.status === 400) {
+          console.warn(`Modelo ${model} no disponible (${geminiResponse.status}). Probando siguiente opción...`);
+          break;
+        }
+      } catch (error) {
+        console.warn(`Error de red con el modelo ${model} (intento ${attempt + 1}):`, error);
       }
-    } catch (error) {
-      console.warn(`Intento ${attempt + 1} fallido hacia Gemini API:`, error);
+
+      // Esperar 1 segundo si fue saturación o caída temporal (503 / 429) antes del reintento
+      if (attempt < 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
     }
 
-    if (attempt < maxRetries) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    if (geminiResponse?.ok) {
+      break;
     }
   }
 
   if (!geminiResponse) {
-    return NextResponse.json({ message: "No fue posible conectar con Gemini tras varios intentos." }, { status: 502 });
+    return NextResponse.json({ message: "No fue posible conectar con ningún modelo de Gemini tras varios intentos." }, { status: 502 });
   }
 
   const geminiPayload = await geminiResponse.json().catch(() => null);
@@ -275,14 +302,14 @@ export async function POST(request: Request) {
       : null;
     console.error("Error de Gemini al generar análisis:", {
       message: typeof providerMessage === "string" ? providerMessage : "Sin detalle del proveedor.",
-      model: geminiModel,
+      model: lastUsedModel,
       status: geminiResponse.status,
     });
 
     const message = geminiResponse.status === 401 || geminiResponse.status === 403
       ? "Gemini rechazó la clave de API configurada en el servidor."
       : geminiResponse.status === 404
-        ? `El modelo Gemini configurado (${geminiModel}) no está disponible para esta clave.`
+        ? `El modelo Gemini configurado (${lastUsedModel}) no está disponible para esta clave.`
         : geminiResponse.status === 429
           ? "Gemini alcanzó el límite de cuota. Intenta de nuevo más tarde."
           : geminiResponse.status === 503
